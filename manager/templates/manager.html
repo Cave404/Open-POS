@@ -11,8 +11,12 @@
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
         <div class="brand-header">
-            <span class="brand-badge">POS</span>
-            <div class="brand-title">System Manager</div>
+            <img id="sidebarLogoImg" class="sidebar-logo-img" src="" alt="Store Logo" style="display:none;">
+            <span class="brand-badge" id="sidebarBrandBadge">POS</span>
+            <div style="display: flex; flex-direction: column; overflow: hidden; min-width: 0;">
+                <div class="brand-title" id="sidebarStoreName" title="Open-POS">Open-POS</div>
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: 500;">System Manager</div>
+            </div>
         </div>
 
         <nav class="nav-group">
@@ -20,7 +24,7 @@
                 <span>📂</span> All Tools
             </div>
             <div class="nav-item" onclick="filterCategory('Desktop_Controls', this)">
-                <span>🎨</span> Controls & Branding
+                <span>🎨</span> Controls &amp; Branding
             </div>
             <div class="nav-item" onclick="filterCategory('Desktop_Tools', this)">
                 <span>🔧</span> Maintenance Tools
@@ -29,13 +33,13 @@
                 <span>🛡️</span> Administration
             </div>
             <div class="nav-item" onclick="filterCategory('Desktop_Apps', this)">
-                <span>🧩</span> Applets & Addons
+                <span>🧩</span> Applets &amp; Addons
             </div>
         </nav>
 
         <div class="sidebar-footer">
             <span>Engine: Online</span>
-            <span>v1.0.0</span>
+            <a href="/manager/about" class="version-badge-link" title="View System Credits &amp; Documentation">v1.1.0</a>
         </div>
     </aside>
 
@@ -50,6 +54,15 @@
         </header>
 
         <div class="view-container">
+            <!-- Dedicated Pinned Quick-Access Section -->
+            <div id="pinnedSection" class="pinned-section" style="display: none;">
+                <div class="pinned-section-header">
+                    <span>📌</span> Pinned Quick Access
+                </div>
+                <div class="cards-grid" id="pinnedGrid"></div>
+            </div>
+
+            <!-- Main Categorized Tools Grid -->
             <div class="cards-grid" id="toolsGrid">
                 <!-- Cards dynamically loaded from /manager/api/applets -->
             </div>
@@ -58,6 +71,9 @@
 
 <script>
 let allApplets = [];
+let currentCategory = 'ALL';
+let pinnedTools = [];
+
 const ICONS = {
     'branding': '🎨',
     'database': '💾',
@@ -78,57 +94,181 @@ const DESCRIPTIONS = {
 
 async function initDashboard() {
     try {
-        const res = await fetch('/manager/api/applets');
-        allApplets = await res.json();
-        renderCards(allApplets);
+        // 1. Fetch Applets
+        const appletsRes = await fetch('/manager/api/applets');
+        if (appletsRes.ok) {
+            allApplets = await appletsRes.json();
+        }
+
+        // 2. Fetch System Settings (Store Name, Logo, Pinned Tools)
+        await loadSettingsAndBranding();
+
+        // 3. Render Dashboard
+        renderAll();
     } catch (err) {
-        console.error('Failed to load applets:', err);
+        console.error('Failed to initialize dashboard:', err);
     }
 }
 
-function renderCards(list) {
+async function loadSettingsAndBranding() {
+    try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) return;
+        const settings = await res.json();
+
+        // Sync Store Logo
+        const logoImg = document.getElementById('sidebarLogoImg');
+        const badge = document.getElementById('sidebarBrandBadge');
+        if (settings.store_logo_url && settings.store_logo_url.trim() !== '') {
+            logoImg.src = settings.store_logo_url + (settings.store_logo_url.includes('?') ? '&' : '?') + 't=' + Date.now();
+            logoImg.style.display = 'block';
+            badge.style.display = 'none';
+        } else {
+            logoImg.style.display = 'none';
+            badge.style.display = 'inline-flex';
+        }
+
+        // Sync Store Name
+        if (settings.store_name && settings.store_name.trim() !== '') {
+            const nameEl = document.getElementById('sidebarStoreName');
+            nameEl.textContent = settings.store_name;
+            nameEl.title = settings.store_name;
+        }
+
+        // Sync Pinned Tools from localStorage or backend
+        const localPinned = localStorage.getItem('openpos_pinned_tools');
+        if (localPinned) {
+            try {
+                pinnedTools = JSON.parse(localPinned);
+            } catch (e) {
+                pinnedTools = [];
+            }
+        } else if (settings.pinned_tools) {
+            if (Array.isArray(settings.pinned_tools)) {
+                pinnedTools = settings.pinned_tools;
+            } else if (typeof settings.pinned_tools === 'string') {
+                try {
+                    pinnedTools = JSON.parse(settings.pinned_tools);
+                } catch (e) {
+                    pinnedTools = ['branding', 'database'];
+                }
+            }
+            localStorage.setItem('openpos_pinned_tools', JSON.stringify(pinnedTools));
+        } else {
+            pinnedTools = ['branding', 'database'];
+            localStorage.setItem('openpos_pinned_tools', JSON.stringify(pinnedTools));
+        }
+    } catch (err) {
+        console.warn('Error loading branding settings:', err);
+        const localPinned = localStorage.getItem('openpos_pinned_tools');
+        if (localPinned) {
+            try { pinnedTools = JSON.parse(localPinned); } catch(e) {}
+        }
+    }
+}
+
+function createCardElement(item, isPinned) {
+    const card = document.createElement('div');
+    card.className = 'control-card' + (isPinned ? ' pinned' : '');
+    const icon = ICONS[item.id] || (item.is_addon ? '🧩' : '⚙️');
+    const desc = DESCRIPTIONS[item.id] || 'Custom system module or installed add-on extension.';
+    const categoryClean = item.category.replace('_', ' ');
+
+    card.innerHTML = `
+        <button class="pin-btn" title="${isPinned ? 'Unpin from Quick Access' : 'Pin to Quick Access'}" onclick="togglePin('${item.id}', event)">📌</button>
+        <div class="card-header">
+            <div class="card-icon">${icon}</div>
+            <div class="card-title">${item.title.replace(/_/g, ' ')}</div>
+        </div>
+        <div class="card-desc">${desc}</div>
+        <div class="card-tag">${categoryClean}</div>
+    `;
+
+    card.onclick = (e) => {
+        if (e.target.closest('.pin-btn')) return;
+        window.location.href = item.target;
+    };
+
+    return card;
+}
+
+function renderAll() {
+    renderPinned();
+    renderMainGrid();
+}
+
+function renderPinned() {
+    const pinnedSection = document.getElementById('pinnedSection');
+    const pinnedGrid = document.getElementById('pinnedGrid');
+    pinnedGrid.innerHTML = '';
+
+    const pinnedList = allApplets.filter(item => pinnedTools.includes(item.id));
+    if (pinnedList.length > 0) {
+        pinnedSection.style.display = 'block';
+        pinnedList.forEach(item => {
+            pinnedGrid.appendChild(createCardElement(item, true));
+        });
+    } else {
+        pinnedSection.style.display = 'none';
+    }
+}
+
+function renderMainGrid() {
     const grid = document.getElementById('toolsGrid');
     grid.innerHTML = '';
 
+    const list = currentCategory === 'ALL' 
+        ? allApplets 
+        : allApplets.filter(a => a.category === currentCategory);
+
     list.forEach(item => {
-        const card = document.createElement('div');
-        card.className = 'control-card';
-        const icon = ICONS[item.id] || (item.is_addon ? '🧩' : '⚙️');
-        const desc = DESCRIPTIONS[item.id] || 'Custom system module or installed add-on extension.';
-        const categoryClean = item.category.replace('_', ' ');
-
-        card.innerHTML = `
-            <div class="card-header">
-                <div class="card-icon">${icon}</div>
-                <div class="card-title">${item.title.replace(/_/g, ' ')}</div>
-            </div>
-            <div class="card-desc">${desc}</div>
-            <div class="card-tag">${categoryClean}</div>
-        `;
-
-        card.onclick = () => {
-            window.location.href = item.target;
-        };
-
-        grid.appendChild(card);
+        const isPinned = pinnedTools.includes(item.id);
+        grid.appendChild(createCardElement(item, isPinned));
     });
+}
+
+async function togglePin(id, event) {
+    if (event) event.stopPropagation();
+
+    const idx = pinnedTools.indexOf(id);
+    if (idx > -1) {
+        pinnedTools.splice(idx, 1);
+    } else {
+        pinnedTools.push(id);
+    }
+
+    // 1. Immediate client-side persistence
+    localStorage.setItem('openpos_pinned_tools', JSON.stringify(pinnedTools));
+
+    // 2. Re-render UI immediately
+    renderAll();
+
+    // 3. Backend persistence sync
+    try {
+        await fetch('/api/settings/pinned', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pinned_tools: pinnedTools })
+        });
+    } catch (err) {
+        console.warn('Failed to sync pinned tools with backend:', err);
+    }
 }
 
 function filterCategory(cat, el) {
     document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
     el.classList.add('active');
+    currentCategory = cat;
 
     if (cat === 'ALL') {
         document.getElementById('viewHeading').textContent = 'System Control Panel';
-        renderCards(allApplets);
     } else {
         document.getElementById('viewHeading').textContent = cat.replace('_', ' ');
-        const filtered = allApplets.filter(a => a.category === cat);
-        renderCards(filtered);
     }
+    renderMainGrid();
 }
 
-initDashboard();
+document.addEventListener('DOMContentLoaded', initDashboard);
 </script>
 </body>
 </html>

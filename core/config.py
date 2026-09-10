@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
+    VERSION = "v1.1.0"
     SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(24).hex())
     HOST = os.environ.get('HOST', '0.0.0.0')
     PORT = int(os.environ.get('PORT', 5000))

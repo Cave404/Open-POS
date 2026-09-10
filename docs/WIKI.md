@@ -1,6 +1,6 @@
-# Open-POS Developer Wiki & Technical Reference
+# Open-POS Developer Wiki & Technical Reference (v1.1.0)
 
-Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, and testing standards for the project.
+Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, and testing standards for the project.
 
 ---
 
@@ -206,4 +206,47 @@ _notify(70, "Hardware peripherals initialized.")
 ### Configuring Update Checks & Splash Assets
 - **Update Checks:** Controlled by the dynamic setting `auto_updates_enabled` (`set_setting('auto_updates_enabled', True)`). When deferred or offline, the boot sequence completes cleanly without blocking.
 - **Splash Screen Assets:** The splash graphic is located at `manager/open_pos_splash.png` (656x404 PNG). To rebrand the splash graphic, replace this file; the frameless window automatically scales and centres the asset.
+
+---
+
+## 7. Store Logo Uploads & POS-Wide Branding Architecture
+
+Open-POS v1.1.0 introduces dynamic store logo image support:
+- **API Endpoint:** `POST /api/settings/logo` (and `/manager/api/settings/logo`) accepts multipart form file uploads under key `logo`.
+- **Validation:** 
+  - Max file size: 2MB.
+  - Permitted MIME types: `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`.
+- **Storage:** Files are sanitized and stored under `static/uploads/store_logo.<ext>`.
+- **Setting Integration:** The relative URL path `/static/uploads/store_logo.<ext>` is saved to the `store_logo_url` key in the database `settings` table.
+- **Sidebar Integration:** In `manager.html`, if `store_logo_url` is present, the sidebar dynamically renders the logo image and hides the fallback `POS` gradient badge. The store name dynamically displays the value of `store_name`.
+- **Removal Action:** `DELETE /api/settings/logo` unlinks the uploaded file and sets `store_logo_url` to `""`.
+
+---
+
+## 8. Dashboard Applet Pinning System
+
+The System Manager provides a pinning mechanism for high-frequency control cards:
+- **Visual Pinning Mechanism:** Each `.control-card` features a pin button (`📌`). Pinned cards display with a `.pinned` class providing a glowing accent border.
+- **Pinned Quick-Access Section:** When 1 or more applets are pinned, a dedicated `Pinned Quick Access` tray is rendered directly above the main categorized grid.
+- **Dual Persistence:**
+  - **Client-Side:** Instant persistence via `localStorage.getItem('openpos_pinned_tools')`.
+  - **Backend Synchronization:** Persisted across sessions and network workstations via `POST /api/settings/pinned` storing a JSON-encoded array into the `settings` table key `pinned_tools`. Default tools: `["branding", "database"]`.
+
+---
+
+## 9. Tactile Navigation & Native Layout Guarantee
+
+- All pseudo-window styling (window-in-a-window headers, faux minimize/maximize buttons, `.cde-title-controls`) has been eradicated.
+- Views flow natively across `.main-content` and `.view-container`.
+- Safe back-navigation is standardized across all subviews (`branding.html`, `about.html`, `placeholder.html`) using the styled tactile component:
+  ```html
+  <a href="/manager" class="btn-back">
+      <span class="btn-icon">←</span>
+      <span>Return to Dashboard</span>
+  </a>
+  ```
+- Version indicators link directly to About & Credits:
+  ```html
+  <a href="/manager/about" class="version-badge-link" title="View System Credits & Documentation">v1.1.0</a>
+  ```
 

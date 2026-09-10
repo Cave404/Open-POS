@@ -1,4 +1,5 @@
 import os
+import io
 import json
 import pytest
 from core.config import Config
@@ -38,6 +39,13 @@ def test_default_settings_seeding():
     assert get_setting("cash_payout_rate") == 60.0
     assert get_setting("credit_payout_rate") == 80.0
     assert get_setting("daily_trade_limit") == 10
+    assert get_setting("store_logo_url") == ""
+    
+    pinned_raw = get_setting("pinned_tools")
+    assert pinned_raw is not None
+    pinned_list = json.loads(pinned_raw) if isinstance(pinned_raw, str) else pinned_raw
+    assert "branding" in pinned_list
+    assert "database" in pinned_list
     
     cond_raw = get_setting("condition_multipliers")
     assert cond_raw is not None
@@ -77,6 +85,8 @@ def test_get_all_settings():
     assert "credit_payout_rate" in all_settings
     assert "daily_trade_limit" in all_settings
     assert "condition_multipliers" in all_settings
+    assert "store_logo_url" in all_settings
+    assert "pinned_tools" in all_settings
 
 def test_condition_multipliers_json_persistence():
     """Asserts that condition_multipliers can be set as a dict and persists as valid JSON."""
@@ -161,31 +171,37 @@ def test_api_post_settings_validation_errors(client):
     assert res.status_code == 400
 
 def test_branding_view_route(client):
-    """Asserts that GET /manager/branding renders the branding template."""
+    """Asserts that GET /manager/branding renders the branding template with tactile navigation."""
     res = client.get("/manager/branding")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
-    assert "Store_Branding" in html
-    assert "Back to Application Manager" in html
+    assert "Store Identity &amp; Rules Configuration" in html or "Store Identity" in html
+    assert "btn-back" in html
+    assert "Return to Dashboard" in html
     assert "brandingForm" in html
     assert "cash_payout_rate" in html
+    assert "logoPreviewBox" in html
+    # Ensure no faux window controls exist
+    assert "cde-title-controls" not in html
+    assert "manager-titlebar" not in html
 
 def test_about_view_route(client):
-    """Asserts that GET /manager/about renders the credits and about template."""
+    """Asserts that GET /manager/about renders the credits and about template with tactile back navigation."""
     res = client.get("/manager/about")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
     assert "Open-POS System" in html
-    assert "Return to System Manager" in html
+    assert "btn-back" in html
+    assert "Return to Dashboard" in html
     assert "Third-Party Dependencies" in html
     assert "Cave404" in html
 
 def test_api_system_credits(client):
-    """Asserts that GET /api/system/credits returns application metadata and dependency audit."""
+    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.1.0."""
     res = client.get("/api/system/credits")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["version"] == "v1.0.0-alpha"
+    assert data["version"] == "v1.1.0"
     assert "https://github.com/Cave404/Open-POS" in data["repository"]
     assert len(data["authors"]) >= 1
     assert len(data["dependencies"]) >= 5
@@ -197,13 +213,14 @@ def test_api_system_credits(client):
     assert "Pillow" in dep_names
 
 def test_placeholder_navigation_routes(client):
-    """Asserts that all non-implemented built-in applet routes render placeholder view safely."""
+    """Asserts that all non-implemented built-in applet routes render placeholder view safely with btn-back."""
     for endpoint in ["/manager/database", "/manager/network", "/manager/cache", "/manager/logs"]:
         res = client.get(endpoint)
         assert res.status_code == 200
         html = res.get_data(as_text=True)
         assert "Under Active Construction" in html
-        assert "Return to System Manager" in html
+        assert "btn-back" in html
+        assert "Return to Dashboard" in html
 
 def test_generic_placeholder_route(client):
     """Asserts that any unconfigured applet ID safely falls back to placeholder."""
@@ -212,7 +229,8 @@ def test_generic_placeholder_route(client):
     html = res.get_data(as_text=True)
     assert "Future Addon" in html
     assert "Under Active Construction" in html
-    assert "Return to System Manager" in html
+    assert "btn-back" in html
+    assert "Return to Dashboard" in html
 
 def test_applets_list_includes_about(client):
     """Asserts that /manager/api/applets includes the new about applet."""
@@ -227,3 +245,70 @@ def test_applets_list_includes_about(client):
     assert "logs" in ids
     assert "about" in ids
 
+def test_api_logo_upload_success_and_delete(client):
+    """Asserts that POST /api/settings/logo uploads a valid image and DELETE removes it."""
+    # 1. Valid image upload
+    img_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+    data = {
+        'logo': (io.BytesIO(img_data), 'test_logo.png')
+    }
+    res = client.post('/api/settings/logo', data=data, content_type='multipart/form-data')
+    assert res.status_code == 200
+    resp_json = res.get_json()
+    assert resp_json["status"] == "success"
+    assert "/static/uploads/store_logo.png" in resp_json["logo_url"]
+    assert get_setting("store_logo_url") == "/static/uploads/store_logo.png"
+
+    # 2. Verify file exists on disk
+    expected_path = os.path.join(os.getcwd(), 'static', 'uploads', 'store_logo.png')
+    assert os.path.exists(expected_path)
+
+    # 3. Delete logo
+    del_res = client.delete('/api/settings/logo')
+    assert del_res.status_code == 200
+    assert del_res.get_json()["status"] == "success"
+    assert get_setting("store_logo_url") == ""
+
+def test_api_logo_upload_validation(client):
+    """Asserts that POST /api/settings/logo validates file size and extension."""
+    # Disallowed extension
+    data = {
+        'logo': (io.BytesIO(b"executable file"), 'malicious.exe')
+    }
+    res = client.post('/api/settings/logo', data=data, content_type='multipart/form-data')
+    assert res.status_code == 400
+    assert "Invalid image format" in res.get_json()["message"]
+
+    # File size exceeding 2MB
+    large_payload = b"0" * (2 * 1024 * 1024 + 10)
+    data_large = {
+        'logo': (io.BytesIO(large_payload), 'large.png')
+    }
+    res_large = client.post('/api/settings/logo', data=data_large, content_type='multipart/form-data')
+    assert res_large.status_code == 400
+    assert "File size exceeds 2MB limit" in res_large.get_json()["message"]
+
+def test_api_pinned_tools(client):
+    """Asserts GET and POST /api/settings/pinned functionality."""
+    # 1. GET returns default list
+    res = client.get('/api/settings/pinned')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "pinned_tools" in data
+    assert "branding" in data["pinned_tools"]
+    assert "database" in data["pinned_tools"]
+
+    # 2. POST updates pinned tools
+    new_pinned = ["branding", "network", "logs"]
+    post_res = client.post('/api/settings/pinned', json={"pinned_tools": new_pinned})
+    assert post_res.status_code == 200
+    assert post_res.get_json()["status"] == "success"
+
+    # 3. Verify GET returns updated list
+    get_updated = client.get('/api/settings/pinned')
+    assert get_updated.status_code == 200
+    assert get_updated.get_json()["pinned_tools"] == new_pinned
+
+    # 4. Bad request validation
+    bad_res = client.post('/api/settings/pinned', json={"pinned_tools": "not-a-list"})
+    assert bad_res.status_code == 400

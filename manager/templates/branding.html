@@ -3,56 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store Branding &amp; Business Rules - Open-POS Manager</title>
-    <link rel="stylesheet" href="/static/css/cde_theme.css">
+    <title>Store Branding &amp; Business Rules - Open-POS</title>
     <link rel="stylesheet" href="/static/css/manager.css">
 </head>
 <body class="manager-body">
 
-<div class="manager-window">
-    <!-- Window Title Bar -->
-    <div class="manager-titlebar">
-        <div class="titlebar-brand">
-            <span class="icon">🎨</span>
-            <span>Store_Branding &amp; Business Rules</span>
+    <!-- Native Top Navigation Header -->
+    <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <a href="/manager" class="btn-back" id="btnReturnDashboard">
+                <span class="btn-icon">←</span>
+                <span>Return to Dashboard</span>
+            </a>
+            <h1 id="viewHeading">Store Branding &amp; Business Rules</h1>
         </div>
-        <div class="titlebar-controls">
-            <button title="Minimize" type="button">_</button>
-            <button title="Maximize" type="button">■</button>
-        </div>
-    </div>
-
-    <!-- Navigation Breadcrumbs -->
-    <div class="manager-nav">
-        <a href="/manager" class="breadcrumb-link" id="backLink">
-            <span class="arrow">&lt;</span> Back to Application Manager
-        </a>
-        <div class="nav-badges">
+        <div class="system-status">
             <span class="nav-badge" id="dbStatusBadge">Engine: SQLite / Postgres</span>
             <span class="nav-badge" id="activeStatusBadge">Live Config</span>
         </div>
-    </div>
+    </header>
 
-    <!-- Main Content Form Area -->
-    <div class="manager-content">
+    <!-- Native Content View Container -->
+    <div class="view-container">
         <div class="settings-header">
             <h1>Store Identity &amp; Rules Configuration</h1>
-            <p>Customize store brand metadata, buy-list cash &amp; credit payout margins, daily limits, and card condition multipliers.</p>
+            <p>Customize store brand metadata, custom logo assets, buy-list cash &amp; credit payout margins, daily limits, and card condition multipliers.</p>
         </div>
 
         <form id="brandingForm" onsubmit="return false;">
             <div class="form-grid">
-                <!-- Section 1: Store Identity -->
+                <!-- Section 1: Store Identity & Logo Asset -->
                 <div class="form-card" id="cardStoreIdentity">
                     <div class="card-header">
                         <span class="card-icon">🏬</span>
-                        <h2>Store Identity</h2>
+                        <h2>Store Identity &amp; Brand Assets</h2>
                     </div>
                     <div class="card-body">
                         <div class="form-group">
                             <label for="store_name">Store Name</label>
                             <input type="text" id="store_name" name="store_name" placeholder="e.g. Open-POS System" required>
-                            <span class="form-hint">Displayed on receipt headers, invoices, and POS windows.</span>
+                            <span class="form-hint">Displayed on receipts, invoices, window titlebars, and sidebar headers.</span>
                         </div>
                         <div class="form-group">
                             <label for="store_legal_entity">Legal Entity Name</label>
@@ -63,6 +53,33 @@
                             <label for="store_location">City/State Location</label>
                             <input type="text" id="store_location" name="store_location" placeholder="e.g. Local Network or Seattle, WA">
                             <span class="form-hint">Store branch location or register physical site identifier.</span>
+                        </div>
+                    </div>
+
+                    <!-- Store Logo & Branding Asset Card Body -->
+                    <div style="padding: 0 20px 20px 20px;">
+                        <label style="font-size: 12px; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 8px;">
+                            Store Logo Asset
+                        </label>
+                        <div class="logo-manager-container">
+                            <div class="logo-preview-box" id="logoPreviewBox">
+                                <img id="logoPreviewImg" class="logo-preview-img" style="display: none;" alt="Store Logo Preview">
+                                <span id="logoPlaceholderText" class="logo-placeholder-text">No Logo Uploaded</span>
+                            </div>
+
+                            <div class="logo-dropzone">
+                                <p style="font-size: 13px; font-weight: 600; color: var(--text-main);">Upload Custom Brand Logo</p>
+                                <p class="form-hint">Supports PNG, JPG, JPEG, SVG, or WEBP (Max 2MB). Automatically syncs to the System Manager sidebar.</p>
+                                <div class="logo-actions">
+                                    <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display: none;">
+                                    <button type="button" class="btn btn-secondary" id="btnTriggerUpload">
+                                        <span>📁</span> Choose Image File...
+                                    </button>
+                                    <button type="button" class="btn-remove-logo" id="btnRemoveLogo" style="display: none;">
+                                        <span>🗑️</span> Remove Logo
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -80,7 +97,7 @@
                                 <input type="number" id="cash_payout_rate" name="cash_payout_rate" min="0" max="100" step="0.5" required>
                                 <span class="input-addon">%</span>
                             </div>
-                            <span class="form-hint">Percentage of market value paid out in cash (Default: 60%).</span>
+                            <span class="form-hint">Percentage of market value paid out in cash (Default: 60.0%).</span>
                         </div>
 
                         <div class="form-group">
@@ -89,7 +106,7 @@
                                 <input type="number" id="credit_payout_rate" name="credit_payout_rate" min="0" max="100" step="0.5" required>
                                 <span class="input-addon">%</span>
                             </div>
-                            <span class="form-hint">Percentage of market value paid in store credit (Default: 80%).</span>
+                            <span class="form-hint">Percentage of market value paid in store credit (Default: 80.0%).</span>
                         </div>
 
                         <div class="form-group">
@@ -150,44 +167,49 @@
         </form>
     </div>
 
-    <!-- Status Bar -->
-    <div class="manager-statusbar">
-        <div class="status-indicator">
-            <span class="status-dot"></span>
-            <span id="statusBarText">Settings loaded and active</span>
+    <!-- Non-blocking Toast Container -->
+    <div class="toast-container" id="toastContainer">
+        <div class="toast" id="toast" role="alert" aria-live="polite">
+            <div class="toast-message">
+                <span id="toastIcon">✓</span>
+                <span id="toastText">Changes saved successfully.</span>
+            </div>
+            <button type="button" class="toast-close" id="toastClose" aria-label="Close">&times;</button>
         </div>
-        <div id="statusTimestamp">Open-POS Control Panel</div>
     </div>
-</div>
-
-<!-- Non-blocking Toast Container -->
-<div class="toast-container" id="toastContainer">
-    <div class="toast" id="toast" role="alert" aria-live="polite">
-        <div class="toast-message">
-            <span id="toastIcon">✓</span>
-            <span id="toastText">Changes saved successfully.</span>
-        </div>
-        <button type="button" class="toast-close" id="toastClose" aria-label="Close">&times;</button>
-    </div>
-</div>
 
 <script>
 let originalSettings = {};
+let currentLogoUrl = "";
 
 async function fetchSettings() {
     try {
         const res = await fetch('/api/settings');
-        if (!res.ok) {
-            throw new Error(`Server returned ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data = await res.json();
         originalSettings = data;
         populateForm(data);
-        document.getElementById('statusBarText').textContent = 'Configuration loaded successfully.';
     } catch (err) {
         console.error('Failed to load settings:', err);
         showToast(`Failed to load settings: ${err.message}`, true);
-        document.getElementById('statusBarText').textContent = 'Failed to load configuration.';
+    }
+}
+
+function updateLogoPreview(url) {
+    currentLogoUrl = url || "";
+    const img = document.getElementById('logoPreviewImg');
+    const placeholder = document.getElementById('logoPlaceholderText');
+    const removeBtn = document.getElementById('btnRemoveLogo');
+
+    if (url && url.trim()) {
+        img.src = url + '?t=' + new Date().getTime();
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+        removeBtn.style.display = 'inline-flex';
+    } else {
+        img.style.display = 'none';
+        placeholder.style.display = 'block';
+        removeBtn.style.display = 'none';
     }
 }
 
@@ -211,13 +233,11 @@ function populateForm(data) {
         document.getElementById('daily_trade_limit').value = data.daily_trade_limit;
     }
 
+    updateLogoPreview(data.store_logo_url || "");
+
     let mults = data.condition_multipliers;
     if (typeof mults === 'string') {
-        try {
-            mults = JSON.parse(mults);
-        } catch (e) {
-            mults = {};
-        }
+        try { mults = JSON.parse(mults); } catch (e) { mults = {}; }
     }
     mults = mults || {};
 
@@ -227,6 +247,60 @@ function populateForm(data) {
     document.getElementById('cond_hp').value = mults.HP !== undefined ? mults.HP : 0.50;
     document.getElementById('cond_dmg').value = mults.DMG !== undefined ? mults.DMG : 0.30;
 }
+
+// File Upload Handler
+document.getElementById('btnTriggerUpload').addEventListener('click', () => {
+    document.getElementById('logoFileInput').click();
+});
+
+document.getElementById('logoFileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+        showToast('File size exceeds 2MB limit.', true);
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('logo', file);
+
+    try {
+        const res = await fetch('/api/settings/logo', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await res.json();
+        if (res.ok && result.status === 'success') {
+            updateLogoPreview(result.logo_url);
+            showToast('Store logo uploaded and updated successfully!');
+        } else {
+            showToast(result.message || 'Failed to upload logo.', true);
+        }
+    } catch (err) {
+        console.error('Error uploading logo:', err);
+        showToast('Network error while uploading logo.', true);
+    }
+});
+
+// Remove Logo Handler
+document.getElementById('btnRemoveLogo').addEventListener('click', async () => {
+    try {
+        const res = await fetch('/api/settings/logo', {
+            method: 'DELETE'
+        });
+        const result = await res.json();
+        if (res.ok && result.status === 'success') {
+            updateLogoPreview("");
+            showToast('Store logo removed.');
+        } else {
+            showToast('Failed to remove logo.', true);
+        }
+    } catch (err) {
+        console.error('Error removing logo:', err);
+        showToast('Network error removing logo.', true);
+    }
+});
 
 async function saveSettings() {
     const saveBtn = document.getElementById('saveBtn');
@@ -240,6 +314,7 @@ async function saveSettings() {
         cash_payout_rate: parseFloat(document.getElementById('cash_payout_rate').value),
         credit_payout_rate: parseFloat(document.getElementById('credit_payout_rate').value),
         daily_trade_limit: parseInt(document.getElementById('daily_trade_limit').value, 10),
+        store_logo_url: currentLogoUrl,
         condition_multipliers: {
             NM: parseFloat(document.getElementById('cond_nm').value),
             LP: parseFloat(document.getElementById('cond_lp').value),
@@ -252,9 +327,7 @@ async function saveSettings() {
     try {
         const res = await fetch('/api/settings', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
@@ -262,7 +335,6 @@ async function saveSettings() {
         if (res.ok && result.status === 'success') {
             originalSettings = payload;
             showToast('Store branding and business rules updated successfully.');
-            document.getElementById('statusBarText').textContent = 'Last saved: ' + new Date().toLocaleTimeString();
         } else {
             showToast(result.message || 'Failed to save settings.', true);
         }
@@ -281,9 +353,7 @@ function showToast(message, isError = false) {
     const text = document.getElementById('toastText');
     const icon = document.getElementById('toastIcon');
 
-    if (toastTimer) {
-        clearTimeout(toastTimer);
-    }
+    if (toastTimer) clearTimeout(toastTimer);
 
     text.textContent = message;
     icon.textContent = isError ? '⚠️' : '✓';
@@ -295,7 +365,6 @@ function showToast(message, isError = false) {
     }
 
     toast.classList.add('show');
-
     toastTimer = setTimeout(() => {
         toast.classList.remove('show');
     }, 3800);

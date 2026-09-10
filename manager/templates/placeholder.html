@@ -141,14 +141,15 @@
 </head>
 <body class="manager-body">
 
-    <!-- Top Navigation Guard Bar -->
-    <div class="manager-nav" style="border-radius: 8px; margin-bottom: 24px;">
-        <a href="/manager" class="breadcrumb-link" id="navReturnLink">
-            <span>&larr;</span> Return to System Manager
+    <!-- Tactile Back Navigation Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <a href="/manager" class="btn-back" id="navReturnLink">
+            <span class="btn-icon">←</span>
+            <span>Return to Dashboard</span>
         </a>
-        <div class="nav-badges">
-            <span class="nav-badge">{{ applet.category }}</span>
-            <span class="nav-badge" style="color: #fbbf24;">In Development</span>
+        <div class="nav-badges" style="display: flex; gap: 8px;">
+            <span class="nav-badge" style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-color); padding: 5px 12px; border-radius: 6px; font-size: 11px; color: var(--text-muted); font-weight: 600;">{{ applet.category }}</span>
+            <span class="nav-badge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); padding: 5px 12px; border-radius: 6px; font-size: 11px; color: #fbbf24; font-weight: 700;">In Development</span>
         </div>
     </div>
 

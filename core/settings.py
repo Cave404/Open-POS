@@ -12,33 +12,42 @@ DEFAULT_SETTINGS = {
     "credit_payout_rate": 80.0,
     "daily_trade_limit": 10,
     "condition_multipliers": '{"NM": 1.0, "LP": 0.85, "MP": 0.70, "HP": 0.50, "DMG": 0.30}',
+    "store_logo_url": "",
+    "pinned_tools": '["branding", "database"]',
 }
 
 def seed_default_settings(force: bool = False) -> None:
     """
-    Seeds default configuration settings into the settings table
-    if the table is empty, or unconditionally if force=True.
+    Seeds default configuration settings into the settings table.
+    If force=False, ensures any missing default keys are inserted without
+    overwriting existing user configuration. If force=True, re-applies all defaults.
     """
     init_db()
     with get_db_connection() as conn:
-        if not force:
-            cur = execute_sql(conn, "SELECT COUNT(*) FROM settings")
-            row = cur.fetchone()
-            count = row[0] if row else 0
-            if count > 0:
-                return
-
         for key, val in DEFAULT_SETTINGS.items():
             str_val = json.dumps(val) if isinstance(val, (dict, list)) else str(val)
-            execute_sql(
-                conn,
-                """
-                INSERT INTO settings (key, value)
-                VALUES (?, ?)
-                ON CONFLICT (key) DO UPDATE SET value = excluded.value
-                """,
-                (key, str_val),
-            )
+            if force:
+                execute_sql(
+                    conn,
+                    """
+                    INSERT INTO settings (key, value)
+                    VALUES (?, ?)
+                    ON CONFLICT (key) DO UPDATE SET value = excluded.value
+                    """,
+                    (key, str_val),
+                )
+            else:
+                cur = execute_sql(conn, "SELECT 1 FROM settings WHERE key = ?", (key,))
+                if not cur.fetchone():
+                    execute_sql(
+                        conn,
+                        """
+                        INSERT INTO settings (key, value)
+                        VALUES (?, ?)
+                        ON CONFLICT (key) DO UPDATE SET value = excluded.value
+                        """,
+                        (key, str_val),
+                    )
 
 def get_setting(key: str, default: any = None) -> any:
     """

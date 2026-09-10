@@ -342,7 +342,7 @@ def get_system_credits():
             logger.error(f"Error reading requirements.txt: {e}")
 
     credits_payload = {
-        "version": "v1.0.0-alpha",
+        "version": "v1.1.0",
         "repository": "https://github.com/Cave404/Open-POS",
         "authors": [
             {"name": "Cave404", "role": "Lead Architect & Maintainer"},
@@ -462,6 +462,18 @@ def handle_update_settings():
 
         validated['condition_multipliers'] = json.dumps(parsed_mults)
 
+    # Validate Store Logo URL
+    if 'store_logo_url' in data:
+        validated['store_logo_url'] = str(data['store_logo_url']).strip()
+
+    # Validate Pinned Tools
+    if 'pinned_tools' in data:
+        pinned_val = data['pinned_tools']
+        if isinstance(pinned_val, list):
+            validated['pinned_tools'] = json.dumps([str(x) for x in pinned_val])
+        elif isinstance(pinned_val, str):
+            validated['pinned_tools'] = pinned_val
+
     # Persist all validated settings to database
     for k, v in validated.items():
         success = set_setting(k, v)
@@ -471,22 +483,129 @@ def handle_update_settings():
     return jsonify({"status": "success"})
 
 
-# Register API routes on both /api/settings and /manager/api/settings
+# -----------------------------------------------------------------------------
+# 4. Store Logo Image Upload & Management Endpoints
+# -----------------------------------------------------------------------------
+UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads'))
+ALLOWED_LOGO_EXTENSIONS = {'png', 'jpg', 'jpeg', 'svg', 'webp'}
+MAX_LOGO_SIZE = 2 * 1024 * 1024  # 2MB Limit
+
+def handle_logo_upload():
+    """
+    Accepts an image upload for the store logo, enforces <= 2MB and allowed
+    image formats, saves the asset to static/uploads, and updates settings.
+    """
+    file = request.files.get('logo') or request.files.get('file')
+    if not file or not file.filename:
+        return jsonify({"status": "error", "message": "No logo file provided."}), 400
+
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in ALLOWED_LOGO_EXTENSIONS:
+        return jsonify({
+            "status": "error",
+            "message": f"Invalid image format. Unsupported format '.{ext}'. Allowed formats: {', '.join(sorted(ALLOWED_LOGO_EXTENSIONS))}"
+        }), 400
+
+    file_data = file.read()
+    if len(file_data) > MAX_LOGO_SIZE:
+        return jsonify({"status": "error", "message": "File size exceeds 2MB limit."}), 400
+
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    # Remove previous store logo versions to avoid disk bloat
+    for old_ext in ALLOWED_LOGO_EXTENSIONS:
+        old_file = os.path.join(UPLOAD_FOLDER, f"store_logo.{old_ext}")
+        if os.path.isfile(old_file):
+            try:
+                os.remove(old_file)
+            except OSError:
+                pass
+
+    target_name = f"store_logo.{ext}"
+    target_path = os.path.join(UPLOAD_FOLDER, target_name)
+    with open(target_path, 'wb') as f:
+        f.write(file_data)
+
+    logo_url = f"/static/uploads/{target_name}"
+    set_setting('store_logo_url', logo_url)
+
+    return jsonify({"status": "success", "logo_url": logo_url}), 200
+
+
+def handle_logo_delete():
+    """Removes the store logo asset and clears the store_logo_url setting."""
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    for ext in ALLOWED_LOGO_EXTENSIONS:
+        path = os.path.join(UPLOAD_FOLDER, f"store_logo.{ext}")
+        if os.path.isfile(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    set_setting('store_logo_url', '')
+    return jsonify({"status": "success"}), 200
+
+
+# -----------------------------------------------------------------------------
+# 5. Dashboard Pinned Tools Management Endpoints
+# -----------------------------------------------------------------------------
+def handle_get_pinned():
+    """Returns the active list of pinned tool IDs."""
+    raw = get_setting('pinned_tools', '["branding", "database"]')
+    try:
+        pinned = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        pinned = ["branding", "database"]
+    return jsonify({"status": "success", "pinned": pinned, "pinned_tools": pinned})
+
+
+def handle_update_pinned():
+    """Updates the pinned tools list in settings."""
+    data = request.get_json(silent=True) or {}
+    pinned = data.get('pinned') if 'pinned' in data else data.get('pinned_tools')
+    if pinned is None or not isinstance(pinned, list):
+        return jsonify({"status": "error", "message": "Expected a JSON list of pinned tool IDs."}), 400
+
+    clean_pinned = [str(x) for x in pinned]
+    set_setting('pinned_tools', json.dumps(clean_pinned))
+    return jsonify({"status": "success", "pinned": clean_pinned, "pinned_tools": clean_pinned}), 200
+
+
+# -----------------------------------------------------------------------------
+# 6. Route Bindings (Dual Mounting for /api and /manager/api)
+# -----------------------------------------------------------------------------
 @api_bp.route('/settings', methods=['GET'])
+@manager_bp.route('/api/settings', methods=['GET'])
 def api_get_settings():
     return handle_get_settings()
 
 
 @api_bp.route('/settings', methods=['POST'])
+@manager_bp.route('/api/settings', methods=['POST'])
 def api_post_settings():
     return handle_update_settings()
 
 
-@manager_bp.route('/api/settings', methods=['GET'])
-def manager_get_settings():
-    return handle_get_settings()
+@api_bp.route('/settings/logo', methods=['POST'])
+@manager_bp.route('/api/settings/logo', methods=['POST'])
+def api_post_logo():
+    return handle_logo_upload()
 
 
-@manager_bp.route('/api/settings', methods=['POST'])
-def manager_post_settings():
-    return handle_update_settings()
+@api_bp.route('/settings/logo', methods=['DELETE'])
+@api_bp.route('/settings/logo/delete', methods=['POST'])
+@manager_bp.route('/api/settings/logo', methods=['DELETE'])
+@manager_bp.route('/api/settings/logo/delete', methods=['POST'])
+def api_delete_logo():
+    return handle_logo_delete()
+
+
+@api_bp.route('/settings/pinned', methods=['GET'])
+@manager_bp.route('/api/settings/pinned', methods=['GET'])
+def api_get_pinned():
+    return handle_get_pinned()
+
+
+@api_bp.route('/settings/pinned', methods=['POST'])
+@manager_bp.route('/api/settings/pinned', methods=['POST'])
+def api_post_pinned():
+    return handle_update_pinned()
