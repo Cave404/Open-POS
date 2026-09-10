@@ -169,3 +169,61 @@ def test_branding_view_route(client):
     assert "Back to Application Manager" in html
     assert "brandingForm" in html
     assert "cash_payout_rate" in html
+
+def test_about_view_route(client):
+    """Asserts that GET /manager/about renders the credits and about template."""
+    res = client.get("/manager/about")
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert "Open-POS System" in html
+    assert "Return to System Manager" in html
+    assert "Third-Party Dependencies" in html
+    assert "Cave404" in html
+
+def test_api_system_credits(client):
+    """Asserts that GET /api/system/credits returns application metadata and dependency audit."""
+    res = client.get("/api/system/credits")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["version"] == "v1.0.0-alpha"
+    assert "https://github.com/Cave404/Open-POS" in data["repository"]
+    assert len(data["authors"]) >= 1
+    assert len(data["dependencies"]) >= 5
+
+    dep_names = [d["name"] for d in data["dependencies"]]
+    assert "Flask" in dep_names
+    assert "pywebview" in dep_names
+    assert "pystray" in dep_names
+    assert "Pillow" in dep_names
+
+def test_placeholder_navigation_routes(client):
+    """Asserts that all non-implemented built-in applet routes render placeholder view safely."""
+    for endpoint in ["/manager/database", "/manager/network", "/manager/cache", "/manager/logs"]:
+        res = client.get(endpoint)
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert "Under Active Construction" in html
+        assert "Return to System Manager" in html
+
+def test_generic_placeholder_route(client):
+    """Asserts that any unconfigured applet ID safely falls back to placeholder."""
+    res = client.get("/manager/placeholder/future_addon")
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert "Future Addon" in html
+    assert "Under Active Construction" in html
+    assert "Return to System Manager" in html
+
+def test_applets_list_includes_about(client):
+    """Asserts that /manager/api/applets includes the new about applet."""
+    res = client.get("/manager/api/applets")
+    assert res.status_code == 200
+    applets = res.get_json()
+    ids = [a["id"] for a in applets]
+    assert "branding" in ids
+    assert "database" in ids
+    assert "network" in ids
+    assert "cache" in ids
+    assert "logs" in ids
+    assert "about" in ids
+

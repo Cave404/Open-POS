@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About &amp; Credits - Open-POS System</title>
+    <link rel="stylesheet" href="/static/css/manager.css">
+    <style>
+        .about-container {
+            max-width: 960px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .about-hero {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .hero-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .brand-pos-logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--accent-blue), #1d4ed8);
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            letter-spacing: 0.5px;
+        }
+
+        .hero-meta h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .hero-meta p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .hero-badges {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .badge-version {
+            background-color: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            color: #60a5fa;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-repo {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+
+        .btn-repo:hover {
+            background-color: var(--bg-card-hover);
+            border-color: #525c74;
+            color: #ffffff;
+        }
+
+        /* Contributors Section */
+        .contributors-box {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+        }
+
+        .contributors-box h2 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .contributors-list {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .contributor-chip {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .contributor-chip .role {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        /* Dependencies Table Section */
+        .table-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .table-card-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-card-header h2 {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .table-card-header .dep-count {
+            font-size: 11px;
+            color: var(--text-muted);
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 3px 8px;
+            border-radius: 12px;
+        }
+
+        .deps-table-wrapper {
+            overflow-x: auto;
+        }
+
+        table.deps-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        table.deps-table th {
+            background-color: var(--bg-card);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        table.deps-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+
+        table.deps-table tr:hover td {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .pkg-name {
+            font-weight: 700;
+            color: #ffffff;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .pkg-version {
+            font-family: monospace;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #93c5fd;
+        }
+
+        .pkg-license {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            background-color: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .pkg-desc {
+            color: var(--text-muted);
+            line-height: 1.4;
+            max-width: 360px;
+        }
+
+        .pkg-link {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .pkg-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body class="manager-body">
+
+    <!-- Top Navigation Guard Bar -->
+    <div class="manager-nav" style="border-radius: 8px; margin-bottom: 24px;">
+        <a href="/manager" class="breadcrumb-link" id="navReturnLink">
+            <span>&larr;</span> Return to System Manager
+        </a>
+        <div class="nav-badges">
+            <span class="nav-badge">System Administration</span>
+            <span class="nav-badge" id="systemVersionTag">v1.0.0-alpha</span>
+        </div>
+    </div>
+
+    <div class="about-container">
+        <!-- Hero Header -->
+        <div class="about-hero">
+            <div class="hero-left">
+                <div class="brand-pos-logo">POS</div>
+                <div class="hero-meta">
+                    <h1>Open-POS System</h1>
+                    <p>Modular, extensible Point-of-Sale &amp; TCG Inventory Architecture.</p>
+                </div>
+            </div>
+            <div class="hero-badges">
+                <span class="badge-version" id="heroVersionBadge">v1.0.0-alpha</span>
+                <a href="https://github.com/Cave404/Open-POS" target="_blank" rel="noopener noreferrer" class="btn-repo" id="btnGithubRepo">
+                    <span>🐙</span> GitHub Repository
+                </a>
+            </div>
+        </div>
+
+        <!-- Authors & Contributors -->
+        <div class="contributors-box">
+            <h2><span>👥</span> Core Authors &amp; Maintainers</h2>
+            <div class="contributors-list" id="contributorsList">
+                <div class="contributor-chip">
+                    <span>👑</span>
+                    <div>
+                        <strong>Cave404</strong>
+                        <div class="role">Lead Architect &amp; Maintainer</div>
+                    </div>
+                </div>
+                <div class="contributor-chip">
+                    <span>🌐</span>
+                    <div>
+                        <strong>Open-POS Community</strong>
+                        <div class="role">Core Contributors</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dependency Audit Table -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <h2><span>📦</span> Third-Party Dependencies &amp; Licensing Audit</h2>
+                <span class="dep-count" id="depCount">Loading dependencies...</span>
+            </div>
+            <div class="deps-table-wrapper">
+                <table class="deps-table">
+                    <thead>
+                        <tr>
+                            <th>Package</th>
+                            <th>Version</th>
+                            <th>License</th>
+                            <th>Functional Role in Open-POS</th>
+                            <th>Upstream</th>
+                        </tr>
+                    </thead>
+                    <tbody id="depsTableBody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                Scanning local environment and requirements ledger...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script>
+async function loadCredits() {
+    try {
+        const res = await fetch('/api/system/credits');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        // Update versions
+        if (data.version) {
+            document.getElementById('systemVersionTag').textContent = data.version;
+            document.getElementById('heroVersionBadge').textContent = data.version;
+        }
+
+        // Render Dependencies Table
+        const tbody = document.getElementById('depsTableBody');
+        tbody.innerHTML = '';
+
+        if (Array.isArray(data.dependencies)) {
+            document.getElementById('depCount').textContent = `${data.dependencies.length} Active Packages`;
+
+            data.dependencies.forEach(dep => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><span class="pkg-name">${dep.name}</span></td>
+                    <td><span class="pkg-version">${dep.version || 'installed'}</span></td>
+                    <td><span class="pkg-license">${dep.license}</span></td>
+                    <td><div class="pkg-desc">${dep.purpose}</div></td>
+                    <td>
+                        <a href="${dep.url}" target="_blank" rel="noopener noreferrer" class="pkg-link">
+                            Source &rarr;
+                        </a>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    } catch (err) {
+        console.error('Failed to load system credits:', err);
+        document.getElementById('depsTableBody').innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; color: var(--danger); padding: 24px;">
+                    Failed to fetch dependency credits: ${err.message}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadCredits);
+</script>
+</body>
+</html>
