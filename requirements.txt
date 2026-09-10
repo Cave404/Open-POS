@@ -6,3 +6,5 @@ python-dotenv>=1.0.0
 requests>=2.30.0
 pytest>=8.0.0
 pywebview>=4.0
+pystray>=0.19.5
+Pillow>=10.0.0

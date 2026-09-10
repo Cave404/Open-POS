@@ -2,91 +2,131 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Application Manager</title>
-    <link rel="stylesheet" href="/static/css/cde_theme.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open-POS System Manager</title>
+    <link rel="stylesheet" href="/static/css/manager.css">
 </head>
-<body class="cde-desktop">
+<body>
 
-<div class="cde-window">
-    <div class="cde-titlebar">
-        <span id="windowTitle">Application Manager</span>
-        <div class="cde-title-controls">
-            <button title="Minimize">_</button>
-            <button title="Maximize">■</button>
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+        <div class="brand-header">
+            <span class="brand-badge">POS</span>
+            <div class="brand-title">System Manager</div>
         </div>
-    </div>
 
-    <div class="cde-menubar">
-        <div class="cde-menu-item">File</div>
-        <div class="cde-menu-item">Selected</div>
-        <div class="cde-menu-item">View</div>
-        <div class="cde-menu-item" style="margin-left: auto;">Help</div>
-    </div>
+        <nav class="nav-group">
+            <div class="nav-item active" onclick="filterCategory('ALL', this)">
+                <span>📂</span> All Tools
+            </div>
+            <div class="nav-item" onclick="filterCategory('Desktop_Controls', this)">
+                <span>🎨</span> Controls & Branding
+            </div>
+            <div class="nav-item" onclick="filterCategory('Desktop_Tools', this)">
+                <span>🔧</span> Maintenance Tools
+            </div>
+            <div class="nav-item" onclick="filterCategory('System_Admin', this)">
+                <span>🛡️</span> Administration
+            </div>
+            <div class="nav-item" onclick="filterCategory('Desktop_Apps', this)">
+                <span>🧩</span> Applets & Addons
+            </div>
+        </nav>
 
-    <div class="cde-workarea" id="appletGrid"></div>
+        <div class="sidebar-footer">
+            <span>Engine: Online</span>
+            <span>v1.0.0</span>
+        </div>
+    </aside>
 
-    <div class="cde-statusbar" id="statusBar">0 Items</div>
-</div>
+    <!-- Main Workspace -->
+    <main class="main-content">
+        <header class="top-bar">
+            <h1 id="viewHeading">System Control Panel</h1>
+            <div class="system-status">
+                <span class="status-dot"></span>
+                <span>Core Local Service Active</span>
+            </div>
+        </header>
+
+        <div class="view-container">
+            <div class="cards-grid" id="toolsGrid">
+                <!-- Cards dynamically loaded from /manager/api/applets -->
+            </div>
+        </div>
+    </main>
 
 <script>
-let currentCategory = 'ROOT';
-let appletData = [];
+let allApplets = [];
+const ICONS = {
+    'branding': '🎨',
+    'database': '💾',
+    'network': '🌐',
+    'cache': '🧹',
+    'logs': '📜'
+};
 
-async function loadApplets() {
-    const res = await fetch('/manager/api/applets');
-    appletData = await res.json();
-    renderView('ROOT');
+const DESCRIPTIONS = {
+    'branding': 'Configure business legal name, locations, condition multipliers, and payout rates.',
+    'database': 'Run database vacuum compaction, health checks, backup dumps, and imports.',
+    'network': 'Manage server ports, local network binding, and client monitor connections.',
+    'cache': 'Inspect and purge card artwork cache files to reclaim disk space.',
+    'logs': 'View live system execution traces, background worker logs, and diagnostic dumps.'
+};
+
+async function initDashboard() {
+    try {
+        const res = await fetch('/manager/api/applets');
+        allApplets = await res.json();
+        renderCards(allApplets);
+    } catch (err) {
+        console.error('Failed to load applets:', err);
+    }
 }
 
-function renderView(category) {
-    currentCategory = category;
-    const grid = document.getElementById('appletGrid');
+function renderCards(list) {
+    const grid = document.getElementById('toolsGrid');
     grid.innerHTML = '';
-    
-    document.getElementById('windowTitle').textContent = 
-        category === 'ROOT' ? 'Application Manager' : `Application Manager – ${category}`;
 
-    if (category !== 'ROOT') {
-        const upBtn = document.createElement('div');
-        upBtn.className = 'cde-icon-entry';
-        upBtn.innerHTML = `
-            <div class="cde-icon-image">📁</div>
-            <div class="cde-icon-label">.. (go up)</div>
+    list.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'control-card';
+        const icon = ICONS[item.id] || (item.is_addon ? '🧩' : '⚙️');
+        const desc = DESCRIPTIONS[item.id] || 'Custom system module or installed add-on extension.';
+        const categoryClean = item.category.replace('_', ' ');
+
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="card-icon">${icon}</div>
+                <div class="card-title">${item.title.replace(/_/g, ' ')}</div>
+            </div>
+            <div class="card-desc">${desc}</div>
+            <div class="card-tag">${categoryClean}</div>
         `;
-        upBtn.onclick = () => renderView('ROOT');
-        grid.appendChild(upBtn);
-    }
 
-    if (category === 'ROOT') {
-        const categories = [...new Set(appletData.map(a => a.category))];
-        categories.forEach(cat => {
-            const el = document.createElement('div');
-            el.className = 'cde-icon-entry';
-            el.innerHTML = `
-                <div class="cde-icon-image">📁</div>
-                <div class="cde-icon-label">${cat}</div>
-            `;
-            el.onclick = () => renderView(cat);
-            grid.appendChild(el);
-        });
-        document.getElementById('statusBar').textContent = `${categories.length} Categories`;
+        card.onclick = () => {
+            window.location.href = item.target;
+        };
+
+        grid.appendChild(card);
+    });
+}
+
+function filterCategory(cat, el) {
+    document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+    el.classList.add('active');
+
+    if (cat === 'ALL') {
+        document.getElementById('viewHeading').textContent = 'System Control Panel';
+        renderCards(allApplets);
     } else {
-        const filtered = appletData.filter(a => a.category === category);
-        filtered.forEach(app => {
-            const el = document.createElement('div');
-            el.className = 'cde-icon-entry';
-            el.innerHTML = `
-                <div class="cde-icon-image">⚙️</div>
-                <div class="cde-icon-label">${app.title}</div>
-            `;
-            el.ondblclick = () => { window.location.href = app.target; };
-            grid.appendChild(el);
-        });
-        document.getElementById('statusBar').textContent = `${filtered.length} Items`;
+        document.getElementById('viewHeading').textContent = cat.replace('_', ' ');
+        const filtered = allApplets.filter(a => a.category === cat);
+        renderCards(filtered);
     }
 }
 
-loadApplets();
+initDashboard();
 </script>
 </body>
 </html>
