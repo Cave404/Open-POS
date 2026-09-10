@@ -1,0 +1,8 @@
+Flask>=3.0.0
+waitress>=3.0.0
+psycopg[binary,pool]>=3.2.0
+cryptography>=41.0.0
+python-dotenv>=1.0.0
+requests>=2.30.0
+pytest>=8.0.0
+pywebview>=4.0

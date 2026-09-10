@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Application Manager</title>
+    <link rel="stylesheet" href="/static/css/cde_theme.css">
+</head>
+<body class="cde-desktop">
+
+<div class="cde-window">
+    <div class="cde-titlebar">
+        <span id="windowTitle">Application Manager</span>
+        <div class="cde-title-controls">
+            <button title="Minimize">_</button>
+            <button title="Maximize">■</button>
+        </div>
+    </div>
+
+    <div class="cde-menubar">
+        <div class="cde-menu-item">File</div>
+        <div class="cde-menu-item">Selected</div>
+        <div class="cde-menu-item">View</div>
+        <div class="cde-menu-item" style="margin-left: auto;">Help</div>
+    </div>
+
+    <div class="cde-workarea" id="appletGrid"></div>
+
+    <div class="cde-statusbar" id="statusBar">0 Items</div>
+</div>
+
+<script>
+let currentCategory = 'ROOT';
+let appletData = [];
+
+async function loadApplets() {
+    const res = await fetch('/manager/api/applets');
+    appletData = await res.json();
+    renderView('ROOT');
+}
+
+function renderView(category) {
+    currentCategory = category;
+    const grid = document.getElementById('appletGrid');
+    grid.innerHTML = '';
+    
+    document.getElementById('windowTitle').textContent = 
+        category === 'ROOT' ? 'Application Manager' : `Application Manager – ${category}`;
+
+    if (category !== 'ROOT') {
+        const upBtn = document.createElement('div');
+        upBtn.className = 'cde-icon-entry';
+        upBtn.innerHTML = `
+            <div class="cde-icon-image">📁</div>
+            <div class="cde-icon-label">.. (go up)</div>
+        `;
+        upBtn.onclick = () => renderView('ROOT');
+        grid.appendChild(upBtn);
+    }
+
+    if (category === 'ROOT') {
+        const categories = [...new Set(appletData.map(a => a.category))];
+        categories.forEach(cat => {
+            const el = document.createElement('div');
+            el.className = 'cde-icon-entry';
+            el.innerHTML = `
+                <div class="cde-icon-image">📁</div>
+                <div class="cde-icon-label">${cat}</div>
+            `;
+            el.onclick = () => renderView(cat);
+            grid.appendChild(el);
+        });
+        document.getElementById('statusBar').textContent = `${categories.length} Categories`;
+    } else {
+        const filtered = appletData.filter(a => a.category === category);
+        filtered.forEach(app => {
+            const el = document.createElement('div');
+            el.className = 'cde-icon-entry';
+            el.innerHTML = `
+                <div class="cde-icon-image">⚙️</div>
+                <div class="cde-icon-label">${app.title}</div>
+            `;
+            el.ondblclick = () => { window.location.href = app.target; };
+            grid.appendChild(el);
+        });
+        document.getElementById('statusBar').textContent = `${filtered.length} Items`;
+    }
+}
+
+loadApplets();
+</script>
+</body>
+</html>
