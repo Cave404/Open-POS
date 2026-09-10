@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store Branding &amp; Business Rules - Open-POS Manager</title>
+    <link rel="stylesheet" href="/static/css/cde_theme.css">
+    <link rel="stylesheet" href="/static/css/manager.css">
+</head>
+<body class="manager-body">
+
+<div class="manager-window">
+    <!-- Window Title Bar -->
+    <div class="manager-titlebar">
+        <div class="titlebar-brand">
+            <span class="icon">🎨</span>
+            <span>Store_Branding &amp; Business Rules</span>
+        </div>
+        <div class="titlebar-controls">
+            <button title="Minimize" type="button">_</button>
+            <button title="Maximize" type="button">■</button>
+        </div>
+    </div>
+
+    <!-- Navigation Breadcrumbs -->
+    <div class="manager-nav">
+        <a href="/manager" class="breadcrumb-link" id="backLink">
+            <span class="arrow">&lt;</span> Back to Application Manager
+        </a>
+        <div class="nav-badges">
+            <span class="nav-badge" id="dbStatusBadge">Engine: SQLite / Postgres</span>
+            <span class="nav-badge" id="activeStatusBadge">Live Config</span>
+        </div>
+    </div>
+
+    <!-- Main Content Form Area -->
+    <div class="manager-content">
+        <div class="settings-header">
+            <h1>Store Identity &amp; Rules Configuration</h1>
+            <p>Customize store brand metadata, buy-list cash &amp; credit payout margins, daily limits, and card condition multipliers.</p>
+        </div>
+
+        <form id="brandingForm" onsubmit="return false;">
+            <div class="form-grid">
+                <!-- Section 1: Store Identity -->
+                <div class="form-card" id="cardStoreIdentity">
+                    <div class="card-header">
+                        <span class="card-icon">🏬</span>
+                        <h2>Store Identity</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="store_name">Store Name</label>
+                            <input type="text" id="store_name" name="store_name" placeholder="e.g. Open-POS System" required>
+                            <span class="form-hint">Displayed on receipt headers, invoices, and POS windows.</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="store_legal_entity">Legal Entity Name</label>
+                            <input type="text" id="store_legal_entity" name="store_legal_entity" placeholder="e.g. Open-POS Retail LLC">
+                            <span class="form-hint">Official corporate entity name for tax and invoice documentation.</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="store_location">City/State Location</label>
+                            <input type="text" id="store_location" name="store_location" placeholder="e.g. Local Network or Seattle, WA">
+                            <span class="form-hint">Store branch location or register physical site identifier.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Trade-In & Buylist Rules -->
+                <div class="form-card" id="cardTradeRules">
+                    <div class="card-header">
+                        <span class="card-icon">💳</span>
+                        <h2>Trade-In &amp; Buylist Rules</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="cash_payout_rate">Cash Payout Rate</label>
+                            <div class="input-with-addon">
+                                <input type="number" id="cash_payout_rate" name="cash_payout_rate" min="0" max="100" step="0.5" required>
+                                <span class="input-addon">%</span>
+                            </div>
+                            <span class="form-hint">Percentage of market value paid out in cash (Default: 60%).</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="credit_payout_rate">Store Credit Payout Rate</label>
+                            <div class="input-with-addon">
+                                <input type="number" id="credit_payout_rate" name="credit_payout_rate" min="0" max="100" step="0.5" required>
+                                <span class="input-addon">%</span>
+                            </div>
+                            <span class="form-hint">Percentage of market value paid in store credit (Default: 80%).</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="daily_trade_limit">Daily Customer Trade Limit</label>
+                            <div class="input-with-addon">
+                                <input type="number" id="daily_trade_limit" name="daily_trade_limit" min="1" step="1" required>
+                                <span class="input-addon">cards</span>
+                            </div>
+                            <span class="form-hint">Maximum card items a customer can trade per calendar day.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Condition Multipliers -->
+                <div class="form-card" id="cardConditionMultipliers">
+                    <div class="card-header">
+                        <span class="card-icon">⚖️</span>
+                        <h2>Condition Multipliers</h2>
+                    </div>
+                    <div class="card-body card-body-full">
+                        <p class="form-hint" style="margin-bottom: 12px;">Decimal weights applied to market pricing based on card condition grading.</p>
+                        <div class="multipliers-grid">
+                            <div class="multiplier-item">
+                                <span class="multiplier-tag tag-nm">NM</span>
+                                <span class="multiplier-desc">Near Mint</span>
+                                <input type="number" id="cond_nm" min="0" max="2.0" step="0.05" required>
+                            </div>
+                            <div class="multiplier-item">
+                                <span class="multiplier-tag tag-lp">LP</span>
+                                <span class="multiplier-desc">Lightly Played</span>
+                                <input type="number" id="cond_lp" min="0" max="2.0" step="0.05" required>
+                            </div>
+                            <div class="multiplier-item">
+                                <span class="multiplier-tag tag-mp">MP</span>
+                                <span class="multiplier-desc">Mod. Played</span>
+                                <input type="number" id="cond_mp" min="0" max="2.0" step="0.05" required>
+                            </div>
+                            <div class="multiplier-item">
+                                <span class="multiplier-tag tag-hp">HP</span>
+                                <span class="multiplier-desc">Heavily Played</span>
+                                <input type="number" id="cond_hp" min="0" max="2.0" step="0.05" required>
+                            </div>
+                            <div class="multiplier-item">
+                                <span class="multiplier-tag tag-dmg">DMG</span>
+                                <span class="multiplier-desc">Damaged</span>
+                                <input type="number" id="cond_dmg" min="0" max="2.0" step="0.05" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="manager-actions">
+                <button type="button" class="btn btn-secondary" id="resetBtn">Discard Changes</button>
+                <button type="submit" class="btn btn-primary" id="saveBtn">Save Changes</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="manager-statusbar">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="statusBarText">Settings loaded and active</span>
+        </div>
+        <div id="statusTimestamp">Open-POS Control Panel</div>
+    </div>
+</div>
+
+<!-- Non-blocking Toast Container -->
+<div class="toast-container" id="toastContainer">
+    <div class="toast" id="toast" role="alert" aria-live="polite">
+        <div class="toast-message">
+            <span id="toastIcon">✓</span>
+            <span id="toastText">Changes saved successfully.</span>
+        </div>
+        <button type="button" class="toast-close" id="toastClose" aria-label="Close">&times;</button>
+    </div>
+</div>
+
+<script>
+let originalSettings = {};
+
+async function fetchSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) {
+            throw new Error(`Server returned ${res.status}`);
+        }
+        const data = await res.json();
+        originalSettings = data;
+        populateForm(data);
+        document.getElementById('statusBarText').textContent = 'Configuration loaded successfully.';
+    } catch (err) {
+        console.error('Failed to load settings:', err);
+        showToast(`Failed to load settings: ${err.message}`, true);
+        document.getElementById('statusBarText').textContent = 'Failed to load configuration.';
+    }
+}
+
+function populateForm(data) {
+    if (data.store_name !== undefined) {
+        document.getElementById('store_name').value = data.store_name;
+    }
+    if (data.store_legal_entity !== undefined) {
+        document.getElementById('store_legal_entity').value = data.store_legal_entity;
+    }
+    if (data.store_location !== undefined) {
+        document.getElementById('store_location').value = data.store_location;
+    }
+    if (data.cash_payout_rate !== undefined) {
+        document.getElementById('cash_payout_rate').value = data.cash_payout_rate;
+    }
+    if (data.credit_payout_rate !== undefined) {
+        document.getElementById('credit_payout_rate').value = data.credit_payout_rate;
+    }
+    if (data.daily_trade_limit !== undefined) {
+        document.getElementById('daily_trade_limit').value = data.daily_trade_limit;
+    }
+
+    let mults = data.condition_multipliers;
+    if (typeof mults === 'string') {
+        try {
+            mults = JSON.parse(mults);
+        } catch (e) {
+            mults = {};
+        }
+    }
+    mults = mults || {};
+
+    document.getElementById('cond_nm').value = mults.NM !== undefined ? mults.NM : 1.0;
+    document.getElementById('cond_lp').value = mults.LP !== undefined ? mults.LP : 0.85;
+    document.getElementById('cond_mp').value = mults.MP !== undefined ? mults.MP : 0.70;
+    document.getElementById('cond_hp').value = mults.HP !== undefined ? mults.HP : 0.50;
+    document.getElementById('cond_dmg').value = mults.DMG !== undefined ? mults.DMG : 0.30;
+}
+
+async function saveSettings() {
+    const saveBtn = document.getElementById('saveBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    const payload = {
+        store_name: document.getElementById('store_name').value.trim(),
+        store_legal_entity: document.getElementById('store_legal_entity').value.trim(),
+        store_location: document.getElementById('store_location').value.trim(),
+        cash_payout_rate: parseFloat(document.getElementById('cash_payout_rate').value),
+        credit_payout_rate: parseFloat(document.getElementById('credit_payout_rate').value),
+        daily_trade_limit: parseInt(document.getElementById('daily_trade_limit').value, 10),
+        condition_multipliers: {
+            NM: parseFloat(document.getElementById('cond_nm').value),
+            LP: parseFloat(document.getElementById('cond_lp').value),
+            MP: parseFloat(document.getElementById('cond_mp').value),
+            HP: parseFloat(document.getElementById('cond_hp').value),
+            DMG: parseFloat(document.getElementById('cond_dmg').value)
+        }
+    };
+
+    try {
+        const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await res.json();
+        if (res.ok && result.status === 'success') {
+            originalSettings = payload;
+            showToast('Store branding and business rules updated successfully.');
+            document.getElementById('statusBarText').textContent = 'Last saved: ' + new Date().toLocaleTimeString();
+        } else {
+            showToast(result.message || 'Failed to save settings.', true);
+        }
+    } catch (err) {
+        console.error('Error saving settings:', err);
+        showToast('Network error while saving settings.', true);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+    }
+}
+
+let toastTimer = null;
+function showToast(message, isError = false) {
+    const toast = document.getElementById('toast');
+    const text = document.getElementById('toastText');
+    const icon = document.getElementById('toastIcon');
+
+    if (toastTimer) {
+        clearTimeout(toastTimer);
+    }
+
+    text.textContent = message;
+    icon.textContent = isError ? '⚠️' : '✓';
+
+    if (isError) {
+        toast.classList.add('toast-error');
+    } else {
+        toast.classList.remove('toast-error');
+    }
+
+    toast.classList.add('show');
+
+    toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3800);
+}
+
+document.getElementById('toastClose').addEventListener('click', () => {
+    document.getElementById('toast').classList.remove('show');
+    if (toastTimer) clearTimeout(toastTimer);
+});
+
+document.getElementById('brandingForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    saveSettings();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+    populateForm(originalSettings);
+    showToast('Form reset to last saved values.');
+});
+
+document.addEventListener('DOMContentLoaded', fetchSettings);
+</script>
+</body>
+</html>
