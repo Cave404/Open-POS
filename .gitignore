@@ -216,3 +216,29 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Security & Secrets
+.env
+*.key
+encryption.key
+secrets.json
+
+# Local POS Databases & Cache
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+static/card_cache/*
+!static/card_cache/.gitkeep
+
+# System & Application Logs
+*.log
+system_logs*.txt
+ui_alerts.json
+
+# Local Backups & Reports
+*.bak
+reports/sales/*
+reports/intake/*
+reports/tournaments/*
+!reports/.gitkeep
