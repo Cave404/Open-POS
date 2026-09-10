@@ -17,7 +17,7 @@ import re
 import json
 import logging
 import importlib.metadata
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, send_file
 from core.settings import get_all_settings, get_setting, set_setting
 
 logger = logging.getLogger(__name__)
@@ -195,6 +195,19 @@ KNOWN_DEPENDENCIES = {
 def manager_index():
     """Renders the primary full-window HTML5 System Manager dashboard."""
     return render_template('manager.html')
+
+
+@manager_bp.route('/splash')
+def manager_splash():
+    """Renders the startup splash window view."""
+    return render_template('splash.html')
+
+
+@manager_bp.route('/splash_image')
+def manager_splash_image():
+    """Serves the open_pos_splash.png graphic asset."""
+    splash_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'open_pos_splash.png'))
+    return send_file(splash_path, mimetype='image/png')
 
 
 @manager_bp.route('/branding')

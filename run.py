@@ -6,7 +6,8 @@ This module is the singular entry point for the Open-POS desktop application.
 It orchestrates the concurrent execution of:
   1. The Flask WSGI backend server (running on a background daemon thread).
   2. The Windows System Tray icon & context menu (running detached via pystray).
-  3. The PyWebView Edge Chromium WebView2 window (running on the MAIN thread).
+  3. The Startup Splash Screen & Boot Progress Sequencer (borderless WebView2).
+  4. The PyWebView Edge Chromium WebView2 window (running on the MAIN thread).
 
 Threading Architecture & Collision Prevention:
 ----------------------------------------------
@@ -16,9 +17,10 @@ Running `webview.start()` inside a secondary or worker thread causes thread
 starvation, deadlocks, and `WebViewException: Thread collision` crashes.
 
 To ensure 100% stable execution:
-  - Main Thread: Exclusively dedicated to `webview.start()`.
+  - Main Thread: Exclusively dedicated to `webview.start(boot_worker)`.
   - Daemon Thread 1: Hosts Flask/Waitress serving REST APIs on localhost:PORT.
   - Daemon Thread 2: Hosts Pystray message pump via `tray.run_detached()`.
+  - Worker Thread: Executes modular boot verification sequence in core.boot.
 =============================================================================
 """
 
@@ -32,12 +34,14 @@ import pystray
 from pystray import MenuItem as item
 
 from core.config import Config
+from core.boot import run_boot_sequence
 from app import create_app
 
 # -----------------------------------------------------------------------------
 # Global Runtime State & Shared Handle Registry
 # -----------------------------------------------------------------------------
-active_window = None          # Handle to the active PyWebView window
+splash_window = None          # Handle to the initial frameless splash window
+active_window = None          # Handle to the primary System Manager window
 tray_instance = None          # Handle to the Pystray icon runner
 is_terminating = False        # Flag indicating whether a full system shutdown is underway
 
@@ -127,17 +131,29 @@ def exit_open_pos(icon=None, menu_item=None):
     Executes a clean, graceful shutdown of the Open-POS desktop application:
       1. Marks the termination flag to stop closing interception.
       2. Stops the system tray icon loop.
-      3. Destroys the WebView container window.
+      3. Destroys all open WebView container windows.
       4. Terminates the Python process.
     """
-    global is_terminating, tray_instance, active_window
+    global is_terminating, tray_instance, active_window, splash_window
     is_terminating = True
 
     if tray_instance is not None:
-        tray_instance.stop()
+        try:
+            tray_instance.stop()
+        except Exception:
+            pass
 
     if active_window is not None:
-        active_window.destroy()
+        try:
+            active_window.destroy()
+        except Exception:
+            pass
+
+    if splash_window is not None:
+        try:
+            splash_window.destroy()
+        except Exception:
+            pass
 
     os._exit(0)
 
@@ -166,7 +182,54 @@ def initialize_system_tray() -> pystray.Icon:
 
 
 # -----------------------------------------------------------------------------
-# 5. Main Execution Entry Point
+# 5. Boot Sequencer Worker & Window Transition
+# -----------------------------------------------------------------------------
+def boot_orchestration_worker():
+    """
+    Executes inside a background thread once pywebview's GUI message loop is active.
+    Coordinates the 5-phase boot sequence, streaming progress events into the
+    splash screen, and smoothly transitions into the primary System Manager window.
+    """
+    global splash_window, active_window
+
+    def update_splash_ui(percent: int, message: str):
+        """Dispatches progress updates into the splash DOM via evaluate_js."""
+        if splash_window is not None:
+            safe_msg = message.replace("\\", "\\\\").replace("'", "\\'")
+            js_code = f"if (window.updateProgress) window.updateProgress({percent}, '{safe_msg}');"
+            try:
+                splash_window.evaluate_js(js_code)
+            except Exception as js_err:
+                pass
+
+    # Execute modular boot sequence (Phases 1 through 5)
+    run_boot_sequence(progress_callback=update_splash_ui, buffer_seconds=1.5)
+
+    # Instantiate the primary System Manager window
+    active_window = webview.create_window(
+        title=f"{Config.STORE_NAME} - System Manager",
+        url=f"http://127.0.0.1:{Config.PORT}/manager",
+        width=1040,
+        height=720,
+        min_size=(820, 560),
+        resizable=True,
+        confirm_close=False
+    )
+
+    # Register close button minimization hook
+    active_window.events.closing += on_window_closing
+
+    # Destroy the temporary splash window
+    if splash_window is not None:
+        try:
+            splash_window.destroy()
+            splash_window = None
+        except Exception:
+            pass
+
+
+# -----------------------------------------------------------------------------
+# 6. Main Execution Entry Point
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
     # Step A: Launch Flask backend on background daemon thread
@@ -181,22 +244,21 @@ if __name__ == '__main__':
     tray_instance = initialize_system_tray()
     tray_instance.run_detached()
 
-    # Step C: Instantiate the primary WebView2 container window
-    active_window = webview.create_window(
-        title=f"{Config.STORE_NAME} - System Manager",
-        url=f"http://127.0.0.1:{Config.PORT}/manager",
-        width=1040,
-        height=720,
-        min_size=(820, 560),
-        resizable=True,
-        confirm_close=False
+    # Step C: Instantiate the borderless splash window matching image aspect ratio (656x404)
+    splash_window = webview.create_window(
+        title="Open-POS Starting",
+        url=f"http://127.0.0.1:{Config.PORT}/manager/splash",
+        width=656,
+        height=404,
+        frameless=True,
+        easy_drag=True,
+        resizable=False,
+        shadow=True,
+        on_top=True
     )
 
-    # Step D: Intercept window close button to minimize quietly to system tray
-    active_window.events.closing += on_window_closing
+    # Step D: Start WebView event loop on MAIN thread with boot worker callback
+    webview.start(boot_orchestration_worker)
 
-    # Step E: Start WebView event loop on the MAIN execution thread
-    webview.start()
-
-    # Step F: Clean exit cleanup once main loop terminates
+    # Step E: Clean exit cleanup once main loop terminates
     exit_open_pos()

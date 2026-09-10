@@ -62,12 +62,15 @@ Open-POS/
 ├── core/
 │   ├── config.py              # Configuration dataclass (ports, paths, DB credentials, business defaults)
 │   ├── db.py                  # Database connection manager (SQLite/PostgreSQL) & query abstraction
-│   └── settings.py            # Dynamic settings engine (get_setting, set_setting, seeding, JSON parsing)
+│   ├── settings.py            # Dynamic settings engine (get_setting, set_setting, seeding, JSON parsing)
+│   └── boot.py                # Multi-phase startup boot sequencer & progress dispatcher
 │
 ├── manager/
 │   ├── routes.py              # System Manager controller: applet discovery, fallback guards, and APIs
+│   ├── open_pos_splash.png    # High-resolution frameless startup splash screen graphic
 │   └── templates/
 │       ├── manager.html       # Primary HTML5 full-window System Manager dashboard & sidebar
+│       ├── splash.html        # Frameless startup splash window with animated progress bar
 │       ├── branding.html      # Store Branding & Business Rules configuration panel
 │       ├── placeholder.html   # Universal Safe Navigation Guard for applets under construction
 │       └── about.html         # System credits, contributor ledger, and dependency audit table
@@ -81,7 +84,8 @@ Open-POS/
 │   └── WIKI.md                # Developer wiki and architectural documentation (this document)
 │
 └── tests/
-    └── test_settings.py       # Automated pytest test suite covering settings, routes, and APIs
+    ├── test_settings.py       # Automated pytest test suite covering settings, routes, and APIs
+    └── test_boot.py           # Automated tests for boot sequencer and splash view routes
 ```
 
 ---
@@ -147,7 +151,7 @@ For rapid web UI and API testing in standard web browsers:
 - Navigate to `http://127.0.0.1:5000/manager`.
 
 ### Running in Desktop Container Mode
-To launch the full desktop application with Edge WebView2 and System Tray supervisor:
+To launch the full desktop application with Edge WebView2, Splash Screen, and System Tray supervisor:
 ```powershell
 .\venv\Scripts\python.exe run.py
 ```
@@ -165,3 +169,41 @@ Open-POS uses `pytest` for all unit and integration testing:
 - **No Hardcoded Secrets:** Cryptographic keys and database passwords must reside in `.env` or system environment variables.
 - **Dynamic Database Portability:** Always use `execute_sql()` from `core/db.py` to ensure queries execute identically on both SQLite and PostgreSQL.
 - **Input Type Sanitization:** All payload updates in `manager/routes.py` must validate boundaries (e.g., percentages 0–100, limits >= 1, non-empty strings) before calling `set_setting()`.
+
+---
+
+## 6. Boot Lifecycle & Splash Orchestration
+
+Open-POS implements a visual, multi-phase boot sequence orchestrated by `core/boot.py` and `run.py`.
+
+```
+[0% - 20%] Phase 1: Environment & Config Verification
+    │       - Validate .env and load core configuration.
+    ▼
+[20% - 45%] Phase 2: Git Repository Update Checker Hook
+    │       - Query git remote status via dry-run or API.
+    ▼
+[45% - 70%] Phase 3: Database & Cache Sanity Check
+    │       - Verify connection pool and settings schema integrity.
+    ▼
+[70% - 90%] Phase 4: Addon Manifest Discovery
+    │       - Scan /addons directory for registered plugins.
+    ▼
+[90% - 100%] Phase 5: Finalization & Smooth Handoff
+            - Hold on 'Finishing up...' (1.5s buffer) and spawn System Manager.
+```
+
+### Hooking Subsystems into the Boot Pipeline
+Subsystem initialization routines (e.g., peripheral serial port scanning, receipt printer discovery, or card cache warming) can be registered inside `core/boot.py`:
+
+```python
+# Example: Adding a hardware verification step to Phase 3
+_notify(65, "Scanning connected peripheral devices...")
+# invoke peripheral scanner
+_notify(70, "Hardware peripherals initialized.")
+```
+
+### Configuring Update Checks & Splash Assets
+- **Update Checks:** Controlled by the dynamic setting `auto_updates_enabled` (`set_setting('auto_updates_enabled', True)`). When deferred or offline, the boot sequence completes cleanly without blocking.
+- **Splash Screen Assets:** The splash graphic is located at `manager/open_pos_splash.png` (656x404 PNG). To rebrand the splash graphic, replace this file; the frameless window automatically scales and centres the asset.
+
