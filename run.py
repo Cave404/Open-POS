@@ -119,6 +119,40 @@ class JSBridge:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    def cancel_reauth(self) -> dict:
+        """
+        Cancels setup re-configuration, re-generates data/config/.setup_complete,
+        closes wizard window, spawns Start_POS.bat detached, and exits.
+        """
+        try:
+            import subprocess
+            from core.setup import mark_setup_complete
+            mark_setup_complete({"store_name": "Store", "restored": True})
+            win = getattr(self, '_window', None) or (webview.windows[0] if webview.windows else None)
+            if win:
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+
+            bat_path = os.path.join(Config.BASE_DIR, "Start_POS.bat")
+            if os.path.isfile(bat_path):
+                subprocess.Popen(
+                    ["cmd.exe", "/c", "Start_POS.bat"],
+                    cwd=Config.BASE_DIR,
+                    creationflags=subprocess.DETACHED_PROCESS
+                )
+
+            def _exit_later():
+                import time
+                time.sleep(0.5)
+                os._exit(0)
+
+            threading.Thread(target=_exit_later, daemon=True).start()
+            return {"status": "success"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
     def finish_and_launch(self, store_name: str = None) -> dict:
         """
         Writes data/config/.setup_complete, closes setup window, spawns Start_POS.bat detached, and exits.
@@ -358,9 +392,9 @@ if __name__ == '__main__':
         active_window = webview.create_window(
             title="OpenPOS - Initial Setup & Security Initialization",
             url=f"http://127.0.0.1:{Config.PORT}/setup",
-            width=840,
-            height=700,
-            min_size=(780, 600),
+            width=980,
+            height=800,
+            min_size=(900, 720),
             resizable=True,
             confirm_close=False,
             js_api=JSBridge()   # Expose native save dialog to wizard JS context

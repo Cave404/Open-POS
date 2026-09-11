@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 
 from core.config import Config
 from core.logger import log_event
+from core.setup.shortcut import create_desktop_shortcut
 
 SETUP_MARKER_PATH = os.path.join(Config.CONFIG_DIR, '.setup_complete')
 AUTH_CONFIG_PATH = os.path.join(Config.CONFIG_DIR, 'manager_auth.json')
@@ -33,9 +34,53 @@ def is_setup_complete() -> bool:
     """Checks whether the first-run onboarding wizard has completed."""
     return os.path.isfile(SETUP_MARKER_PATH)
 
+def check_existing_installation() -> dict:
+    """
+    Checks whether an existing store configuration or credential set is registered,
+    even if .setup_complete was removed or deleted.
+    Inspects data/config/manager_auth.json and data/config/.env.
+    """
+    has_auth = False
+    has_password = False
+    has_keys = False
+
+    if os.path.isfile(AUTH_CONFIG_PATH):
+        try:
+            with open(AUTH_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                auth = json.load(f)
+                if auth.get("password_hash"):
+                    has_auth = True
+                    has_password = True
+        except Exception:
+            pass
+
+    if os.path.isfile(ENV_CONFIG_PATH):
+        try:
+            with open(ENV_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if "FERNET_KEY=" in content or "SECRET_KEY=" in content:
+                    for line in content.splitlines():
+                        line_s = line.strip()
+                        if line_s.startswith("FERNET_KEY=") and len(line_s.split("=", 1)[1].strip()) > 8:
+                            has_keys = True
+                            break
+                        if line_s.startswith("SECRET_KEY=") and len(line_s.split("=", 1)[1].strip()) > 8:
+                            has_keys = True
+                            break
+        except Exception:
+            pass
+
+    exists = has_auth or has_keys
+    return {
+        "exists": exists,
+        "has_password": has_password,
+        "has_keys": has_keys
+    }
+
 def mark_setup_complete(metadata: dict = None) -> bool:
     """
     Creates data/config/.setup_complete, permanently locking out the setup wizard.
+    Also ensures Windows Desktop shortcut 'OpenPOS.lnk' is generated.
     """
     try:
         os.makedirs(Config.CONFIG_DIR, exist_ok=True)
@@ -49,6 +94,13 @@ def mark_setup_complete(metadata: dict = None) -> bool:
         }
         with open(SETUP_MARKER_PATH, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=2)
+
+        # Generate automated desktop shortcut on completion
+        try:
+            create_desktop_shortcut(Config.BASE_DIR)
+        except Exception as sc_err:
+            logger.warning(f"Could not create desktop shortcut during completion: {sc_err}")
+
         log_event("INFO", f"First-run setup completed and locked permanently. Version: {Config.VERSION}", "SETUP")
         return True
     except Exception as e:

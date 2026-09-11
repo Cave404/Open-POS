@@ -26,6 +26,10 @@
             padding: 0;
         }
 
+        html, body.wizard-body, .wizard-container {
+            overflow-x: hidden;
+        }
+
         body.wizard-body {
             background-color: var(--wizard-bg);
             color: var(--wizard-text);
@@ -86,15 +90,18 @@
             font-weight: 600;
         }
 
-        /* Step Progress Stepper */
+        /* Step Progress Stepper - Clean flexbox with zero overflow */
         .stepper-container {
             background: #161922;
             border-bottom: 1px solid var(--wizard-border);
-            padding: 14px 28px;
+            padding: 14px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            overflow-x: auto;
+            width: 100%;
+            flex-wrap: nowrap;
+            overflow-x: hidden;
+            box-sizing: border-box;
         }
 
         .step-item {
@@ -104,6 +111,7 @@
             opacity: 0.45;
             transition: all 0.2s ease;
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .step-item.active {
@@ -152,8 +160,107 @@
             flex: 1;
             height: 1px;
             background: var(--wizard-border);
-            margin: 0 12px;
-            min-width: 16px;
+            margin: 0 8px;
+            min-width: 8px;
+        }
+
+        /* Re-Configuration Authentication Gate Styles */
+        .reauth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 12, 18, 0.88);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .reauth-card {
+            background: var(--wizard-card);
+            border: 1px solid var(--wizard-border);
+            border-radius: 14px;
+            padding: 36px 32px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(59, 130, 246, 0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .reauth-card.shake {
+            animation: reauthShake 0.4s ease;
+        }
+
+        @keyframes reauthShake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(6px); }
+        }
+
+        .reauth-icon {
+            font-size: 42px;
+            line-height: 1;
+        }
+
+        .reauth-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--wizard-text);
+            margin: 0;
+            letter-spacing: -0.2px;
+        }
+
+        .reauth-notice {
+            font-size: 13.5px;
+            color: var(--wizard-muted);
+            line-height: 1.55;
+            margin: 0;
+        }
+
+        .reauth-input-wrap {
+            width: 100%;
+        }
+
+        .reauth-input {
+            width: 100%;
+            font-size: 15px;
+            padding: 12px 16px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .reauth-error {
+            font-size: 12.5px;
+            color: var(--wizard-danger);
+            min-height: 18px;
+            font-weight: 500;
+        }
+
+        .reauth-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .reauth-actions .btn-wizard {
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Wizard Content Area */
@@ -543,6 +650,38 @@
 </head>
 <body class="wizard-body">
 
+    {% if reauth_required %}
+    <!-- Re-Configuration Authentication Gate (Setup Tamper Protection) -->
+    <div class="reauth-overlay" id="reauthOverlay" role="dialog" aria-modal="true" aria-label="Re-Configuration Authentication Required">
+        <div class="reauth-card" id="reauthCard">
+            <div class="reauth-icon">&#128737;&#65039;</div>
+            <h2 class="reauth-title">Existing Store Configuration Detected</h2>
+            <p class="reauth-notice">
+                A previous installation or security policy is already registered in your private data directory. Enter the administrator password to reconfigure the system or modify setup settings.
+            </p>
+            <div class="reauth-input-wrap">
+                <input
+                    type="password"
+                    id="reauthPassword"
+                    class="form-input reauth-input"
+                    placeholder="Enter admin password / PIN"
+                    autocomplete="current-password"
+                    autofocus
+                >
+            </div>
+            <div id="reauthError" class="reauth-error"></div>
+            <div class="reauth-actions">
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnVerifyReauth">
+                    Verify &amp; Unlock Setup
+                </button>
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnCancelReauth">
+                    Cancel &amp; Launch System
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Top Branding Header -->
     <header class="wizard-header">
         <div class="wizard-brand">
@@ -552,7 +691,7 @@
                 <p>Initial Store &amp; Cryptographic Provisioning</p>
             </div>
         </div>
-        <span class="version-pill">v1.0.4</span>
+        <span class="version-pill">v1.0.5</span>
     </header>
 
     <!-- Progress Stepper -->
@@ -855,7 +994,7 @@
                 <div style="border: 1px solid #999999; padding: 12px 16px; margin-bottom: 16px; background: #f8fafc; font-size: 13px; line-height: 1.6;">
                     <div><strong>Store Name:</strong> <span id="printStoreName">Store</span></div>
                     <div><strong>Generated:</strong> <span id="printDate">&#8212;</span></div>
-                    <div><strong>System Version:</strong> v1.0.4</div>
+                    <div><strong>System Version:</strong> v1.0.5</div>
                 </div>
                 <div style="margin-bottom: 14px;">
                     <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Master Emergency Recovery Token:</div>
@@ -877,6 +1016,19 @@
                 <div style="margin-top: 20px; border-top: 1px solid #000000; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #555555;">
                     <span>Open-POS &bull; Cryptographic Hardware &amp; Vault Recovery Sheet</span>
                     <span>Page 1 of 1</span>
+                </div>
+            </div>
+
+            <!-- Automated Windows Desktop Shortcut Confirmation Notice -->
+            <div class="shortcut-notice-card" style="margin-top: 18px; padding: 14px 18px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; display: flex; align-items: flex-start; gap: 12px;">
+                <span style="font-size: 22px; line-height: 1;">🖥️</span>
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #93c5fd; margin-bottom: 2px;">
+                        A desktop shortcut 'OpenPOS' has been created on your Windows Desktop.
+                    </div>
+                    <div style="font-size: 12px; color: var(--wizard-muted); line-height: 1.5;">
+                        You can double-click OpenPOS on your desktop or run Open_POS.vbs at any time to launch the system silently.
+                    </div>
                 </div>
             </div>
 
@@ -1273,8 +1425,104 @@ document.getElementById('btnNext4').addEventListener('click', () => {
 document.getElementById('btnBack5').addEventListener('click', () => showStep(4));
 document.getElementById('btnNext5').addEventListener('click', () => showStep(6));
 
-// Scan prerequisites immediately on load
-document.addEventListener('DOMContentLoaded', scanPrerequisites);
+// ---------------------------------------------------------------------------
+// Re-Configuration Authentication Gate Handlers (Tamper Protection)
+// ---------------------------------------------------------------------------
+const reauthOverlay = document.getElementById('reauthOverlay');
+if (reauthOverlay) {
+    const pwdInput = document.getElementById('reauthPassword');
+    const btnVerify = document.getElementById('btnVerifyReauth');
+    const btnCancel = document.getElementById('btnCancelReauth');
+    const errorEl = document.getElementById('reauthError');
+    const cardEl = document.getElementById('reauthCard');
+
+    function shakeReauth(msg) {
+        if (errorEl) errorEl.textContent = msg;
+        if (pwdInput) {
+            pwdInput.classList.add('error');
+            pwdInput.focus();
+        }
+        if (cardEl) {
+            cardEl.classList.remove('shake');
+            void cardEl.offsetWidth;
+            cardEl.classList.add('shake');
+        }
+    }
+
+    async function doVerifyReauth() {
+        const pwd = pwdInput ? pwdInput.value.trim() : '';
+        if (errorEl) errorEl.textContent = '';
+        btnVerify.disabled = true;
+        btnVerify.innerHTML = '<span>⏳</span> Verifying...';
+
+        try {
+            const res = await fetch('/api/setup/reauth_verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pwd })
+            });
+            const data = await res.json();
+            if (res.ok && data.authorized) {
+                reauthOverlay.style.opacity = '0';
+                reauthOverlay.style.transition = 'opacity 0.25s ease';
+                setTimeout(() => {
+                    reauthOverlay.remove();
+                    scanPrerequisites();
+                }, 250);
+            } else {
+                shakeReauth(data.message || 'Incorrect administrator password.');
+                if (pwdInput) pwdInput.value = '';
+            }
+        } catch (e) {
+            shakeReauth('Verification failed: ' + e.message);
+        } finally {
+            btnVerify.disabled = false;
+            btnVerify.innerHTML = 'Verify &amp; Unlock Setup';
+        }
+    }
+
+    if (btnVerify) btnVerify.addEventListener('click', doVerifyReauth);
+    if (pwdInput) {
+        pwdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doVerifyReauth();
+        });
+        setTimeout(() => pwdInput.focus(), 250);
+    }
+
+    if (btnCancel) {
+        btnCancel.addEventListener('click', async () => {
+            btnCancel.disabled = true;
+            btnCancel.innerHTML = '<span>⏳</span> Launching System...';
+
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.cancel_reauth) {
+                try {
+                    await window.pywebview.api.cancel_reauth();
+                    return;
+                } catch(e) {
+                    console.warn('cancel_reauth error:', e);
+                }
+            }
+
+            try {
+                await fetch('/api/setup/cancel_reauth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ restart_supervisor: true })
+                });
+                window.location.href = '/manager';
+            } catch(e) {
+                window.location.href = '/manager';
+            }
+        });
+    }
+}
+
+// Scan prerequisites immediately on load if reauth overlay is not active
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.getElementById('reauthOverlay')) {
+        scanPrerequisites();
+    }
+});
 </script>
 </body>
 </html>

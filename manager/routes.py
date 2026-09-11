@@ -37,6 +37,7 @@ from core.setup import (
     is_setup_complete,
     mark_setup_complete,
     check_prerequisites,
+    check_existing_installation,
     save_setup_configuration,
     get_recovery_key_text,
     install_missing_requirements
@@ -309,6 +310,7 @@ def manager_setup():
     """
     Renders the First-Run Setup & Security Wizard.
     Enforces permanent one-way lockout once setup is completed.
+    Detects existing store configuration if .setup_complete was removed.
     """
     if is_setup_complete():
         return Response(
@@ -323,7 +325,9 @@ def manager_setup():
             status=403,
             mimetype="text/html"
         )
-    return render_template('setup_wizard.html')
+    existing = check_existing_installation()
+    reauth_required = existing["exists"] and (session.get('setup_reauth_verified') is not True)
+    return render_template('setup_wizard.html', reauth_required=reauth_required)
 
 
 @manager_bp.route('/branding')
@@ -1027,12 +1031,89 @@ def api_setup_prerequisites():
     return jsonify(check_prerequisites())
 
 
+@api_bp.route('/setup/reauth_status', methods=['GET'])
+@manager_bp.route('/api/setup/reauth_status', methods=['GET'])
+def api_setup_reauth_status():
+    """Checks whether existing installation demands re-authentication before entering setup."""
+    if is_setup_complete():
+        return jsonify({"status": "locked", "message": "Setup is already completed and permanently locked."}), 403
+    existing = check_existing_installation()
+    verified = session.get('setup_reauth_verified') is True
+    return jsonify({
+        "status": "success",
+        "has_existing_config": existing["exists"],
+        "has_password": existing["has_password"],
+        "reauth_required": existing["exists"] and not verified,
+        "authorized": verified or not existing["exists"]
+    })
+
+
+@api_bp.route('/setup/reauth_verify', methods=['POST'])
+@manager_bp.route('/api/setup/reauth_verify', methods=['POST'])
+def api_setup_reauth_verify():
+    """Verifies administrator password against existing manager_auth.json to unlock setup wizard."""
+    if is_setup_complete():
+        return jsonify({"status": "error", "message": "Setup is already completed and permanently locked."}), 403
+
+    data = request.get_json(silent=True) or {}
+    pwd = str(data.get('password', '')).strip()
+    cfg = _read_auth_file()
+    expected = cfg.get("password_hash", "")
+    salt = cfg.get("salt", "")
+
+    if expected:
+        if not pwd or _hash_with_salt(pwd, salt) != expected:
+            return jsonify({
+                "status": "error",
+                "authorized": False,
+                "message": "Incorrect administrator password."
+            }), 401
+
+    session['setup_reauth_verified'] = True
+    session['manager_authenticated'] = True
+    return jsonify({
+        "status": "success",
+        "authorized": True,
+        "message": "Setup re-configuration unlocked."
+    }), 200
+
+
+@api_bp.route('/setup/cancel_reauth', methods=['POST'])
+@manager_bp.route('/api/setup/cancel_reauth', methods=['POST'])
+def api_setup_cancel_reauth():
+    """Cancels setup re-configuration, restores .setup_complete, and launches system manager."""
+    mark_setup_complete({"store_name": "Store", "restored": True})
+    data = request.get_json(silent=True) or {}
+    if data.get("restart_supervisor", True):
+        def _deferred_launch():
+            import time
+            time.sleep(0.5)
+            bat_path = os.path.join(Config.BASE_DIR, "Start_POS.bat")
+            if os.path.isfile(bat_path):
+                subprocess.Popen(["cmd.exe", "/c", "Start_POS.bat"], cwd=Config.BASE_DIR, creationflags=subprocess.DETACHED_PROCESS)
+            os._exit(0)
+
+        threading.Thread(target=_deferred_launch, daemon=True).start()
+
+    return jsonify({
+        "status": "success",
+        "message": "Setup cancelled and restored. Launching System Manager..."
+    })
+
+
 @api_bp.route('/setup/submit', methods=['POST'])
 @manager_bp.route('/api/setup/submit', methods=['POST'])
 def api_setup_submit():
     """Persists initial configuration, generates crypto keys, and performs roundtrip tests."""
     if is_setup_complete():
         return jsonify({"status": "error", "message": "Setup is already completed and permanently locked."}), 403
+
+    existing = check_existing_installation()
+    if existing["exists"] and session.get('setup_reauth_verified') is not True:
+        return jsonify({
+            "status": "error",
+            "message": "Administrator authentication required before modifying existing configuration."
+        }), 403
 
     data = request.get_json(silent=True) or {}
     result = save_setup_configuration(data)
@@ -1149,7 +1230,7 @@ def api_live_logs_stream():
             ],
             "DISCORD": [
                 ("INFO", "Discord Gateway WebSocket heartbeat acknowledged (ping: 26ms)."),
-                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.4 Cashiers'."),
+                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.5 Cashiers'."),
                 ("INFO", "Daily trade webhooks channel #pos-trades listener healthy."),
                 ("INFO", "Discord bot queue empty. 0 outgoing transaction summaries pending.")
             ]

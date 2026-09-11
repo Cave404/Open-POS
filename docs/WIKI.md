@@ -1,4 +1,4 @@
-# Open-POS Developer Wiki & Technical Reference (v1.0.4)
+# Open-POS Developer Wiki & Technical Reference (v1.0.5)
 
 Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, security controls, and testing standards for the project.
 
@@ -142,7 +142,7 @@ To prevent layout shifting and guarantee tactile navigation across every subview
               </div>
           </div>
           <span class="status-pill status-online">Engine: Online</span>
-          <a href="/manager/about" class="version-badge-link">v1.0.4</a>
+          <a href="/manager/about" class="version-badge-link">v1.0.5</a>
       </div>
   </header>
   ```
@@ -208,14 +208,17 @@ All store-specific data is strictly quarantined inside an untracked `data/` dire
 
 - **Onboarding Pipeline:**
   - On application boot, `run.py` checks for `data/config/.setup_complete`.
-  - If missing, launches the Setup Wizard (`840x700`, title="OpenPOS - Initial Setup & Security Initialization") to guide store owners through initial configuration.
+  - If missing, launches the Setup Wizard (`980x800`, min `900x720`, title="OpenPOS - Initial Setup & Security Initialization") to guide store owners through initial configuration.
+- **Setup Tamper & Re-provisioning Guard:**
+  - If `data/config/.setup_complete` is removed but existing credentials (`data/config/manager_auth.json`) or encryption keys (`data/config/.env`) are detected, access to Step 1 is locked behind a **Re-Configuration Authentication** gate.
+  - The administrator password must be verified before setup can be modified. Users can also select "Cancel & Launch System" to immediately restore `.setup_complete` and launch Open-POS.
 - **6-Step Setup Flow:**
-  1. Prerequisites check: Verifies Python 3.12+, DB drivers, cryptography, and writable `data/` directories.
+  1. Prerequisites check: Verifies Python 3.12+, DB drivers, cryptography, and writable `data/` directories. Supports automated dependency installation via auto-pip.
   2. Store identity: Collects Store Name, Legal Entity Name, City/State, and optional Store Logo image upload.
   3. Security & Manager Credentials: Sets admin password/PIN and lockout preference.
   4. Database Engine: Standalone SQLite (`data/db/pos_store.db`) vs. Network PostgreSQL.
   5. Cryptographic Initialization: Generates 32-byte Fernet AES-128 key, 32-byte Flask secret key, Emergency Recovery Token, and runs read/write roundtrip test.
-  6. Recovery Key Sheet: Displays high-contrast Master Recovery Key, supports saving `.txt` recovery key file and printing via `@media print` formatted for 8.5x11 paper or PDF printer.
+  6. Recovery Key Sheet & Desktop Shortcut: Displays high-contrast Master Recovery Key, supports saving `.txt` recovery key file, printing via `@media print` formatted for 8.5x11 paper or PDF printer, and automatically generates an `OpenPOS.lnk` shortcut on the Windows Desktop.
 - **Permanent Lockout:**
   - Once completed, creates `data/config/.setup_complete`.
   - Any subsequent attempts to access `/setup` return HTTP 403 Forbidden.
