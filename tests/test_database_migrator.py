@@ -28,6 +28,8 @@ from core.db_migrator import (
     test_postgres_connection as fn_test_postgres_connection,
     dry_run_migration,
     update_env_engine,
+    migrate_sqlite_to_postgres,
+    migrate_postgres_to_sqlite,
 )
 from run import JSBridge
 from app import create_app
@@ -218,3 +220,102 @@ def test_lockout_guard_contains_return_to_home():
     assert "btn-lockout-return" in content
     assert "backdrop-filter" in content
     assert "blur(" in content
+
+
+def test_migrate_sqlite_to_postgres_mocked(tmp_path, monkeypatch):
+    """Verifies that migrate_sqlite_to_postgres handles identity overrides, sequences, and updates .env."""
+    test_sqlite = str(tmp_path / "source.db")
+    conn = sqlite3.connect(test_sqlite)
+    conn.execute("CREATE TABLE inventory (id INTEGER PRIMARY KEY, email TEXT, metadata TEXT);")
+    conn.execute("INSERT INTO inventory (id, email, metadata) VALUES (1, 'store@openpos.io', '{\"qty\": 5}');")
+    conn.commit()
+    conn.close()
+
+    executed_queries = []
+    mock_conn = MagicMock()
+    def fake_execute(sql, params=None):
+        executed_queries.append((sql, params))
+        m = MagicMock()
+        m.fetchall.return_value = []
+        m.fetchone.return_value = {"cnt": 1}
+        return m
+    mock_conn.execute.side_effect = fake_execute
+    mock_conn.executemany.side_effect = lambda sql, rows: executed_queries.append((sql, rows))
+
+    progress_events = []
+    def progress_cb(pct, msg):
+        progress_events.append((pct, msg))
+
+    monkeypatch.setattr(Config, "CONFIG_DIR", str(tmp_path))
+    (tmp_path / ".env").write_text("DB_ENGINE=sqlite\n", encoding="utf-8")
+
+    with patch("core.db_migrator._pg_connection") as mock_pg:
+        mock_pg.return_value.__enter__.return_value = mock_conn
+        res = migrate_sqlite_to_postgres(
+            sqlite_path=test_sqlite,
+            pg_config={"host": "localhost", "port": 5432, "dbname": "openpos", "user": "postgres", "password": ""},
+            progress_callback=progress_cb
+        )
+        assert res["status"] == "success"
+        assert res["tables_migrated"] == 1
+        assert res["rows_migrated"] == 1
+        assert any("OVERRIDING SYSTEM VALUE" in q[0] for q in executed_queries)
+        assert any("setval" in q[0] for q in executed_queries)
+        assert len(progress_events) > 0
+        assert "DB_ENGINE=postgresql" in (tmp_path / ".env").read_text(encoding="utf-8")
+
+
+def test_migrate_postgres_to_sqlite_mocked(tmp_path, monkeypatch):
+    """Verifies that migrate_postgres_to_sqlite streams rows, translates JSONB/CITEXT, and updates .env."""
+    target_sqlite = str(tmp_path / "target.db")
+    mock_conn = MagicMock()
+
+    def fake_execute(sql, params=None):
+        m = MagicMock()
+        if "information_schema.tables" in sql:
+            m.fetchall.return_value = [{"table_name": "inventory"}]
+        elif "information_schema.columns" in sql:
+            m.fetchall.return_value = [
+                {"column_name": "id", "data_type": "bigint", "is_nullable": "NO", "column_default": "nextval('inventory_id_seq')"},
+                {"column_name": "email", "data_type": "citext", "is_nullable": "YES", "column_default": ""},
+                {"column_name": "payload", "data_type": "jsonb", "is_nullable": "YES", "column_default": ""}
+            ]
+        elif "SELECT * FROM" in sql:
+            m.fetchmany.side_effect = [
+                [{"id": 1, "email": "admin@store.com", "payload": {"active": True}}],
+                []
+            ]
+        elif "SELECT COUNT(*)" in sql:
+            m.fetchone.return_value = {"cnt": 1}
+        return m
+
+    mock_conn.execute.side_effect = fake_execute
+
+    progress_events = []
+    def progress_cb(pct, msg):
+        progress_events.append((pct, msg))
+
+    monkeypatch.setattr(Config, "CONFIG_DIR", str(tmp_path))
+    (tmp_path / ".env").write_text("DB_ENGINE=postgresql\n", encoding="utf-8")
+
+    with patch("core.db_migrator._pg_connection") as mock_pg:
+        mock_pg.return_value.__enter__.return_value = mock_conn
+        res = migrate_postgres_to_sqlite(
+            pg_config={"host": "localhost", "port": 5432, "dbname": "openpos", "user": "postgres", "password": ""},
+            sqlite_path=target_sqlite,
+            progress_callback=progress_cb
+        )
+        assert res["status"] == "success"
+        assert res["tables_migrated"] == 1
+        assert res["rows_migrated"] == 1
+        assert len(progress_events) > 0
+        assert "DB_ENGINE=sqlite" in (tmp_path / ".env").read_text(encoding="utf-8")
+
+        # Verify target sqlite file has the migrated row
+        dst = sqlite3.connect(target_sqlite)
+        row = dst.execute("SELECT id, email, payload FROM inventory;").fetchone()
+        assert row[0] == 1
+        assert row[1] == "admin@store.com"
+        assert json.loads(row[2]) == {"active": True}
+        dst.close()
+
