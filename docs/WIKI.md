@@ -1,6 +1,7 @@
-# Open-POS Developer Wiki & Technical Reference (v1.1.0)
+# Open-POS Developer Wiki & Technical Reference (v1.0.1)
 
 Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, and testing standards for the project.
+
 
 ---
 
@@ -52,15 +53,22 @@ Open-POS is a hybrid desktop application combining a native Microsoft Windows We
 
 ```
 Open-POS/
-├── run.py                     # Consolidated single desktop runner & supervisor entry point
+├── Start_POS.bat              # One-click Windows terminal-free launcher (environment checker & runner)
+├── Open_POS.vbs               # Silent one-click shortcut executing Start_POS.bat without terminal flash
+├── run.py                     # Consolidated desktop runner & supervisor entry point
 ├── app.py                     # Flask application factory (create_app), DB init & blueprint mounting
 ├── requirements.txt           # Python package dependencies and version specifications
 ├── pytest.ini                 # Pytest configuration specifying pythonpath = .
-├── supervisor.pyw             # [DELETED] Replaced by run.py
-├── desktop_app.py             # [DELETED] Replaced by run.py
+│
+├── data/                      # Isolated private store data (untracked by git)
+│   ├── db/                    # Local databases (pos_store.db, shop_inventory.db)
+│   ├── cache/                 # Card art and asset caches
+│   ├── uploads/               # Store logos and custom media assets
+│   ├── logs/                  # Activity and runtime diagnostic logs
+│   └── custom_addons/         # Store-specific custom extensions
 │
 ├── core/
-│   ├── config.py              # Configuration dataclass (ports, paths, DB credentials, business defaults)
+│   ├── config.py              # Configuration dataclass (ports, data paths, DB credentials, defaults)
 │   ├── db.py                  # Database connection manager (SQLite/PostgreSQL) & query abstraction
 │   ├── settings.py            # Dynamic settings engine (get_setting, set_setting, seeding, JSON parsing)
 │   └── boot.py                # Multi-phase startup boot sequencer & progress dispatcher
@@ -211,23 +219,25 @@ _notify(70, "Hardware peripherals initialized.")
 
 ## 7. Store Logo Uploads & POS-Wide Branding Architecture
 
-Open-POS v1.1.0 introduces dynamic store logo image support:
+Open-POS v1.0.1 introduces dynamic store logo image support:
 - **API Endpoint:** `POST /api/settings/logo` (and `/manager/api/settings/logo`) accepts multipart form file uploads under key `logo`.
 - **Validation:** 
   - Max file size: 2MB.
   - Permitted MIME types: `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`.
-- **Storage:** Files are sanitized and stored under `static/uploads/store_logo.<ext>`.
-- **Setting Integration:** The relative URL path `/static/uploads/store_logo.<ext>` is saved to the `store_logo_url` key in the database `settings` table.
+- **Storage:** Files are sanitized and stored in the isolated private data directory under `data/uploads/store_logo.<ext>`.
+- **Setting Integration:** The relative URL path `/data/uploads/store_logo.<ext>` is saved to the `store_logo_url` key in the database `settings` table.
 - **Sidebar Integration:** In `manager.html`, if `store_logo_url` is present, the sidebar dynamically renders the logo image and hides the fallback `POS` gradient badge. The store name dynamically displays the value of `store_name`.
 - **Removal Action:** `DELETE /api/settings/logo` unlinks the uploaded file and sets `store_logo_url` to `""`.
 
 ---
 
-## 8. Dashboard Applet Pinning System
+## 8. Dashboard Applet Pinning System & Dedicated "Home" Tab
 
 The System Manager provides a pinning mechanism for high-frequency control cards:
+- **Dedicated "Home" Dashboard:** The `🏠 Home` view is the top-level tab and active by default on system launch.
+  - Displays exclusively the tools pinned by the store.
+  - If no tools are pinned, displays a clean placeholder empty-state card guiding staff to pin tools from categories.
 - **Visual Pinning Mechanism:** Each `.control-card` features a pin button (`📌`). Pinned cards display with a `.pinned` class providing a glowing accent border.
-- **Pinned Quick-Access Section:** When 1 or more applets are pinned, a dedicated `Pinned Quick Access` tray is rendered directly above the main categorized grid.
 - **Dual Persistence:**
   - **Client-Side:** Instant persistence via `localStorage.getItem('openpos_pinned_tools')`.
   - **Backend Synchronization:** Persisted across sessions and network workstations via `POST /api/settings/pinned` storing a JSON-encoded array into the `settings` table key `pinned_tools`. Default tools: `["branding", "database"]`.
@@ -247,6 +257,31 @@ The System Manager provides a pinning mechanism for high-frequency control cards
   ```
 - Version indicators link directly to About & Credits:
   ```html
-  <a href="/manager/about" class="version-badge-link" title="View System Credits & Documentation">v1.1.0</a>
+  <a href="/manager/about" class="version-badge-link" title="View System Credits & Documentation">v1.0.1</a>
   ```
+
+---
+
+## 10. One-Click OOTB Desktop Launchers
+
+Staff and cashiers run Open-POS without interacting with a command prompt:
+- **`Open_POS.vbs`:** A clean VBScript wrapper that invokes `Start_POS.bat` in hidden mode (`0`), preventing console windows from flashing on screen.
+- **`Start_POS.bat`:**
+  - Automatically verifies and bootstraps the Python virtual environment (`venv/`) from `requirements.txt` if missing.
+  - Initializes `.env` from `.env.example` if not already present.
+  - Executes `run.py` using `venv\Scripts\python.exe`.
+  - Features error traps that pause with diagnostic advice if execution fails.
+
+---
+
+## 11. Isolated Private Data Directory Architecture (`data/`)
+
+All store-specific data is strictly quarantined inside an untracked `data/` directory to prevent git collision during upstream repository pulls:
+- `data/db/`: SQLite database files (`pos_store.db`, `shop_inventory.db`).
+- `data/cache/`: Cached card artwork and metadata.
+- `data/uploads/`: Store brand logos and uploaded images.
+- `data/logs/`: Application telemetry and execution traces.
+- `data/custom_addons/`: Custom site-specific addons.
+- All folders are tracked in git via `.gitkeep` files while `.gitignore` ignores all actual data files.
+
 

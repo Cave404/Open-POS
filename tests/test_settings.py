@@ -195,13 +195,14 @@ def test_about_view_route(client):
     assert "Return to Dashboard" in html
     assert "Third-Party Dependencies" in html
     assert "Cave404" in html
+    assert "v1.0.1" in html
 
 def test_api_system_credits(client):
-    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.1.0."""
+    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.1."""
     res = client.get("/api/system/credits")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["version"] == "v1.1.0"
+    assert data["version"] == "v1.0.1"
     assert "https://github.com/Cave404/Open-POS" in data["repository"]
     assert len(data["authors"]) >= 1
     assert len(data["dependencies"]) >= 5
@@ -246,7 +247,7 @@ def test_applets_list_includes_about(client):
     assert "about" in ids
 
 def test_api_logo_upload_success_and_delete(client):
-    """Asserts that POST /api/settings/logo uploads a valid image and DELETE removes it."""
+    """Asserts that POST /api/settings/logo uploads a valid image to data/uploads and DELETE removes it."""
     # 1. Valid image upload
     img_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
     data = {
@@ -256,14 +257,18 @@ def test_api_logo_upload_success_and_delete(client):
     assert res.status_code == 200
     resp_json = res.get_json()
     assert resp_json["status"] == "success"
-    assert "/static/uploads/store_logo.png" in resp_json["logo_url"]
-    assert get_setting("store_logo_url") == "/static/uploads/store_logo.png"
+    assert "/data/uploads/store_logo.png" in resp_json["logo_url"]
+    assert get_setting("store_logo_url") == "/data/uploads/store_logo.png"
 
-    # 2. Verify file exists on disk
-    expected_path = os.path.join(os.getcwd(), 'static', 'uploads', 'store_logo.png')
+    # 2. Verify file exists in Config.UPLOAD_DIR
+    expected_path = os.path.join(Config.UPLOAD_DIR, 'store_logo.png')
     assert os.path.exists(expected_path)
 
-    # 3. Delete logo
+    # 3. Verify static serving route /data/uploads/store_logo.png
+    serve_res = client.get('/data/uploads/store_logo.png')
+    assert serve_res.status_code == 200
+
+    # 4. Delete logo
     del_res = client.delete('/api/settings/logo')
     assert del_res.status_code == 200
     assert del_res.get_json()["status"] == "success"
@@ -312,3 +317,24 @@ def test_api_pinned_tools(client):
     # 4. Bad request validation
     bad_res = client.post('/api/settings/pinned', json={"pinned_tools": "not-a-list"})
     assert bad_res.status_code == 400
+
+def test_data_directory_structure():
+    """Asserts that isolated private data subdirectories are initialized."""
+    assert os.path.isdir(Config.DATA_DIR)
+    assert os.path.isdir(Config.DB_DIR)
+    assert os.path.isdir(Config.CACHE_DIR)
+    assert os.path.isdir(Config.UPLOAD_DIR)
+    assert os.path.isdir(Config.LOGS_DIR)
+    assert os.path.isdir(Config.CUSTOM_ADDONS_DIR)
+
+def test_manager_dashboard_home_view(client):
+    """Asserts that GET /manager renders the Home view as default with v1.0.1 footer."""
+    res = client.get('/manager')
+    assert res.status_code in (200, 308)
+    if res.status_code == 308:
+        res = client.get('/manager/')
+    html = res.get_data(as_text=True)
+    assert "Quick-Access Dashboard" in html
+    assert "Home" in html
+    assert "v1.0.1" in html
+

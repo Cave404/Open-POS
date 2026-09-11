@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, send_from_directory
 from core.config import Config
 from core.db import init_db
 from core.settings import seed_default_settings
@@ -19,6 +19,14 @@ def create_app():
     @app.route('/')
     def index():
         return redirect(url_for('manager.manager_index'))
+
+    @app.route('/data/uploads/<path:filename>')
+    def serve_data_uploads(filename):
+        return send_from_directory(Config.UPLOAD_DIR, filename)
+
+    @app.route('/data/cache/<path:filename>')
+    def serve_data_cache(filename):
+        return send_from_directory(Config.CACHE_DIR, filename)
 
     return app
 

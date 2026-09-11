@@ -20,7 +20,10 @@
         </div>
 
         <nav class="nav-group">
-            <div class="nav-item active" onclick="filterCategory('ALL', this)">
+            <div class="nav-item active" onclick="filterCategory('HOME', this)">
+                <span>🏠</span> Home
+            </div>
+            <div class="nav-item" onclick="filterCategory('ALL', this)">
                 <span>📂</span> All Tools
             </div>
             <div class="nav-item" onclick="filterCategory('Desktop_Controls', this)">
@@ -39,14 +42,14 @@
 
         <div class="sidebar-footer">
             <span>Engine: Online</span>
-            <a href="/manager/about" class="version-badge-link" title="View System Credits &amp; Documentation">v1.1.0</a>
+            <a href="/manager/about" class="version-badge-link" title="View System Credits &amp; Documentation">v1.0.1</a>
         </div>
     </aside>
 
     <!-- Main Workspace -->
     <main class="main-content">
         <header class="top-bar">
-            <h1 id="viewHeading">System Control Panel</h1>
+            <h1 id="viewHeading">Quick-Access Dashboard</h1>
             <div class="system-status">
                 <span class="status-dot"></span>
                 <span>Core Local Service Active</span>
@@ -54,24 +57,16 @@
         </header>
 
         <div class="view-container">
-            <!-- Dedicated Pinned Quick-Access Section -->
-            <div id="pinnedSection" class="pinned-section" style="display: none;">
-                <div class="pinned-section-header">
-                    <span>📌</span> Pinned Quick Access
-                </div>
-                <div class="cards-grid" id="pinnedGrid"></div>
-            </div>
-
-            <!-- Main Categorized Tools Grid -->
+            <!-- Dedicated Tools Grid -->
             <div class="cards-grid" id="toolsGrid">
-                <!-- Cards dynamically loaded from /manager/api/applets -->
+                <!-- Cards dynamically loaded -->
             </div>
         </div>
     </main>
 
 <script>
 let allApplets = [];
-let currentCategory = 'ALL';
+let currentCategory = 'HOME';
 let pinnedTools = [];
 
 const ICONS = {
@@ -103,8 +98,8 @@ async function initDashboard() {
         // 2. Fetch System Settings (Store Name, Logo, Pinned Tools)
         await loadSettingsAndBranding();
 
-        // 3. Render Dashboard
-        renderAll();
+        // 3. Render Dashboard (Defaults to HOME)
+        renderGrid();
     } catch (err) {
         console.error('Failed to initialize dashboard:', err);
     }
@@ -170,6 +165,7 @@ async function loadSettingsAndBranding() {
 function createCardElement(item, isPinned) {
     const card = document.createElement('div');
     card.className = 'control-card' + (isPinned ? ' pinned' : '');
+    card.id = `card-${item.id}`;
     const icon = ICONS[item.id] || (item.is_addon ? '🧩' : '⚙️');
     const desc = DESCRIPTIONS[item.id] || 'Custom system module or installed add-on extension.';
     const categoryClean = item.category.replace('_', ' ');
@@ -192,33 +188,30 @@ function createCardElement(item, isPinned) {
     return card;
 }
 
-function renderAll() {
-    renderPinned();
-    renderMainGrid();
-}
-
-function renderPinned() {
-    const pinnedSection = document.getElementById('pinnedSection');
-    const pinnedGrid = document.getElementById('pinnedGrid');
-    pinnedGrid.innerHTML = '';
-
-    const pinnedList = allApplets.filter(item => pinnedTools.includes(item.id));
-    if (pinnedList.length > 0) {
-        pinnedSection.style.display = 'block';
-        pinnedList.forEach(item => {
-            pinnedGrid.appendChild(createCardElement(item, true));
-        });
-    } else {
-        pinnedSection.style.display = 'none';
-    }
-}
-
-function renderMainGrid() {
+function renderGrid() {
     const grid = document.getElementById('toolsGrid');
     grid.innerHTML = '';
 
-    const list = currentCategory === 'ALL' 
-        ? allApplets 
+    if (currentCategory === 'HOME') {
+        const pinnedList = allApplets.filter(item => pinnedTools.includes(item.id));
+        if (pinnedList.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-pinned-card">
+                    <div class="empty-icon">📌</div>
+                    <h3>No quick-access tools pinned yet.</h3>
+                    <p>Browse the categories in the sidebar and click the 📌 icon on any card to pin it here.</p>
+                </div>
+            `;
+            return;
+        }
+        pinnedList.forEach(item => {
+            grid.appendChild(createCardElement(item, true));
+        });
+        return;
+    }
+
+    const list = currentCategory === 'ALL'
+        ? allApplets
         : allApplets.filter(a => a.category === currentCategory);
 
     list.forEach(item => {
@@ -231,24 +224,41 @@ async function togglePin(id, event) {
     if (event) event.stopPropagation();
 
     const idx = pinnedTools.indexOf(id);
-    if (idx > -1) {
-        pinnedTools.splice(idx, 1);
-    } else {
+    const isNowPinned = idx === -1;
+
+    if (isNowPinned) {
         pinnedTools.push(id);
+    } else {
+        pinnedTools.splice(idx, 1);
     }
 
     // 1. Immediate client-side persistence
     localStorage.setItem('openpos_pinned_tools', JSON.stringify(pinnedTools));
 
-    // 2. Re-render UI immediately
-    renderAll();
+    // 2. Immediate UI Update
+    if (currentCategory === 'HOME') {
+        renderGrid();
+    } else {
+        const card = document.getElementById(`card-${id}`);
+        if (card) {
+            if (isNowPinned) {
+                card.classList.add('pinned');
+                const btn = card.querySelector('.pin-btn');
+                if (btn) btn.title = 'Unpin from Quick Access';
+            } else {
+                card.classList.remove('pinned');
+                const btn = card.querySelector('.pin-btn');
+                if (btn) btn.title = 'Pin to Quick Access';
+            }
+        }
+    }
 
     // 3. Backend persistence sync
     try {
         await fetch('/api/settings/pinned', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pinned_tools: pinnedTools })
+            body: JSON.stringify({ pinned_tools: pinnedTools, pinned: pinnedTools })
         });
     } catch (err) {
         console.warn('Failed to sync pinned tools with backend:', err);
@@ -260,12 +270,14 @@ function filterCategory(cat, el) {
     el.classList.add('active');
     currentCategory = cat;
 
-    if (cat === 'ALL') {
+    if (cat === 'HOME') {
+        document.getElementById('viewHeading').textContent = 'Quick-Access Dashboard';
+    } else if (cat === 'ALL') {
         document.getElementById('viewHeading').textContent = 'System Control Panel';
     } else {
-        document.getElementById('viewHeading').textContent = cat.replace('_', ' ');
+        document.getElementById('viewHeading').textContent = cat.replace(/_/g, ' ');
     }
-    renderMainGrid();
+    renderGrid();
 }
 
 document.addEventListener('DOMContentLoaded', initDashboard);

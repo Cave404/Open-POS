@@ -1,14 +1,36 @@
 import os
+import shutil
 from dotenv import load_dotenv
 
 # Load local .env if present
 load_dotenv()
 
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+DB_DIR = os.path.join(DATA_DIR, 'db')
+CACHE_DIR = os.path.join(DATA_DIR, 'cache')
+UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
+LOGS_DIR = os.path.join(DATA_DIR, 'logs')
+CUSTOM_ADDONS_DIR = os.path.join(DATA_DIR, 'custom_addons')
+
+# Automatically ensure private data directories exist on startup
+for _directory in (DATA_DIR, DB_DIR, CACHE_DIR, UPLOAD_DIR, LOGS_DIR, CUSTOM_ADDONS_DIR):
+    os.makedirs(_directory, exist_ok=True)
+
 class Config:
-    VERSION = "v1.1.0"
+    VERSION = "v1.0.1"
     SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(24).hex())
     HOST = os.environ.get('HOST', '0.0.0.0')
     PORT = int(os.environ.get('PORT', 5000))
+
+    # Isolated Private Data Paths
+    BASE_DIR = BASE_DIR
+    DATA_DIR = DATA_DIR
+    DB_DIR = DB_DIR
+    CACHE_DIR = CACHE_DIR
+    UPLOAD_DIR = UPLOAD_DIR
+    LOGS_DIR = LOGS_DIR
+    CUSTOM_ADDONS_DIR = CUSTOM_ADDONS_DIR
 
     # Database Settings
     DB_ENGINE = os.environ.get('DB_ENGINE', 'sqlite').lower()
@@ -18,6 +40,12 @@ class Config:
     DB_USER = os.environ.get('DB_USER', 'postgres')
     DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
 
+    # SQLite Database Path Resolution
+    if DB_NAME == ':memory:' or os.path.isabs(DB_NAME):
+        DB_PATH = DB_NAME
+    else:
+        DB_PATH = os.path.join(DB_DIR, DB_NAME)
+
     # Business Logic Defaults
     STORE_NAME = os.environ.get('STORE_NAME', 'Open-POS System')
     STORE_LEGAL_ENTITY = os.environ.get('STORE_LEGAL_ENTITY', 'Open-POS Retail LLC')
@@ -25,3 +53,12 @@ class Config:
     DAILY_TRADE_LIMIT = int(os.environ.get('DAILY_TRADE_LIMIT', 10))
     CASH_PAYOUT_PERCENT = float(os.environ.get('CASH_PAYOUT_PERCENT', 60.0))
     CREDIT_PAYOUT_PERCENT = float(os.environ.get('CREDIT_PAYOUT_PERCENT', 80.0))
+
+# Migration check: if legacy root pos_store.db exists and data/db/pos_store.db does not, migrate it
+_legacy_root_db = os.path.join(BASE_DIR, 'pos_store.db')
+_target_data_db = os.path.join(DB_DIR, 'pos_store.db')
+if os.path.isfile(_legacy_root_db) and not os.path.isfile(_target_data_db):
+    try:
+        shutil.copy2(_legacy_root_db, _target_data_db)
+    except Exception:
+        pass

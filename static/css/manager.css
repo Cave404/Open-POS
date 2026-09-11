@@ -274,6 +274,39 @@ body.manager-body {
     gap: 18px;
 }
 
+.empty-pinned-card {
+    grid-column: 1 / -1;
+    background-color: var(--bg-secondary);
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-muted);
+}
+
+.empty-pinned-card .empty-icon {
+    font-size: 36px;
+    margin-bottom: 4px;
+}
+
+.empty-pinned-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.empty-pinned-card p {
+    font-size: 13px;
+    max-width: 480px;
+    line-height: 1.5;
+}
+
+
 .control-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);

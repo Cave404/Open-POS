@@ -3,13 +3,15 @@ import sqlite3
 from contextlib import contextmanager
 from core.config import Config
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-
 def get_db_path():
-    db_name = Config.DB_NAME
+    db_name = getattr(Config, 'DB_NAME', 'pos_store.db')
     if db_name == ':memory:' or os.path.isabs(db_name):
         return db_name
-    return os.path.join(BASE_DIR, db_name)
+    db_path = getattr(Config, 'DB_PATH', None)
+    if db_path and os.path.isabs(db_path):
+        return db_path
+    return os.path.join(Config.DB_DIR, db_name)
+
 
 @contextmanager
 def get_db_connection():

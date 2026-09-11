@@ -242,3 +242,12 @@ reports/sales/*
 reports/intake/*
 reports/tournaments/*
 !reports/.gitkeep
+
+# Local Store Data Directory
+data/*
+!data/.gitkeep
+!data/db/.gitkeep
+!data/cache/.gitkeep
+!data/uploads/.gitkeep
+!data/logs/.gitkeep
+!data/custom_addons/.gitkeep

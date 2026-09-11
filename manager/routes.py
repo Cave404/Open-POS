@@ -17,7 +17,8 @@ import re
 import json
 import logging
 import importlib.metadata
-from flask import Blueprint, jsonify, render_template, request, send_file
+from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory
+from core.config import Config
 from core.settings import get_all_settings, get_setting, set_setting
 
 logger = logging.getLogger(__name__)
@@ -342,7 +343,7 @@ def get_system_credits():
             logger.error(f"Error reading requirements.txt: {e}")
 
     credits_payload = {
-        "version": "v1.1.0",
+        "version": "v1.0.1",
         "repository": "https://github.com/Cave404/Open-POS",
         "authors": [
             {"name": "Cave404", "role": "Lead Architect & Maintainer"},
@@ -486,14 +487,14 @@ def handle_update_settings():
 # -----------------------------------------------------------------------------
 # 4. Store Logo Image Upload & Management Endpoints
 # -----------------------------------------------------------------------------
-UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads'))
+UPLOAD_FOLDER = Config.UPLOAD_DIR
 ALLOWED_LOGO_EXTENSIONS = {'png', 'jpg', 'jpeg', 'svg', 'webp'}
 MAX_LOGO_SIZE = 2 * 1024 * 1024  # 2MB Limit
 
 def handle_logo_upload():
     """
     Accepts an image upload for the store logo, enforces <= 2MB and allowed
-    image formats, saves the asset to static/uploads, and updates settings.
+    image formats, saves the asset to data/uploads, and updates settings.
     """
     file = request.files.get('logo') or request.files.get('file')
     if not file or not file.filename:
@@ -525,7 +526,7 @@ def handle_logo_upload():
     with open(target_path, 'wb') as f:
         f.write(file_data)
 
-    logo_url = f"/static/uploads/{target_name}"
+    logo_url = f"/data/uploads/{target_name}"
     set_setting('store_logo_url', logo_url)
 
     return jsonify({"status": "success", "logo_url": logo_url}), 200
@@ -541,8 +542,19 @@ def handle_logo_delete():
                 os.remove(path)
             except OSError:
                 pass
+    # Clean legacy folder if present
+    legacy_folder = os.path.join(Config.BASE_DIR, 'static', 'uploads')
+    if os.path.isdir(legacy_folder):
+        for ext in ALLOWED_LOGO_EXTENSIONS:
+            p = os.path.join(legacy_folder, f"store_logo.{ext}")
+            if os.path.isfile(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
     set_setting('store_logo_url', '')
     return jsonify({"status": "success"}), 200
+
 
 
 # -----------------------------------------------------------------------------
@@ -609,3 +621,9 @@ def api_get_pinned():
 @manager_bp.route('/api/settings/pinned', methods=['POST'])
 def api_post_pinned():
     return handle_update_pinned()
+
+
+@manager_bp.route('/data/uploads/<path:filename>')
+@api_bp.route('/data/uploads/<path:filename>')
+def api_serve_data_uploads(filename):
+    return send_from_directory(Config.UPLOAD_DIR, filename)
