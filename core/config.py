@@ -13,12 +13,14 @@ UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
 LOGS_DIR = os.path.join(DATA_DIR, 'logs')
 CUSTOM_ADDONS_DIR = os.path.join(DATA_DIR, 'custom_addons')
 
+CONFIG_DIR = os.path.join(DATA_DIR, 'config')
+
 # Automatically ensure private data directories exist on startup
-for _directory in (DATA_DIR, DB_DIR, CACHE_DIR, UPLOAD_DIR, LOGS_DIR, CUSTOM_ADDONS_DIR):
+for _directory in (DATA_DIR, DB_DIR, CACHE_DIR, UPLOAD_DIR, LOGS_DIR, CUSTOM_ADDONS_DIR, CONFIG_DIR):
     os.makedirs(_directory, exist_ok=True)
 
 class Config:
-    VERSION = "v1.0.1"
+    VERSION = "v1.0.2"
     SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(24).hex())
     HOST = os.environ.get('HOST', '0.0.0.0')
     PORT = int(os.environ.get('PORT', 5000))
@@ -31,6 +33,8 @@ class Config:
     UPLOAD_DIR = UPLOAD_DIR
     LOGS_DIR = LOGS_DIR
     CUSTOM_ADDONS_DIR = CUSTOM_ADDONS_DIR
+    CONFIG_DIR = CONFIG_DIR
+
 
     # Database Settings
     DB_ENGINE = os.environ.get('DB_ENGINE', 'sqlite').lower()

@@ -250,4 +250,6 @@ data/*
 !data/cache/.gitkeep
 !data/uploads/.gitkeep
 !data/logs/.gitkeep
-!data/custom_addons/.gitkeep
+!data/custom_addons/.gitkeep
+!data/config/.gitkeep
+

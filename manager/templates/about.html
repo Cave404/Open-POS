@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About &amp; Credits - Open-POS System</title>
     <link rel="stylesheet" href="/static/css/manager.css">
+    <script src="/static/js/notifications.js"></script>
     <style>
         .about-container {
             max-width: 960px;
@@ -251,17 +252,39 @@
 </head>
 <body class="manager-body">
 
-    <!-- Tactile Back Navigation Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <a href="/manager" class="btn-back" id="navReturnLink">
-            <span class="btn-icon">←</span>
-            <span>Return to Dashboard</span>
-        </a>
-        <div class="nav-badges" style="display: flex; gap: 8px;">
-            <span class="nav-badge" style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-color); padding: 5px 12px; border-radius: 6px; font-size: 11px; color: var(--text-muted); font-weight: 600;">System Administration</span>
-            <span class="nav-badge" id="systemVersionTag" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); padding: 5px 12px; border-radius: 6px; font-size: 11px; color: #60a5fa; font-weight: 700;">v1.0.1</span>
+    <!-- Standardized Subview Header -->
+    <header class="subview-header" style="margin-bottom: 24px;">
+        <div class="header-left">
+            <a href="/manager" class="btn-back" id="navReturnLink">
+                <span class="btn-icon">←</span>
+                <span>Return to Dashboard</span>
+            </a>
+            <div class="header-divider"></div>
+            <h2 class="subview-title">About &amp; Credits</h2>
         </div>
-    </div>
+        <div class="header-right">
+            <!-- Live Notifications Trigger -->
+            <div class="notification-wrapper">
+                <button id="notifBellBtn" class="btn-icon-tray" title="System Notifications">
+                    🔔 <span id="notifBadge" class="badge-count" style="display: none;">0</span>
+                </button>
+                <div id="notifDropdown" class="notif-dropdown-menu" style="display: none;">
+                    <div class="notif-dropdown-header">
+                        <span>System Notifications</span>
+                        <button id="clearNotifsBtn" class="btn-text-action">Clear</button>
+                    </div>
+                    <div id="notifList" class="notif-dropdown-body">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div class="notif-dropdown-footer">
+                        <a href="/manager/logs" class="btn-full-action">Open Terminal Logs →</a>
+                    </div>
+                </div>
+            </div>
+            <span class="status-pill status-online">Engine: Online</span>
+            <a href="/manager/about" class="version-badge-link" id="systemVersionTag">v1.0.2</a>
+        </div>
+    </header>
 
     <div class="about-container">
         <!-- Hero Header -->
@@ -274,7 +297,7 @@
                 </div>
             </div>
             <div class="hero-badges">
-                <span class="badge-version" id="heroVersionBadge">v1.0.1</span>
+                <span class="badge-version" id="heroVersionBadge">v1.0.2</span>
                 <a href="https://github.com/Cave404/Open-POS" target="_blank" rel="noopener noreferrer" class="btn-repo" id="btnGithubRepo">
                     <span>🐙</span> GitHub Repository
                 </a>
