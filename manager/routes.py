@@ -21,8 +21,9 @@ import secrets
 import hashlib
 import logging
 import subprocess
+import threading
 import importlib.metadata
-from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory, Response
+from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory, Response, stream_with_context, session
 from core.config import Config
 from core.settings import get_all_settings, get_setting, set_setting
 from core.notifications import (
@@ -37,7 +38,17 @@ from core.setup import (
     mark_setup_complete,
     check_prerequisites,
     save_setup_configuration,
-    get_recovery_key_text
+    get_recovery_key_text,
+    install_missing_requirements
+)
+from core.db_migrator import (
+    get_database_status,
+    test_sqlite_connection,
+    test_postgres_connection,
+    migrate_sqlite_to_postgres,
+    migrate_postgres_to_sqlite,
+    update_env_engine,
+    dry_run_migration,
 )
 
 logger = logging.getLogger(__name__)
@@ -220,6 +231,55 @@ KNOWN_DEPENDENCIES = {
     }
 }
 
+# -----------------------------------------------------------------------------
+# Access Control & Authentication Helpers
+# -----------------------------------------------------------------------------
+AUTH_CONFIG_PATH = os.path.join(Config.CONFIG_DIR, 'manager_auth.json')
+
+def _read_auth_file() -> dict:
+    """Reads security configuration strictly from isolated data/config/manager_auth.json."""
+    if os.path.isfile(AUTH_CONFIG_PATH):
+        try:
+            with open(AUTH_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "require_password": False,
+        "password_hash": "",
+        "salt": "",
+        "protected_sections": ["branding", "database", "admin"],
+        "bypass_manager_on_boot": False
+    }
+
+def _write_auth_file(data: dict) -> None:
+    """Persists security configuration to isolated data/config/manager_auth.json."""
+    os.makedirs(Config.CONFIG_DIR, exist_ok=True)
+    with open(AUTH_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+
+def _hash_with_salt(password: str, salt: str) -> str:
+    """Computes SHA-256 salted password digest."""
+    return hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+
+def is_section_locked(section_name: str) -> bool:
+    """
+    Determines whether a view should be rendered in locked/blurred state.
+    Inspects data/config/manager_auth.json and current session authentication.
+    """
+    cfg = _read_auth_file()
+    if not cfg.get("require_password", False) or not cfg.get("password_hash"):
+        return False
+    protected = cfg.get("protected_sections", ["branding", "database", "admin"])
+    is_protected = (
+        ('all' in protected) or
+        (section_name in protected) or
+        (section_name == 'configure_manager' and ('admin' in protected or 'configure_manager' in protected))
+    )
+    if not is_protected:
+        return False
+    return session.get('manager_authenticated') is not True
+
 
 # -----------------------------------------------------------------------------
 # 1. Dashboard & Applet Navigation Handlers
@@ -269,7 +329,7 @@ def manager_setup():
 @manager_bp.route('/branding')
 def manager_branding():
     """Renders the Store Branding & Business Rules configuration panel."""
-    return render_template('branding.html')
+    return render_template('branding.html', is_locked=is_section_locked('branding'))
 
 
 @manager_bp.route('/about')
@@ -294,10 +354,10 @@ def manager_placeholder(applet_id):
     return render_template('placeholder.html', applet=meta)
 
 
-# Explicit route bindings for built-in applets under construction
 @manager_bp.route('/database')
 def manager_database():
-    return manager_placeholder('database')
+    """Renders the full Database Tools & Migration wizard view."""
+    return render_template('database.html', is_locked=is_section_locked('database'))
 
 
 @manager_bp.route('/network')
@@ -319,7 +379,7 @@ def manager_logs():
 @manager_bp.route('/configure_manager')
 def manager_configure():
     """Renders the Configure Manager administrative security & update panel."""
-    return render_template('configure_manager.html')
+    return render_template('configure_manager.html', is_locked=is_section_locked('configure_manager'))
 
 
 
@@ -729,8 +789,184 @@ def api_test_notification():
 
 
 # -----------------------------------------------------------------------------
-# 8. Terminal Logs & Live Subsystem Monitor Endpoints
+# 8b. Database Tools & Migration API Endpoints
 # -----------------------------------------------------------------------------
+@api_bp.route('/database/status', methods=['GET'])
+@manager_bp.route('/api/database/status', methods=['GET'])
+def api_database_status():
+    """
+    Returns a real-time snapshot of the active database:
+    engine name, connection details, table count, and file size (SQLite).
+    """
+    status = get_database_status()
+    return jsonify({"status": "success", "database": status})
+
+
+@api_bp.route('/database/test_connection', methods=['POST'])
+@manager_bp.route('/api/database/test_connection', methods=['POST'])
+def api_database_test_connection():
+    """
+    Tests a database connection without persisting any configuration.
+    Accepts JSON body:
+      { "engine": "sqlite" | "postgresql",
+        "host": str, "port": int, "dbname": str, "user": str, "password": str,
+        "db_path": str  (SQLite only) }
+    Returns: { ok, message, latency_ms, [server_version] }
+    """
+    data = request.get_json(silent=True) or {}
+    engine = str(data.get('engine', 'sqlite')).lower()
+
+    if engine in ('postgres', 'postgresql'):
+        result = test_postgres_connection(
+            host=data.get('host'),
+            port=data.get('port'),
+            dbname=data.get('dbname'),
+            user=data.get('user'),
+            password=data.get('password')
+        )
+    else:
+        result = test_sqlite_connection(db_path=data.get('db_path'))
+
+    status_code = 200 if result['ok'] else 502
+    return jsonify(result), status_code
+
+
+@api_bp.route('/database/dry_run', methods=['POST'])
+@manager_bp.route('/api/database/dry_run', methods=['POST'])
+def api_database_dry_run():
+    """
+    Performs a non-destructive dry-run validation of migration credentials,
+    schema introspection, and row counts across SQLite and PostgreSQL.
+    """
+    data = request.get_json(silent=True) or {}
+    direction = str(data.get('direction', 'sqlite_to_postgres')).lower()
+    res = dry_run_migration(
+        direction=direction,
+        sqlite_path=data.get('sqlite_path'),
+        pg_host=data.get('host'),
+        pg_port=data.get('port'),
+        pg_dbname=data.get('dbname'),
+        pg_user=data.get('user'),
+        pg_password=data.get('password'),
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@api_bp.route('/database/migrate', methods=['POST'])
+@manager_bp.route('/api/database/migrate', methods=['POST'])
+def api_database_migrate():
+    """
+    Triggers a bidirectional database migration and streams progress as Server-Sent Events.
+    Accepts JSON body:
+      { "direction": "sqlite_to_postgres" | "postgres_to_sqlite",
+        "host": str, "port": int, "dbname": str, "user": str, "password": str }
+
+    SSE event format (each line prefixed with 'data: '):
+      { "percent": int, "message": str, "done": bool, "result": {...} }
+    """
+    data = request.get_json(silent=True) or {}
+    direction = str(data.get('direction', 'sqlite_to_postgres')).lower()
+    pg_host = data.get('host')
+    pg_port = data.get('port')
+    pg_dbname = data.get('dbname')
+    pg_user = data.get('user')
+    pg_password = data.get('password')
+
+    def generate():
+        """Generator that yields SSE-formatted progress events."""
+        import queue
+        import threading
+
+        q = queue.Queue()
+
+        def progress_cb(pct: int, msg: str):
+            """Thread-safe callback that feeds progress into the SSE queue."""
+            q.put({"percent": pct, "message": msg, "done": False})
+
+        def run_migration():
+            """Executes the migration on a worker thread so Flask can stream the SSE."""
+            try:
+                if direction == 'postgres_to_sqlite':
+                    result = migrate_postgres_to_sqlite(
+                        progress_cb=progress_cb,
+                        pg_host=pg_host, pg_port=pg_port,
+                        pg_dbname=pg_dbname, pg_user=pg_user, pg_password=pg_password
+                    )
+                else:
+                    result = migrate_sqlite_to_postgres(
+                        progress_cb=progress_cb,
+                        pg_host=pg_host, pg_port=pg_port,
+                        pg_dbname=pg_dbname, pg_user=pg_user, pg_password=pg_password
+                    )
+                q.put({"percent": 100, "message": "Migration finished.", "done": True, "result": result})
+            except Exception as e:
+                q.put({"percent": 100, "message": str(e), "done": True, "result": {"status": "error", "message": str(e)}})
+
+        worker = threading.Thread(target=run_migration, daemon=True)
+        worker.start()
+
+        # Drain the queue until migration signals done
+        while True:
+            try:
+                item = q.get(timeout=90)
+                yield f"data: {json.dumps(item)}\n\n"
+                if item.get('done'):
+                    break
+            except Exception:
+                # Timeout or queue closed — emit error sentinel
+                yield f"data: {json.dumps({'percent': 100, 'message': 'Stream timeout.', 'done': True})}\n\n"
+                break
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
+
+
+@api_bp.route('/database/switch_engine', methods=['POST'])
+@manager_bp.route('/api/database/switch_engine', methods=['POST'])
+def api_database_switch_engine():
+    """
+    Switches the active database engine in .env without running a migration.
+    Intended for fresh deployments where a new empty database is acceptable.
+    Accepts JSON body:
+      { "engine": "sqlite" | "postgresql",
+        "host": str, "port": int, "dbname": str, "user": str, "password": str }
+    """
+    data = request.get_json(silent=True) or {}
+    engine = str(data.get('engine', 'sqlite')).lower()
+
+    if engine not in ('sqlite', 'postgresql', 'postgres'):
+        return jsonify({"status": "error", "message": "Invalid engine. Use 'sqlite' or 'postgresql'."}), 400
+
+    pg_params = None
+    if engine in ('postgresql', 'postgres'):
+        pg_params = {
+            'DB_HOST':     data.get('host', 'localhost'),
+            'DB_PORT':     str(data.get('port', 5432)),
+            'DB_NAME':     data.get('dbname', 'openpos'),
+            'DB_USER':     data.get('user', 'postgres'),
+            'DB_PASSWORD': data.get('password', ''),
+        }
+
+    try:
+        update_env_engine(engine, pg_params)
+        add_alert('WARNING', f'Database engine switched to {engine}. A system restart is recommended.', 'DATABASE')
+        return jsonify({
+            'status': 'success',
+            'engine': engine,
+            'message': f'Engine switched to {engine}. Restart Open-POS for the change to take full effect.'
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @api_bp.route('/logs', methods=['GET'])
 @manager_bp.route('/api/logs', methods=['GET'])
 def api_get_logs():
@@ -805,6 +1041,18 @@ def api_setup_submit():
     return jsonify(result), 200
 
 
+@api_bp.route('/setup/install_dependencies', methods=['POST'])
+@manager_bp.route('/api/setup/install_dependencies', methods=['POST'])
+def api_setup_install_dependencies():
+    """
+    Executes automated pip install -r requirements.txt using current Python interpreter.
+    Provides live progress and error diagnostic feedback for the Setup Wizard.
+    """
+    result = install_missing_requirements()
+    code = 200 if result.get("status") == "success" else 500
+    return jsonify(result), code
+
+
 @api_bp.route('/setup/complete', methods=['POST'])
 @manager_bp.route('/api/setup/complete', methods=['POST'])
 def api_setup_complete():
@@ -816,6 +1064,19 @@ def api_setup_complete():
     success = mark_setup_complete(data)
     if not success:
         return jsonify({"status": "error", "message": "Failed to create setup completion marker."}), 500
+
+    # If requested (e.g. from web UI), spawn Start_POS.bat in a new detached process and exit setup
+    if data.get("restart_supervisor", False):
+        def _deferred_launch():
+            import time
+            time.sleep(1.0)
+            bat_path = os.path.join(Config.BASE_DIR, "Start_POS.bat")
+            if os.path.isfile(bat_path):
+                subprocess.Popen(["cmd.exe", "/c", "Start_POS.bat"], cwd=Config.BASE_DIR, creationflags=subprocess.DETACHED_PROCESS)
+            os._exit(0)
+
+        threading.Thread(target=_deferred_launch, daemon=True).start()
+
     return jsonify({"status": "success", "message": "Setup permanently completed and locked."}), 200
 
 
@@ -888,7 +1149,7 @@ def api_live_logs_stream():
             ],
             "DISCORD": [
                 ("INFO", "Discord Gateway WebSocket heartbeat acknowledged (ping: 26ms)."),
-                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.3 Cashiers'."),
+                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.4 Cashiers'."),
                 ("INFO", "Daily trade webhooks channel #pos-trades listener healthy."),
                 ("INFO", "Discord bot queue empty. 0 outgoing transaction summaries pending.")
             ]
@@ -925,35 +1186,6 @@ def api_live_logs_stream():
 # -----------------------------------------------------------------------------
 # 9. Admin Authentication & Access Control Endpoints
 # -----------------------------------------------------------------------------
-AUTH_CONFIG_PATH = os.path.join(Config.CONFIG_DIR, 'manager_auth.json')
-
-def _read_auth_file() -> dict:
-    """Reads security configuration strictly from isolated data/config/manager_auth.json."""
-    if os.path.isfile(AUTH_CONFIG_PATH):
-        try:
-            with open(AUTH_CONFIG_PATH, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {
-        "require_password": False,
-        "password_hash": "",
-        "salt": "",
-        "protected_sections": ["branding", "database", "admin"],
-        "bypass_manager_on_boot": False
-    }
-
-def _write_auth_file(data: dict) -> None:
-    """Persists security configuration to isolated data/config/manager_auth.json."""
-    os.makedirs(Config.CONFIG_DIR, exist_ok=True)
-    with open(AUTH_CONFIG_PATH, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
-
-def _hash_with_salt(password: str, salt: str) -> str:
-    """Computes SHA-256 salted password digest."""
-    return hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
-
-
 @api_bp.route('/admin/auth/status', methods=['GET'])
 @manager_bp.route('/api/admin/auth/status', methods=['GET'])
 def api_admin_auth_status():
@@ -1015,19 +1247,23 @@ def api_admin_auth_configure():
     return jsonify({"status": "success", "message": "Security policy updated successfully."})
 
 
+@api_bp.route('/settings/verify_password', methods=['POST'])
+@manager_bp.route('/api/settings/verify_password', methods=['POST'])
 @api_bp.route('/admin/auth/verify', methods=['POST'])
 @manager_bp.route('/api/admin/auth/verify', methods=['POST'])
 def api_admin_auth_verify():
-    """Verifies manager password for protected section access."""
+    """Verifies manager password for protected section access and establishes authenticated session."""
     data = request.get_json(silent=True) or {}
     cfg = _read_auth_file()
 
-    if not cfg.get("require_password", False):
+    if not cfg.get("require_password", False) or not cfg.get("password_hash"):
+        session['manager_authenticated'] = True
         return jsonify({"status": "success", "authorized": True})
 
     section = str(data.get('section', '')).strip()
     protected = cfg.get("protected_sections", [])
-    if section and 'all' not in protected and section not in protected:
+    if section and 'all' not in protected and section not in protected and section != 'settings':
+        session['manager_authenticated'] = True
         return jsonify({"status": "success", "authorized": True})
 
     pwd = str(data.get('password', ''))
@@ -1035,9 +1271,18 @@ def api_admin_auth_verify():
     expected = cfg.get("password_hash", "")
 
     if expected and _hash_with_salt(pwd, salt) == expected:
+        session['manager_authenticated'] = True
         return jsonify({"status": "success", "authorized": True})
 
     return jsonify({"status": "error", "authorized": False, "message": "Invalid administrator password."}), 401
+
+
+@api_bp.route('/settings/logout', methods=['POST'])
+@manager_bp.route('/api/settings/logout', methods=['POST'])
+def api_settings_logout():
+    """Clears authenticated manager session."""
+    session.pop('manager_authenticated', None)
+    return jsonify({"status": "success", "message": "Session locked."})
 
 
 # -----------------------------------------------------------------------------

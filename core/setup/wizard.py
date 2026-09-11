@@ -57,112 +57,12 @@ def mark_setup_complete(metadata: dict = None) -> bool:
 
 def check_prerequisites() -> dict:
     """
-    Validates runtime environment prerequisites for Open-POS:
-      - Python 3.12+
-      - SQLite / PostgreSQL drivers
-      - Cryptography Fernet
-      - Writable data directories
+    Validates live runtime environment prerequisites for Open-POS:
+    Python >= 3.12, SQLite3, psycopg, cryptography, pywebview, pystray,
+    and private data/ directory write permissions.
     """
-    checks = []
-
-    # 1. Python version check (3.12+)
-    py_ver = sys.version_info
-    py_ok = (py_ver.major == 3 and py_ver.minor >= 12) or (py_ver.major > 3)
-    py_str = f"{py_ver.major}.{py_ver.minor}.{py_ver.micro}"
-    checks.append({
-        "id": "python_version",
-        "name": "Python 3.12+ Runtime",
-        "status": py_ok,
-        "detail": f"Detected Python {py_str}" if py_ok else f"Detected Python {py_str} (3.12+ required)",
-        "required": True
-    })
-
-    # 2. SQLite driver check
-    sqlite_ok = False
-    try:
-        import sqlite3
-        sqlite_ok = True
-        detail_sqlite = f"SQLite3 module available (v{sqlite3.sqlite_version})"
-    except Exception as e:
-        detail_sqlite = f"SQLite3 unavailable: {e}"
-    checks.append({
-        "id": "sqlite_driver",
-        "name": "SQLite3 Database Driver",
-        "status": sqlite_ok,
-        "detail": detail_sqlite,
-        "required": True
-    })
-
-    # 3. PostgreSQL driver check (psycopg)
-    pg_ok = False
-    try:
-        import psycopg
-        pg_ok = True
-        detail_pg = "psycopg module loaded successfully"
-    except Exception as e:
-        detail_pg = "psycopg not installed (SQLite standalone mode available)"
-    checks.append({
-        "id": "postgres_driver",
-        "name": "PostgreSQL Driver (psycopg)",
-        "status": pg_ok,
-        "detail": detail_pg,
-        "required": False
-    })
-
-    # 4. Cryptography / Fernet check
-    crypto_ok = False
-    try:
-        test_key = Fernet.generate_key()
-        f = Fernet(test_key)
-        enc = f.encrypt(b"OpenPOS_Prereq_Test")
-        dec = f.decrypt(enc)
-        crypto_ok = (dec == b"OpenPOS_Prereq_Test")
-        detail_crypto = "Fernet symmetric AES-128-CBC encryption verified"
-    except Exception as e:
-        detail_crypto = f"Cryptography failed: {e}"
-    checks.append({
-        "id": "cryptography",
-        "name": "Hardware/Credential Cryptography",
-        "status": crypto_ok,
-        "detail": detail_crypto,
-        "required": True
-    })
-
-    # 5. Data Directory Isolation & Write Permissions
-    dirs_to_verify = [
-        ("data_root", Config.DATA_DIR),
-        ("config_dir", Config.CONFIG_DIR),
-        ("db_dir", Config.DB_DIR),
-        ("logs_dir", Config.LOGS_DIR),
-        ("uploads_dir", Config.UPLOAD_DIR),
-        ("cache_dir", Config.CACHE_DIR),
-    ]
-    all_dirs_ok = True
-    dir_details = []
-    for d_name, d_path in dirs_to_verify:
-        try:
-            os.makedirs(d_path, exist_ok=True)
-            test_file = os.path.join(d_path, '.perm_test')
-            with open(test_file, 'w') as tf:
-                tf.write('ok')
-            os.remove(test_file)
-        except Exception as e:
-            all_dirs_ok = False
-            dir_details.append(f"Failed {d_name}: {e}")
-
-    checks.append({
-        "id": "data_isolation",
-        "name": "Data Isolation & Storage (data/)",
-        "status": all_dirs_ok,
-        "detail": "All isolated directories in data/ writable" if all_dirs_ok else "; ".join(dir_details),
-        "required": True
-    })
-
-    all_passed = all(c["status"] for c in checks if c["required"])
-    return {
-        "all_passed": all_passed,
-        "checks": checks
-    }
+    from core.setup.checks import run_prerequisite_checks
+    return run_prerequisite_checks()
 
 def generate_crypto_keys() -> dict:
     """

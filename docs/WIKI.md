@@ -1,4 +1,4 @@
-# Open-POS Developer Wiki & Technical Reference (v1.0.3)
+# Open-POS Developer Wiki & Technical Reference (v1.0.4)
 
 Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, security controls, and testing standards for the project.
 
@@ -142,7 +142,7 @@ To prevent layout shifting and guarantee tactile navigation across every subview
               </div>
           </div>
           <span class="status-pill status-online">Engine: Online</span>
-          <a href="/manager/about" class="version-badge-link">v1.0.3</a>
+          <a href="/manager/about" class="version-badge-link">v1.0.4</a>
       </div>
   </header>
   ```

@@ -195,14 +195,14 @@ def test_about_view_route(client):
     assert "Return to Dashboard" in html
     assert "Third-Party Dependencies" in html
     assert "Cave404" in html
-    assert "v1.0.3" in html
+    assert "v1.0.4" in html
 
 def test_api_system_credits(client):
-    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.3."""
+    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.4."""
     res = client.get("/api/system/credits")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["version"] == "v1.0.3"
+    assert data["version"] == "v1.0.4"
     assert "https://github.com/Cave404/Open-POS" in data["repository"]
     assert len(data["authors"]) >= 1
     assert len(data["dependencies"]) >= 5
@@ -215,13 +215,25 @@ def test_api_system_credits(client):
 
 def test_placeholder_navigation_routes(client):
     """Asserts that non-implemented built-in applet routes render placeholder view safely with btn-back."""
-    for endpoint in ["/manager/database", "/manager/network", "/manager/cache"]:
+    for endpoint in ["/manager/network", "/manager/cache"]:
         res = client.get(endpoint)
         assert res.status_code == 200
         html = res.get_data(as_text=True)
         assert "Under Active Construction" in html
         assert "btn-back" in html
         assert "Return to Dashboard" in html
+
+def test_database_view_route(client):
+    """Asserts that /manager/database renders the dedicated database tools & migration template."""
+    res = client.get("/manager/database")
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert "Database Tools" in html
+    assert "Active Engine" in html
+    assert "Switch Engine / Migrate Database" in html
+    assert "Test Connection" in html
+    assert "Start Automated Conversion" in html
+    assert "btn-back" in html
 
 def test_generic_placeholder_route(client):
     """Asserts that any unconfigured applet ID safely falls back to placeholder."""
@@ -330,7 +342,7 @@ def test_data_directory_structure():
     assert os.path.isdir(Config.CONFIG_DIR)
 
 def test_manager_dashboard_home_view(client):
-    """Asserts that GET /manager renders the Home view as default with v1.0.3 footer and notification bell."""
+    """Asserts that GET /manager renders the Home view as default with v1.0.4 footer and notification bell."""
     res = client.get('/manager')
     assert res.status_code in (200, 308)
     if res.status_code == 308:
@@ -338,7 +350,7 @@ def test_manager_dashboard_home_view(client):
     html = res.get_data(as_text=True)
     assert "Quick-Access Dashboard" in html
     assert "Home" in html
-    assert "v1.0.3" in html
+    assert "v1.0.4" in html
     assert "notifBellBtn" in html
     assert "configure_manager" in html
 
@@ -353,7 +365,7 @@ def test_logs_view_route(client):
     assert "btnExportCsv" in html
     assert "btnDownloadLog" in html
     assert "btnOpenLiveTerminal" in html
-    assert "v1.0.3" in html
+    assert "v1.0.4" in html
 
 def test_configure_manager_view_route(client):
     """Asserts that GET /manager/configure_manager renders the Configure Manager view."""
@@ -367,7 +379,7 @@ def test_configure_manager_view_route(client):
     assert "bypassManagerToggle" in html
     assert "btnScanPackages" in html
     assert "password-grid" in html
-    assert "v1.0.3" in html
+    assert "v1.0.4" in html
 
 def test_notifications_service_and_apis(client):
     """Asserts that notification queue operations and REST endpoints function correctly."""
@@ -531,5 +543,6 @@ def test_system_packages_and_restart_api(client):
     restart_res = client.post('/api/system/restart')
     assert restart_res.status_code == 200
     assert restart_res.get_json()["status"] == "success"
+
 
 

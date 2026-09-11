@@ -516,51 +516,27 @@
             cursor: not-allowed;
         }
 
-        /* Print Specific Styles */
+        .print-sheet-doc {
+            display: none;
+        }
+
+        /* Dedicated Print Layout Styles */
         @media print {
-            body.wizard-body {
+            body * { visibility: hidden !important; }
+            #printableRecoverySheet, #printableRecoverySheet * {
+                visibility: visible !important;
+                display: block !important;
+            }
+            #printableRecoverySheet {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
                 background: #ffffff !important;
                 color: #000000 !important;
-            }
-
-            .wizard-header,
-            .stepper-container,
-            .wizard-btn-row,
-            .btn-wizard,
-            .stage-1, .stage-2, .stage-3, .stage-4, .stage-5 {
-                display: none !important;
-            }
-
-            .wizard-stage-card {
-                box-shadow: none !important;
-                border: 1px solid #000 !important;
-                background: #fff !important;
-                max-width: 100% !important;
-                padding: 20px !important;
-                display: block !important;
-            }
-
-            .stage-6 {
-                display: block !important;
-            }
-
-            .recovery-key-card {
-                background: #f8fafc !important;
-                border: 2px solid #000 !important;
-                color: #000 !important;
-                box-shadow: none !important;
-            }
-
-            .recovery-token-display {
-                background: #f1f5f9 !important;
-                color: #000000 !important;
-                border: 1px solid #000 !important;
-            }
-
-            .warning-notice {
-                background: #fef2f2 !important;
-                border: 1px solid #dc2626 !important;
-                color: #991b1b !important;
+                padding: 24px !important;
+                border: 2px solid #000000 !important;
+                box-sizing: border-box !important;
             }
         }
     </style>
@@ -576,7 +552,7 @@
                 <p>Initial Store &amp; Cryptographic Provisioning</p>
             </div>
         </div>
-        <span class="version-pill">v1.0.3</span>
+        <span class="version-pill">v1.0.4</span>
     </header>
 
     <!-- Progress Stepper -->
@@ -633,6 +609,24 @@
                 <div style="text-align: center; color: var(--wizard-muted); padding: 24px;">
                     Scanning runtime environment...
                 </div>
+            </div>
+
+            <!-- Auto-Pip Pipeline and Upstream Links (Active when missing components detected) -->
+            <div id="prereqActionArea" style="display: none; margin-top: 16px; padding: 16px 20px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #f87171; margin-bottom: 6px; font-size: 13.5px;">
+                    <span>⚠️</span> Required Environment Components Missing
+                </div>
+                <p style="font-size: 12.5px; color: var(--wizard-muted); margin-bottom: 12px; line-height: 1.5;">
+                    One or more required Python drivers or libraries could not be loaded. You can install missing packages automatically via the auto-pip pipeline or download upstream installers.
+                </p>
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <button type="button" class="btn-wizard btn-wizard-primary" id="btnInstallDeps" style="padding: 9px 18px; font-size: 13px;">
+                        <span>📦</span> Install Missing Components
+                    </button>
+                    <a href="https://www.python.org/downloads/" target="_blank" style="color: #60a5fa; font-size: 12px; text-decoration: underline;">Python 3.12+ Upstream &rarr;</a>
+                    <a href="https://www.postgresql.org/download/" target="_blank" style="color: #60a5fa; font-size: 12px; text-decoration: underline;">PostgreSQL Upstream &rarr;</a>
+                </div>
+                <div id="pipInstallStatus" style="display: none; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--wizard-warning);"></div>
             </div>
 
             <div class="wizard-btn-row">
@@ -852,6 +846,40 @@
                 This recovery key will <strong>NEVER</strong> be shown again after setup is completed. OpenPOS developers do not possess a backdoor and cannot restore your database if this key is lost. Please store it on an offline drive or paper printout in a safe.
             </div>
 
+            <!-- Dedicated Printable Document Layout (Active during print via #printableRecoverySheet) -->
+            <div id="printableRecoverySheet" style="display: none;">
+                <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 16px;">
+                    <h2 style="font-size: 20px; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">OPEN-POS EMERGENCY SYSTEM RECOVERY KEY</h2>
+                    <div style="font-size: 11px; color: #444444; margin-top: 4px; font-weight: 600; letter-spacing: 0.5px;">CONFIDENTIAL MASTER CREDENTIALS &bull; STORE IN SECURE OFFLINE VAULT</div>
+                </div>
+                <div style="border: 1px solid #999999; padding: 12px 16px; margin-bottom: 16px; background: #f8fafc; font-size: 13px; line-height: 1.6;">
+                    <div><strong>Store Name:</strong> <span id="printStoreName">Store</span></div>
+                    <div><strong>Generated:</strong> <span id="printDate">&#8212;</span></div>
+                    <div><strong>System Version:</strong> v1.0.4</div>
+                </div>
+                <div style="margin-bottom: 14px;">
+                    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Master Emergency Recovery Token:</div>
+                    <div id="printTokenVal" style="font-family: Consolas, monospace; font-size: 16px; font-weight: 700; padding: 10px 14px; border: 2px solid #000000; background: #f1f5f9; text-align: center; letter-spacing: 1.5px;">OPOS-REC-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX</div>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Symmetric Fernet Encryption Key:</div>
+                    <div id="printFernetVal" style="font-family: Consolas, monospace; font-size: 11px; padding: 8px 12px; border: 1px solid #999999; word-break: break-all; background: #f8fafc;">&#8212;</div>
+                </div>
+                <div style="border-top: 1px solid #000000; padding-top: 12px; font-size: 12px; line-height: 1.6;">
+                    <strong style="text-transform: uppercase; letter-spacing: 0.5px;">Recovery Instructions &amp; Safe Storage Protocol:</strong>
+                    <ol style="margin-top: 6px; padding-left: 20px; font-size: 11.5px;">
+                        <li><strong>Physical Vault Storage:</strong> File this document immediately in a locked fireproof vault or manager safe. Do not leave exposed on the counter.</li>
+                        <li><strong>Administrative Password Reset:</strong> If the administrator PIN or manager password is forgotten, this recovery token must be entered to reset credentials.</li>
+                        <li><strong>Cryptographic Data Protection:</strong> All local sales, customer data, and store inventory records are encrypted with this Fernet key.</li>
+                        <li><strong>Zero Knowledge Protocol:</strong> OpenPOS developers and support staff do not possess duplicate keys and cannot restore store records if this sheet is lost.</li>
+                    </ol>
+                </div>
+                <div style="margin-top: 20px; border-top: 1px solid #000000; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #555555;">
+                    <span>Open-POS &bull; Cryptographic Hardware &amp; Vault Recovery Sheet</span>
+                    <span>Page 1 of 1</span>
+                </div>
+            </div>
+
             <div class="wizard-btn-row">
                 <span style="font-size: 12px; color: var(--wizard-muted);">Step 6 of 6 Complete</span>
                 <button type="button" class="btn-wizard btn-wizard-success" id="btnFinishSetup">
@@ -919,17 +947,65 @@ async function scanPrerequisites() {
                 <div class="prereq-info">
                     <h4>${c.name}</h4>
                     <p>${c.detail}</p>
+                    ${!c.status && c.upstream_url ? `<div style="margin-top: 4px;"><a href="${c.upstream_url}" target="_blank" style="color: #60a5fa; font-size: 11.5px; text-decoration: underline;">Download from official site &rarr;</a></div>` : ''}
                 </div>
                 <div class="prereq-badge ${badgeClass}">${badgeText}</div>
             `;
             listEl.appendChild(item);
         });
 
+        const actionArea = document.getElementById('prereqActionArea');
+        if (actionArea) {
+            actionArea.style.display = (data.has_missing_packages || !prereqPassed) ? 'block' : 'none';
+        }
+
         document.getElementById('btnNext1').disabled = !prereqPassed;
     } catch (err) {
         listEl.innerHTML = `<div style="color: var(--wizard-danger); padding: 20px;">Failed to scan prerequisites: ${err.message}</div>`;
         document.getElementById('btnNext1').disabled = true;
     }
+}
+
+const btnInstall = document.getElementById('btnInstallDeps');
+if (btnInstall) {
+    btnInstall.addEventListener('click', async () => {
+        const statusEl = document.getElementById('pipInstallStatus');
+        btnInstall.disabled = true;
+        btnInstall.innerHTML = '<span>⏳</span> Installing Components (pip install -r requirements.txt)...';
+        if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--wizard-warning)';
+            statusEl.textContent = 'Executing pip installation... please wait...';
+        }
+
+        try {
+            const res = await fetch('/api/setup/install_dependencies', { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'success') {
+                if (statusEl) {
+                    statusEl.textContent = '✓ Dependencies installed successfully! Re-scanning environment...';
+                    statusEl.style.color = 'var(--wizard-success)';
+                }
+                setTimeout(() => {
+                    scanPrerequisites();
+                }, 1200);
+            } else {
+                if (statusEl) {
+                    statusEl.textContent = 'Installation failed: ' + (data.message || 'Unknown error');
+                    statusEl.style.color = 'var(--wizard-danger)';
+                }
+                btnInstall.disabled = false;
+                btnInstall.innerHTML = '<span>📦</span> Retry Installing Components';
+            }
+        } catch (e) {
+            if (statusEl) {
+                statusEl.textContent = 'Request failed: ' + e.message;
+                statusEl.style.color = 'var(--wizard-danger)';
+            }
+            btnInstall.disabled = false;
+            btnInstall.innerHTML = '<span>📦</span> Retry Installing Components';
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -1042,14 +1118,80 @@ document.getElementById('inputLogoFile').addEventListener('change', async (e) =>
 // ---------------------------------------------------------------------------
 // 5. Recovery Key Export & Print
 // ---------------------------------------------------------------------------
-document.getElementById('btnDownloadRecoveryFile').addEventListener('click', () => {
-    const storeName = encodeURIComponent(document.getElementById('inputStoreName').value.trim() || 'Store');
-    const token = encodeURIComponent(generatedCrypto.recovery_token);
-    const fernet = encodeURIComponent(generatedCrypto.fernet_key);
-    window.location.href = `/api/setup/recovery_file?store_name=${storeName}&recovery_token=${token}&fernet_key=${fernet}`;
+document.getElementById('btnDownloadRecoveryFile').addEventListener('click', async () => {
+    const storeName = document.getElementById('inputStoreName').value.trim() || 'Store';
+    const token = generatedCrypto.recovery_token || '';
+    const fernet = generatedCrypto.fernet_key || '';
+
+    // Primary: Native Win32 Save-As dialog via pywebview bridge
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_recovery_file_dialog) {
+        try {
+            const result = await window.pywebview.api.save_recovery_file_dialog(storeName, token, fernet);
+            if (result && result.status === 'success') {
+                const btn = document.getElementById('btnDownloadRecoveryFile');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span>✓</span> Saved to Desktop!';
+                btn.style.background = 'var(--wizard-success)';
+                setTimeout(() => { btn.innerHTML = originalText; btn.style.background = ''; }, 2500);
+                return;
+            } else if (result && result.status === 'cancelled') {
+                return; // User canceled dialog
+            }
+        } catch(e) {
+            console.warn('save_recovery_file_dialog error:', e);
+        }
+    }
+
+    // Fallback: Legacy save_recovery_file bridge method
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_recovery_file) {
+        try {
+            const now = new Date().toLocaleString();
+            const content = [
+                '=== OPENPOS EMERGENCY SYSTEM RECOVERY KEY ===',
+                `Store: ${storeName}`,
+                `Generated: ${now}`,
+                '',
+                `RECOVERY TOKEN: ${token}`,
+                `FERNET KEY:     ${fernet}`,
+                '',
+                'Keep this file in a secure offline location (e.g. encrypted USB drive).'
+            ].join('\n');
+            const result = await window.pywebview.api.save_recovery_file(content, `${storeName.replace(/\s+/g, '_')}_Recovery_Key.txt`);
+            if (result && result.status === 'success') {
+                const btn = document.getElementById('btnDownloadRecoveryFile');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span>✓</span> Saved to Desktop!';
+                btn.style.background = 'var(--wizard-success)';
+                setTimeout(() => { btn.innerHTML = originalText; btn.style.background = ''; }, 2500);
+                return;
+            } else if (result && result.status === 'cancelled') {
+                return;
+            }
+        } catch(e) {
+            console.warn('save_recovery_file error:', e);
+        }
+    }
+
+    // Browser / HTTP fallback: redirect to server-side download endpoint
+    const qs = `store_name=${encodeURIComponent(storeName)}&recovery_token=${encodeURIComponent(token)}&fernet_key=${encodeURIComponent(fernet)}`;
+    window.location.href = `/api/setup/recovery_file?${qs}`;
 });
 
 document.getElementById('btnPrintRecoverySheet').addEventListener('click', () => {
+    const storeName = document.getElementById('inputStoreName').value.trim() || 'Store';
+    const token = generatedCrypto.recovery_token || '';
+    const fernet = generatedCrypto.fernet_key || '';
+
+    const printStoreEl = document.getElementById('printStoreName');
+    const printDateEl = document.getElementById('printDate');
+    const printTokenEl = document.getElementById('printTokenVal');
+    const printFernetEl = document.getElementById('printFernetVal');
+
+    if (printStoreEl) printStoreEl.textContent = storeName;
+    if (printDateEl) printDateEl.textContent = new Date().toLocaleString();
+    if (printTokenEl) printTokenEl.textContent = token;
+    if (printFernetEl) printFernetEl.textContent = fernet || 'Configured in data/config/.env';
+
     window.print();
 });
 
@@ -1059,7 +1201,19 @@ document.getElementById('btnPrintRecoverySheet').addEventListener('click', () =>
 document.getElementById('btnFinishSetup').addEventListener('click', async () => {
     const finishBtn = document.getElementById('btnFinishSetup');
     finishBtn.disabled = true;
-    finishBtn.innerHTML = '<span>⏳</span> Finalizing Security Lockout...';
+    finishBtn.innerHTML = '<span>⏳</span> Finalizing Setup &amp; Launching OpenPOS...';
+
+    const storeName = document.getElementById('inputStoreName').value.trim() || 'Store';
+
+    // Desktop mode: Native clean exit, close window, and spawn detached Start_POS.bat
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.finish_and_launch) {
+        try {
+            await window.pywebview.api.finish_and_launch(storeName);
+            return;
+        } catch (e) {
+            console.warn('Native finish_and_launch error, falling back to HTTP:', e);
+        }
+    }
 
     try {
         const res = await fetch('/api/setup/complete', {
@@ -1067,7 +1221,8 @@ document.getElementById('btnFinishSetup').addEventListener('click', async () => 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 completed_by: 'installer',
-                store_name: document.getElementById('inputStoreName').value.trim()
+                store_name: storeName,
+                restart_supervisor: true
             })
         });
         const data = await res.json();
@@ -1075,8 +1230,10 @@ document.getElementById('btnFinishSetup').addEventListener('click', async () => 
             throw new Error(data.message || 'Failed to complete setup');
         }
 
-        // Setup permanently locked out! Transition to System Manager
-        window.location.href = '/manager';
+        // Transition to System Manager
+        setTimeout(() => {
+            window.location.href = '/manager';
+        }, 800);
     } catch (err) {
         alert(`Error finishing setup: ${err.message}`);
         finishBtn.disabled = false;

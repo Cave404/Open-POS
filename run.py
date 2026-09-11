@@ -48,6 +48,116 @@ is_terminating = False        # Flag indicating whether a full system shutdown i
 
 
 # -----------------------------------------------------------------------------
+# JS Bridge: Python capabilities exposed to the WebView2 JS context
+# -----------------------------------------------------------------------------
+class JSBridge:
+    """
+    Exposes safe Python-native capabilities to the embedded WebView2 browser
+    context via window.pywebview.api.<method>(). pywebview injects _window
+    automatically so we can reference the calling window for dialog dispatch.
+
+    Threading note: pywebview runs bridge methods on a background worker thread
+    but internally dispatches Win32 dialog calls to the main OS thread, so
+    create_file_dialog() is safe to call here without additional synchronization.
+    """
+
+    def save_recovery_file(self, content: str, filename: str = 'OpenPOS_Emergency_Recovery.txt') -> dict:
+        """
+        Opens a native Windows Save-As dialog pre-filled with the given filename,
+        then writes the provided text content to the chosen path.
+
+        Returns:
+            { 'status': 'success', 'path': '/chosen/path' }
+            { 'status': 'cancelled' }  -- if the user dismissed the dialog
+        """
+        try:
+            win = getattr(self, '_window', None) or (webview.windows[0] if webview.windows else None)
+            if not win:
+                return {'status': 'error', 'message': 'No active pywebview window available.'}
+            result = win.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename=filename,
+                file_types=('Text Files (*.txt)', 'All Files (*.*)')
+            )
+            if result and len(result) > 0:
+                target_path = result[0]
+                with open(target_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                return {'status': 'success', 'path': target_path}
+            return {'status': 'cancelled'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+
+    def save_recovery_file_dialog(self, store_name, token, fernet_key):
+        """
+        Opens a native Windows Save-As dialog pre-filled with the store recovery key filename,
+        then writes the recovery token and Fernet key to plain text.
+        """
+        try:
+            from datetime import datetime
+            win = getattr(self, '_window', None) or (webview.windows[0] if webview.windows else None)
+            if not win:
+                return {'status': 'error', 'message': 'No active pywebview window available.'}
+
+            safe_name = str(store_name or 'OpenPOS_Store').replace(' ', '_')
+            file_path = win.create_file_dialog(
+                webview.SAVE_DIALOG,
+                directory=os.path.expanduser("~/Desktop"),
+                save_filename=f"{safe_name}_Recovery_Key.txt"
+            )
+            if file_path:
+                target = file_path[0] if isinstance(file_path, (list, tuple)) else file_path
+                with open(target, 'w', encoding='utf-8') as f:
+                    f.write("=== OPENPOS EMERGENCY SYSTEM RECOVERY KEY ===\n")
+                    f.write(f"Store: {store_name}\n")
+                    f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                    f.write(f"RECOVERY TOKEN: {token}\n")
+                    f.write(f"FERNET KEY:     {fernet_key}\n\n")
+                    f.write("Keep this file in a secure offline location (e.g. encrypted USB drive).\n")
+                return {"status": "success", "path": target}
+            return {"status": "cancelled"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def finish_and_launch(self, store_name: str = None) -> dict:
+        """
+        Writes data/config/.setup_complete, closes setup window, spawns Start_POS.bat detached, and exits.
+        """
+        try:
+            import subprocess
+            from core.setup import mark_setup_complete
+            mark_setup_complete({"store_name": store_name or "Store", "completed_by": "setup_wizard"})
+            win = getattr(self, '_window', None) or (webview.windows[0] if webview.windows else None)
+            if win:
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+
+            bat_path = os.path.join(Config.BASE_DIR, "Start_POS.bat")
+            if os.path.isfile(bat_path):
+                subprocess.Popen(
+                    ["cmd.exe", "/c", "Start_POS.bat"],
+                    cwd=Config.BASE_DIR,
+                    creationflags=subprocess.DETACHED_PROCESS
+                )
+
+            def _exit_later():
+                import time
+                time.sleep(0.5)
+                os._exit(0)
+
+            threading.Thread(target=_exit_later, daemon=True).start()
+            return {"status": "success"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def get_version(self) -> str:
+        """Returns the current Open-POS version string (used by JS diagnostics)."""
+        return Config.VERSION
+
+
+# -----------------------------------------------------------------------------
 # 1. Background Web Server Worker
 # -----------------------------------------------------------------------------
 def run_backend_server():
@@ -214,7 +324,8 @@ def boot_orchestration_worker():
         height=720,
         min_size=(820, 560),
         resizable=True,
-        confirm_close=False
+        confirm_close=False,
+        js_api=JSBridge()   # Expose native save/dialog bridge to manager JS context
     )
 
     # Register close button minimization hook
@@ -251,7 +362,8 @@ if __name__ == '__main__':
             height=700,
             min_size=(780, 600),
             resizable=True,
-            confirm_close=False
+            confirm_close=False,
+            js_api=JSBridge()   # Expose native save dialog to wizard JS context
         )
         active_window.events.closing += on_window_closing
         webview.start()
