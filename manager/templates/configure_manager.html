@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure Manager &amp; Administration - Open-POS</title>
+    <link rel="stylesheet" href="/static/css/manager.css">
+    <script src="/static/js/notifications.js"></script>
+    <style>
+        .admin-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--text-main);
+            transition: all 0.15s ease;
+        }
+
+        .checkbox-label:hover {
+            border-color: var(--border-color-hover);
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            accent-color: var(--accent-blue);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .packages-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+            margin-top: 12px;
+        }
+
+        .packages-table th {
+            background-color: var(--bg-card);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .packages-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+
+        .pkg-name-cell {
+            font-family: monospace;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .badge-current {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+
+        .badge-latest {
+            background-color: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #34d399;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="manager-body">
+
+    <!-- Standardized Subview Header -->
+    <header class="subview-header">
+        <div class="header-left">
+            <a href="/manager" class="btn-back" id="btnReturnDashboard">
+                <span class="btn-icon">←</span>
+                <span>Return to Dashboard</span>
+            </a>
+            <div class="header-divider"></div>
+            <h2 class="subview-title">Configure Manager &amp; Administration</h2>
+        </div>
+        <div class="header-right">
+            <!-- Live Notifications Trigger -->
+            <div class="notification-wrapper">
+                <button id="notifBellBtn" class="btn-icon-tray" title="System Notifications">
+                    🔔 <span id="notifBadge" class="badge-count" style="display: none;">0</span>
+                </button>
+                <div id="notifDropdown" class="notif-dropdown-menu" style="display: none;">
+                    <div class="notif-dropdown-header">
+                        <span>System Notifications</span>
+                        <button id="clearNotifsBtn" class="btn-text-action">Clear</button>
+                    </div>
+                    <div id="notifList" class="notif-dropdown-body">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div class="notif-dropdown-footer">
+                        <a href="/manager/logs" class="btn-full-action">Open Terminal Logs →</a>
+                    </div>
+                </div>
+            </div>
+            <span class="status-pill status-online">Engine: Online</span>
+            <a href="/manager/about" class="version-badge-link">v1.0.2</a>
+        </div>
+    </header>
+
+    <div class="view-container">
+        <div class="admin-container">
+
+            <!-- Restart Warning Banner (dynamically toggled) -->
+            <div id="restartWarningBanner" class="restart-warning-banner" style="display: none;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">⚠️</span>
+                    <div>
+                        <div>A critical core dependency was updated. A system restart is required for changes to take effect.</div>
+                        <div style="font-size: 11px; color: #fde68a; font-weight: normal;">Server sockets, WebView2 container, and system tray hooks will re-initialize.</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-action-sm btn-action-primary" id="btnRestartPOS" style="background: #d97706; border-color: #b45309;">
+                    <span>⚡</span> Restart POS System
+                </button>
+            </div>
+
+            <!-- Section A: Access Control & Employee Lockout -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <span style="font-size: 22px;">🔒</span>
+                    <h3>Access Control &amp; Employee Lockout</h3>
+                </div>
+
+                <div class="admin-toggle-row">
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-main); font-size: 14px;">Require Manager Password to Access Settings</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                            Prevents unauthorized register staff and cashiers from modifying financial ratios, store branding, or clearing databases.
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="requirePasswordToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div id="lockoutDetails" style="display: flex; flex-direction: column; gap: 14px;">
+                    <div>
+                        <label style="font-size: 12px; font-weight: 600; color: var(--text-main);">Protected Functional Areas:</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="chkProtectBranding" checked>
+                                <span>Store Branding &amp; Rules</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="chkProtectDatabase" checked>
+                                <span>Database Operations</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="chkProtectAdmin" checked>
+                                <span>System Administration</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="chkProtectAll">
+                                <span>All Non-Home Applets</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Password Management Form -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-top: 6px;">
+                        <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-main);">Set / Change Manager Admin Password</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                            <div class="form-group" id="currentPassGroup" style="display: none;">
+                                <label for="currentPassword">Current Password</label>
+                                <input type="password" id="currentPassword" class="log-input" placeholder="Enter current password">
+                            </div>
+                            <div class="form-group">
+                                <label for="newPassword">New PIN / Password</label>
+                                <input type="password" id="newPassword" class="log-input" placeholder="New manager password">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmPassword">Confirm Password</label>
+                                <input type="password" id="confirmPassword" class="log-input" placeholder="Re-type new password">
+                            </div>
+                        </div>
+                        <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
+                            <button type="button" class="btn-action-sm btn-action-primary" id="btnSaveAuth">
+                                <span>💾</span> Save Security Policy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section B: Startup & Register Bypass Modes -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <span style="font-size: 22px;">🚀</span>
+                    <h3>Startup &amp; Register Bypass Modes</h3>
+                </div>
+
+                <div class="admin-toggle-row">
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-main); font-size: 14px;">Bypass Manager on Boot</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                            When enabled, the system starts the supervisor silently to the system tray and immediately launches the cashier Register UI in full focus.
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="bypassManagerToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Section C: Subsystem & Python Package Updates -->
+            <div class="admin-card">
+                <div class="admin-card-header" style="justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 22px;">📦</span>
+                        <h3>Subsystem &amp; Python Package Updates</h3>
+                    </div>
+                    <button type="button" class="btn-action-sm" id="btnScanPackages">
+                        <span>🔍</span> Scan for Updates
+                    </button>
+                </div>
+
+                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
+                    Check the active Python virtual environment for newer stable upstream releases of core POS dependencies (Flask, Waitress, PyWebView, Psycopg, etc.).
+                </p>
+
+                <table class="packages-table">
+                    <thead>
+                        <tr>
+                            <th>Package</th>
+                            <th>Installed Version</th>
+                            <th>Latest Available</th>
+                            <th style="text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="packagesTableBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                Click "Scan for Updates" to query the environment package ledger.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer">
+        <div class="toast" id="toast">
+            <div class="toast-message">
+                <span id="toastIcon">✓</span>
+                <span id="toastText">Action successful.</span>
+            </div>
+            <button type="button" class="toast-close" id="toastClose">&times;</button>
+        </div>
+    </div>
+
+<script>
+let authConfig = { has_password: false, require_password: false, protected_sections: [] };
+
+async function loadAdminStatus() {
+    try {
+        const res = await fetch('/api/admin/auth/status');
+        if (!res.ok) return;
+        authConfig = await res.json();
+
+        document.getElementById('requirePasswordToggle').checked = !!authConfig.require_password;
+        document.getElementById('bypassManagerToggle').checked = !!authConfig.bypass_manager_on_boot;
+
+        if (authConfig.has_password) {
+            document.getElementById('currentPassGroup').style.display = 'block';
+        }
+
+        const sections = authConfig.protected_sections || [];
+        document.getElementById('chkProtectBranding').checked = sections.includes('branding');
+        document.getElementById('chkProtectDatabase').checked = sections.includes('database');
+        document.getElementById('chkProtectAdmin').checked = sections.includes('admin');
+        document.getElementById('chkProtectAll').checked = sections.includes('all');
+    } catch (err) {
+        console.error('Failed to load admin configuration:', err);
+    }
+}
+
+async function saveSecurityPolicy() {
+    const requirePw = document.getElementById('requirePasswordToggle').checked;
+    const currentPw = document.getElementById('currentPassword').value;
+    const newPw = document.getElementById('newPassword').value;
+    const confirmPw = document.getElementById('confirmPassword').value;
+
+    if (newPw && newPw !== confirmPw) {
+        showToast('New passwords do not match!', true);
+        return;
+    }
+
+    const sections = [];
+    if (document.getElementById('chkProtectBranding').checked) sections.push('branding');
+    if (document.getElementById('chkProtectDatabase').checked) sections.push('database');
+    if (document.getElementById('chkProtectAdmin').checked) sections.push('admin');
+    if (document.getElementById('chkProtectAll').checked) sections.push('all');
+
+    const payload = {
+        require_password: requirePw,
+        current_password: currentPw,
+        new_password: newPw,
+        protected_sections: sections,
+        bypass_manager_on_boot: document.getElementById('bypassManagerToggle').checked
+    };
+
+    try {
+        const res = await fetch('/api/admin/auth/configure', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            showToast('Security policy updated successfully.');
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            loadAdminStatus();
+        } else {
+            showToast(data.message || 'Failed to save security policy', true);
+        }
+    } catch (err) {
+        showToast(`Network error: ${err.message}`, true);
+    }
+}
+
+async function scanPackages() {
+    const tbody = document.getElementById('packagesTableBody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                Checking upstream Python package ledger with pip...
+            </td>
+        </tr>
+    `;
+
+    try {
+        const res = await fetch('/api/system/packages');
+        const data = await res.json();
+        const packages = data.packages || [];
+
+        tbody.innerHTML = '';
+        if (packages.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--success); padding: 24px;">
+                        ✓ All installed packages are currently up-to-date.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        packages.forEach(pkg => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="pkg-name-cell">${pkg.name}</td>
+                <td><span class="badge-current">${pkg.version}</span></td>
+                <td><span class="badge-latest">${pkg.latest_version}</span></td>
+                <td style="text-align: right;">
+                    <button type="button" class="btn-action-sm btn-action-primary" onclick="upgradePackage('${pkg.name}', this)">
+                        <span>⬆</span> Upgrade
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" style="text-align: center; color: var(--danger); padding: 24px;">
+                    Failed to scan packages: ${err.message}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+async function upgradePackage(name, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Upgrading...';
+
+    try {
+        const res = await fetch('/api/system/packages/upgrade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ package: name })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            showToast(`Successfully upgraded ${name} to ${data.new_version || 'latest'}`);
+            btn.textContent = 'Upgraded ✓';
+            btn.style.background = 'var(--success)';
+
+            if (data.restart_required) {
+                document.getElementById('restartWarningBanner').style.display = 'flex';
+            }
+        } else {
+            showToast(data.message || `Failed to upgrade ${name}`, true);
+            btn.disabled = false;
+            btn.textContent = 'Upgrade';
+        }
+    } catch (err) {
+        showToast(`Upgrade error: ${err.message}`, true);
+        btn.disabled = false;
+        btn.textContent = 'Upgrade';
+    }
+}
+
+async function restartSystem() {
+    try {
+        await fetch('/api/system/restart', { method: 'POST' });
+        showToast('System restart initiated. Reconnecting...');
+    } catch (err) {
+        showToast(`Restart error: ${err.message}`, true);
+    }
+}
+
+// Toast helper
+let toastTimer = null;
+function showToast(msg, isError = false) {
+    const toast = document.getElementById('toast');
+    const text = document.getElementById('toastText');
+    const icon = document.getElementById('toastIcon');
+
+    if (toastTimer) clearTimeout(toastTimer);
+
+    text.textContent = msg;
+    icon.textContent = isError ? '⚠️' : '✓';
+    toast.className = 'toast show' + (isError ? ' toast-error' : '');
+
+    toastTimer = setTimeout(() => {
+        toast.className = 'toast';
+    }, 4000);
+}
+
+document.getElementById('toastClose').addEventListener('click', () => {
+    document.getElementById('toast').className = 'toast';
+});
+
+document.getElementById('btnSaveAuth').addEventListener('click', saveSecurityPolicy);
+document.getElementById('bypassManagerToggle').addEventListener('change', saveSecurityPolicy);
+document.getElementById('btnScanPackages').addEventListener('click', scanPackages);
+document.getElementById('btnRestartPOS').addEventListener('click', restartSystem);
+
+document.addEventListener('DOMContentLoaded', loadAdminStatus);
+</script>
+</body>
+</html>

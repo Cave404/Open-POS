@@ -244,12 +244,22 @@ if __name__ == '__main__':
     tray_instance = initialize_system_tray()
     tray_instance.run_detached()
 
-    # Step C: Instantiate the borderless splash window matching image aspect ratio (656x404)
+    # Step C: Measure exact splash image dimensions and instantiate borderless window with docked tray
+    splash_path = os.path.join(Config.BASE_DIR, 'manager', 'open_pos_splash.png')
+    img_w, img_h = 656, 404
+    if os.path.isfile(splash_path):
+        try:
+            with Image.open(splash_path) as img:
+                img_w, img_h = img.size
+        except Exception:
+            pass
+
+    TRAY_HEIGHT = 54
     splash_window = webview.create_window(
         title="Open-POS Starting",
         url=f"http://127.0.0.1:{Config.PORT}/manager/splash",
-        width=656,
-        height=404,
+        width=img_w,
+        height=img_h + TRAY_HEIGHT,
         frameless=True,
         easy_drag=True,
         resizable=False,

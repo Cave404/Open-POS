@@ -195,14 +195,14 @@ def test_about_view_route(client):
     assert "Return to Dashboard" in html
     assert "Third-Party Dependencies" in html
     assert "Cave404" in html
-    assert "v1.0.1" in html
+    assert "v1.0.2" in html
 
 def test_api_system_credits(client):
-    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.1."""
+    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.2."""
     res = client.get("/api/system/credits")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["version"] == "v1.0.1"
+    assert data["version"] == "v1.0.2"
     assert "https://github.com/Cave404/Open-POS" in data["repository"]
     assert len(data["authors"]) >= 1
     assert len(data["dependencies"]) >= 5
@@ -214,8 +214,8 @@ def test_api_system_credits(client):
     assert "Pillow" in dep_names
 
 def test_placeholder_navigation_routes(client):
-    """Asserts that all non-implemented built-in applet routes render placeholder view safely with btn-back."""
-    for endpoint in ["/manager/database", "/manager/network", "/manager/cache", "/manager/logs"]:
+    """Asserts that non-implemented built-in applet routes render placeholder view safely with btn-back."""
+    for endpoint in ["/manager/database", "/manager/network", "/manager/cache"]:
         res = client.get(endpoint)
         assert res.status_code == 200
         html = res.get_data(as_text=True)
@@ -234,7 +234,7 @@ def test_generic_placeholder_route(client):
     assert "Return to Dashboard" in html
 
 def test_applets_list_includes_about(client):
-    """Asserts that /manager/api/applets includes the new about applet."""
+    """Asserts that /manager/api/applets includes the about and configure_manager applets."""
     res = client.get("/manager/api/applets")
     assert res.status_code == 200
     applets = res.get_json()
@@ -244,6 +244,7 @@ def test_applets_list_includes_about(client):
     assert "network" in ids
     assert "cache" in ids
     assert "logs" in ids
+    assert "configure_manager" in ids
     assert "about" in ids
 
 def test_api_logo_upload_success_and_delete(client):
@@ -326,9 +327,10 @@ def test_data_directory_structure():
     assert os.path.isdir(Config.UPLOAD_DIR)
     assert os.path.isdir(Config.LOGS_DIR)
     assert os.path.isdir(Config.CUSTOM_ADDONS_DIR)
+    assert os.path.isdir(Config.CONFIG_DIR)
 
 def test_manager_dashboard_home_view(client):
-    """Asserts that GET /manager renders the Home view as default with v1.0.1 footer."""
+    """Asserts that GET /manager renders the Home view as default with v1.0.2 footer and notification bell."""
     res = client.get('/manager')
     assert res.status_code in (200, 308)
     if res.status_code == 308:
@@ -336,5 +338,177 @@ def test_manager_dashboard_home_view(client):
     html = res.get_data(as_text=True)
     assert "Quick-Access Dashboard" in html
     assert "Home" in html
-    assert "v1.0.1" in html
+    assert "v1.0.2" in html
+    assert "notifBellBtn" in html
+    assert "configure_manager" in html
+
+def test_logs_view_route(client):
+    """Asserts that GET /manager/logs renders the Terminal Logs interface."""
+    res = client.get('/manager/logs')
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert "Terminal Logs &amp; Diagnostics" in html or "Terminal Logs" in html
+    assert "btn-back" in html
+    assert "Return to Dashboard" in html
+    assert "btnExportCsv" in html
+    assert "btnDownloadLog" in html
+    assert "btnOpenLiveTerminal" in html
+    assert "v1.0.2" in html
+
+def test_configure_manager_view_route(client):
+    """Asserts that GET /manager/configure_manager renders the Configure Manager view."""
+    res = client.get('/manager/configure_manager')
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert "Configure Manager &amp; Administration" in html or "Configure Manager" in html
+    assert "btn-back" in html
+    assert "Return to Dashboard" in html
+    assert "requirePasswordToggle" in html
+    assert "bypassManagerToggle" in html
+    assert "btnScanPackages" in html
+    assert "v1.0.2" in html
+
+def test_notifications_service_and_apis(client):
+    """Asserts that notification queue operations and REST endpoints function correctly."""
+    # 1. GET notifications
+    res = client.get('/api/notifications')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["status"] == "success"
+    assert "notifications" in data
+    assert "unread_count" in data
+
+    # 2. POST test notification
+    test_alert = {
+        "level": "WARNING",
+        "subsystem": "PRICE_ENGINE",
+        "message": "TCGdex pricing API throttle event detected."
+    }
+    post_res = client.post('/api/notifications/test', json=test_alert)
+    assert post_res.status_code == 200
+    alert_resp = post_res.get_json()
+    assert alert_resp["status"] == "success"
+    assert alert_resp["alert"]["level"] == "WARNING"
+    assert alert_resp["alert"]["subsystem"] == "PRICE_ENGINE"
+
+    # 3. Verify notification appears in GET /api/notifications
+    res2 = client.get('/api/notifications')
+    data2 = res2.get_json()
+    assert any(n["message"] == "TCGdex pricing API throttle event detected." for n in data2["notifications"])
+
+    # 4. Clear notifications
+    clear_res = client.post('/api/notifications/clear')
+    assert clear_res.status_code == 200
+    assert clear_res.get_json()["status"] == "success"
+
+    res_empty = client.get('/api/notifications')
+    assert res_empty.get_json()["unread_count"] == 0
+
+def test_terminal_logs_api(client):
+    """Asserts that logs query, CSV export, raw txt download, and SSE live stream endpoints function."""
+    # 1. Query logs
+    res = client.get('/api/logs')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["status"] == "success"
+    assert isinstance(data["logs"], list)
+
+    # 2. Export CSV
+    csv_res = client.get('/api/logs/export?format=csv')
+    assert csv_res.status_code == 200
+    assert "text/csv" in csv_res.content_type
+    assert "Timestamp,Subsystem,Level,Message" in csv_res.get_data(as_text=True)
+
+    # 3. Download txt
+    txt_res = client.get('/api/logs/download')
+    assert txt_res.status_code == 200
+    assert "text/plain" in txt_res.content_type
+
+    # 4. SSE live stream endpoint verification
+    stream_res = client.get('/api/logs/live_stream?subsystem=CORE')
+    assert stream_res.status_code == 200
+    assert "text/event-stream" in stream_res.content_type
+
+def test_admin_auth_and_lockout_api(client, tmp_path, monkeypatch):
+    """Asserts password hashing, security policy persistence, and verification."""
+    test_auth_file = str(tmp_path / "manager_auth.json")
+    monkeypatch.setattr("manager.routes.AUTH_CONFIG_PATH", test_auth_file)
+
+    # Read initial status (fresh isolated config)
+    res = client.get('/api/admin/auth/status')
+    assert res.status_code == 200
+    initial_status = res.get_json()
+    assert initial_status["status"] == "success"
+    assert initial_status["has_password"] is False
+    assert initial_status["require_password"] is False
+
+    # Attempt to enable lockout without setting password
+    bad_req = client.post('/api/admin/auth/configure', json={
+        "require_password": True,
+        "new_password": ""
+    })
+    assert bad_req.status_code == 400
+
+    # Configure new admin password
+    set_res = client.post('/api/admin/auth/configure', json={
+        "require_password": True,
+        "new_password": "posSecurePassword123",
+        "protected_sections": ["branding", "database"],
+        "bypass_manager_on_boot": True
+    })
+    assert set_res.status_code == 200
+    assert set_res.get_json()["status"] == "success"
+
+    # Verify status reflects updated policy
+    status_res = client.get('/api/admin/auth/status')
+    status_data = status_res.get_json()
+    assert status_data["has_password"] is True
+    assert status_data["require_password"] is True
+    assert status_data["bypass_manager_on_boot"] is True
+    assert "branding" in status_data["protected_sections"]
+
+    # Verify auth verification endpoint: wrong password
+    verify_fail = client.post('/api/admin/auth/verify', json={
+        "password": "wrongPassword",
+        "section": "branding"
+    })
+    assert verify_fail.status_code == 401
+    assert verify_fail.get_json()["authorized"] is False
+
+    # Verify auth verification endpoint: correct password
+    verify_ok = client.post('/api/admin/auth/verify', json={
+        "password": "posSecurePassword123",
+        "section": "branding"
+    })
+    assert verify_ok.status_code == 200
+    assert verify_ok.get_json()["authorized"] is True
+
+    # Section not protected should succeed even with wrong password
+    unprotected_ok = client.post('/api/admin/auth/verify', json={
+        "password": "wrongPassword",
+        "section": "network"
+    })
+    assert unprotected_ok.status_code == 200
+    assert unprotected_ok.get_json()["authorized"] is True
+
+def test_system_packages_and_restart_api(client):
+    """Asserts package updates query and restart acknowledgment APIs."""
+    # Query packages
+    res = client.get('/api/system/packages')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["status"] == "success"
+    assert isinstance(data["packages"], list)
+
+    # Invalid package identifier for upgrade
+    bad_upgrade = client.post('/api/system/packages/upgrade', json={
+        "package": "invalid; rm -rf"
+    })
+    assert bad_upgrade.status_code == 400
+
+    # Trigger system restart
+    restart_res = client.post('/api/system/restart')
+    assert restart_res.status_code == 200
+    assert restart_res.get_json()["status"] == "success"
+
 

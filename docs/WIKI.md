@@ -1,7 +1,6 @@
-# Open-POS Developer Wiki & Technical Reference (v1.0.1)
+# Open-POS Developer Wiki & Technical Reference (v1.0.2)
 
-Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, and testing standards for the project.
-
+Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, security controls, and testing standards for the project.
 
 ---
 
@@ -64,13 +63,15 @@ Open-POS/
 │   ├── db/                    # Local databases (pos_store.db, shop_inventory.db)
 │   ├── cache/                 # Card art and asset caches
 │   ├── uploads/               # Store logos and custom media assets
-│   ├── logs/                  # Activity and runtime diagnostic logs
+│   ├── logs/                  # Activity and runtime diagnostic logs (open_pos.log)
+│   ├── config/                # Isolated configuration & encrypted security policies (manager_auth.json)
 │   └── custom_addons/         # Store-specific custom extensions
 │
 ├── core/
 │   ├── config.py              # Configuration dataclass (ports, data paths, DB credentials, defaults)
 │   ├── db.py                  # Database connection manager (SQLite/PostgreSQL) & query abstraction
 │   ├── settings.py            # Dynamic settings engine (get_setting, set_setting, seeding, JSON parsing)
+│   ├── notifications.py       # Rolling thread-safe notification queue and log trace writer
 │   └── boot.py                # Multi-phase startup boot sequencer & progress dispatcher
 │
 ├── manager/
@@ -80,13 +81,17 @@ Open-POS/
 │       ├── manager.html       # Primary HTML5 full-window System Manager dashboard & sidebar
 │       ├── splash.html        # Frameless startup splash window with animated progress bar
 │       ├── branding.html      # Store Branding & Business Rules configuration panel
+│       ├── logs.html          # Terminal Logs, filtering, CSV export, and SSE live daemon terminal
+│       ├── configure_manager.html # Access control, salted PIN lockout, bypass modes, and package manager
 │       ├── placeholder.html   # Universal Safe Navigation Guard for applets under construction
 │       └── about.html         # System credits, contributor ledger, and dependency audit table
 │
 ├── static/
-│   └── css/
-│       ├── manager.css        # Unified dark dashboard styling, card grid, forms, and toast notifications
-│       └── cde_theme.css      # Retro CDE desktop styling tokens
+│   ├── css/
+│   │   ├── manager.css        # Unified dark dashboard styling, card grid, forms, and toast notifications
+│   │   └── cde_theme.css      # Retro CDE desktop styling tokens
+│   └── js/
+│       └── notifications.js   # Client-side 5s polling tray, badge counter, and dropdown controller
 │
 ├── docs/
 │   └── WIKI.md                # Developer wiki and architectural documentation (this document)
@@ -108,180 +113,91 @@ All applets accessible from the System Manager dashboard are discovered through 
 > **No route or applet in Open-POS may ever lead to a 404 dead end.**
 
 Every applet registered in `BUILTIN_APPLETS` must resolve to:
-1. A **dedicated business logic page** (e.g., `/manager/branding` -> `branding.html`, `/manager/about` -> `about.html`), OR
+1. A **dedicated business logic page** (e.g., `/manager/branding`, `/manager/logs`, `/manager/configure_manager`, `/manager/about`), OR
 2. The **universal fallback view** (`/manager/placeholder/<applet_id>` -> `placeholder.html`).
 
-### How to Add a New Applet
-
-1. **Register the Applet in `manager/routes.py`:**
-   ```python
-   BUILTIN_APPLETS.append({
-       "id": "inventory_sync",
-       "title": "Inventory_Sync",
-       "category": "Desktop_Tools",
-       "icon": "sync.png",
-       "target": "/manager/inventory_sync"
-   })
-   ```
-
-2. **Add Informative Metadata to `APPLETS_META`:**
-   ```python
-   APPLETS_META["inventory_sync"] = {
-       "title": "Inventory Synchronization",
-       "icon": "🔄",
-       "category": "Desktop Tools",
-       "description": "Sync local stock levels with external TCG marketplaces and online kiosks."
-   }
-   ```
-
-3. **Bind the Route:**
-   - During prototyping, bind to `manager_placeholder`:
-     ```python
-     @manager_bp.route('/inventory_sync')
-     def manager_inventory_sync():
-         return manager_placeholder('inventory_sync')
-     ```
-   - When production-ready, replace with a dedicated template (e.g. `render_template('inventory_sync.html')`).
-
-4. **Add UI Metadata in `manager/templates/manager.html`:**
-   Add the applet's display icon and summary description to the JavaScript lookup objects (`ICONS` and `DESCRIPTIONS`).
-
 ---
 
-## 4. Debugging & Runtime Modes
+## 4. Unified Navigation Header Standard (`.subview-header`)
 
-### Running in Headless / Web Dev Mode
-For rapid web UI and API testing in standard web browsers:
-```powershell
-.\venv\Scripts\python.exe app.py
-```
-- Starts Flask on `http://127.0.0.1:5000` with live reload.
-- Navigate to `http://127.0.0.1:5000/manager`.
-
-### Running in Desktop Container Mode
-To launch the full desktop application with Edge WebView2, Splash Screen, and System Tray supervisor:
-```powershell
-.\venv\Scripts\python.exe run.py
-```
-
-### Running the Automated Test Suite
-Open-POS uses `pytest` for all unit and integration testing:
-```powershell
-.\venv\Scripts\pytest.exe tests/ -v
-```
-
----
-
-## 5. Security & Decoupling Checklist
-
-- **No Hardcoded Secrets:** Cryptographic keys and database passwords must reside in `.env` or system environment variables.
-- **Dynamic Database Portability:** Always use `execute_sql()` from `core/db.py` to ensure queries execute identically on both SQLite and PostgreSQL.
-- **Input Type Sanitization:** All payload updates in `manager/routes.py` must validate boundaries (e.g., percentages 0–100, limits >= 1, non-empty strings) before calling `set_setting()`.
-
----
-
-## 6. Boot Lifecycle & Splash Orchestration
-
-Open-POS implements a visual, multi-phase boot sequence orchestrated by `core/boot.py` and `run.py`.
-
-```
-[0% - 20%] Phase 1: Environment & Config Verification
-    │       - Validate .env and load core configuration.
-    ▼
-[20% - 45%] Phase 2: Git Repository Update Checker Hook
-    │       - Query git remote status via dry-run or API.
-    ▼
-[45% - 70%] Phase 3: Database & Cache Sanity Check
-    │       - Verify connection pool and settings schema integrity.
-    ▼
-[70% - 90%] Phase 4: Addon Manifest Discovery
-    │       - Scan /addons directory for registered plugins.
-    ▼
-[90% - 100%] Phase 5: Finalization & Smooth Handoff
-            - Hold on 'Finishing up...' (1.5s buffer) and spawn System Manager.
-```
-
-### Hooking Subsystems into the Boot Pipeline
-Subsystem initialization routines (e.g., peripheral serial port scanning, receipt printer discovery, or card cache warming) can be registered inside `core/boot.py`:
-
-```python
-# Example: Adding a hardware verification step to Phase 3
-_notify(65, "Scanning connected peripheral devices...")
-# invoke peripheral scanner
-_notify(70, "Hardware peripherals initialized.")
-```
-
-### Configuring Update Checks & Splash Assets
-- **Update Checks:** Controlled by the dynamic setting `auto_updates_enabled` (`set_setting('auto_updates_enabled', True)`). When deferred or offline, the boot sequence completes cleanly without blocking.
-- **Splash Screen Assets:** The splash graphic is located at `manager/open_pos_splash.png` (656x404 PNG). To rebrand the splash graphic, replace this file; the frameless window automatically scales and centres the asset.
-
----
-
-## 7. Store Logo Uploads & POS-Wide Branding Architecture
-
-Open-POS v1.0.1 introduces dynamic store logo image support:
-- **API Endpoint:** `POST /api/settings/logo` (and `/manager/api/settings/logo`) accepts multipart form file uploads under key `logo`.
-- **Validation:** 
-  - Max file size: 2MB.
-  - Permitted MIME types: `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`.
-- **Storage:** Files are sanitized and stored in the isolated private data directory under `data/uploads/store_logo.<ext>`.
-- **Setting Integration:** The relative URL path `/data/uploads/store_logo.<ext>` is saved to the `store_logo_url` key in the database `settings` table.
-- **Sidebar Integration:** In `manager.html`, if `store_logo_url` is present, the sidebar dynamically renders the logo image and hides the fallback `POS` gradient badge. The store name dynamically displays the value of `store_name`.
-- **Removal Action:** `DELETE /api/settings/logo` unlinks the uploaded file and sets `store_logo_url` to `""`.
-
----
-
-## 8. Dashboard Applet Pinning System & Dedicated "Home" Tab
-
-The System Manager provides a pinning mechanism for high-frequency control cards:
-- **Dedicated "Home" Dashboard:** The `🏠 Home` view is the top-level tab and active by default on system launch.
-  - Displays exclusively the tools pinned by the store.
-  - If no tools are pinned, displays a clean placeholder empty-state card guiding staff to pin tools from categories.
-- **Visual Pinning Mechanism:** Each `.control-card` features a pin button (`📌`). Pinned cards display with a `.pinned` class providing a glowing accent border.
-- **Dual Persistence:**
-  - **Client-Side:** Instant persistence via `localStorage.getItem('openpos_pinned_tools')`.
-  - **Backend Synchronization:** Persisted across sessions and network workstations via `POST /api/settings/pinned` storing a JSON-encoded array into the `settings` table key `pinned_tools`. Default tools: `["branding", "database"]`.
-
----
-
-## 9. Tactile Navigation & Native Layout Guarantee
-
-- All pseudo-window styling (window-in-a-window headers, faux minimize/maximize buttons, `.cde-title-controls`) has been eradicated.
-- Views flow natively across `.main-content` and `.view-container`.
-- Safe back-navigation is standardized across all subviews (`branding.html`, `about.html`, `placeholder.html`) using the styled tactile component:
+To prevent layout shifting and guarantee tactile navigation across every subview:
+- The top header must strictly employ `.subview-header`:
   ```html
-  <a href="/manager" class="btn-back">
-      <span class="btn-icon">←</span>
-      <span>Return to Dashboard</span>
-  </a>
+  <header class="subview-header">
+      <div class="header-left">
+          <a href="/manager" class="btn-back">
+              <span class="btn-icon">←</span>
+              <span>Return to Dashboard</span>
+          </a>
+          <div class="header-divider"></div>
+          <h2 class="subview-title">{{ page_title }}</h2>
+      </div>
+      <div class="header-right">
+          <div class="notification-wrapper">
+              <button id="notifBellBtn" class="btn-icon-tray" title="System Notifications">
+                  🔔 <span id="notifBadge" class="badge-count" style="display: none;">0</span>
+              </button>
+              <div id="notifDropdown" class="notif-dropdown-menu" style="display: none;">
+                  ...
+              </div>
+          </div>
+          <span class="status-pill status-online">Engine: Online</span>
+          <a href="/manager/about" class="version-badge-link">v1.0.2</a>
+      </div>
+  </header>
   ```
-- Version indicators link directly to About & Credits:
-  ```html
-  <a href="/manager/about" class="version-badge-link" title="View System Credits & Documentation">v1.0.1</a>
-  ```
+- Subviews embed `static/js/notifications.js` to initialize background polling and interactive badge updates.
 
 ---
 
-## 10. One-Click OOTB Desktop Launchers
+## 5. Persistent Notification Service
 
-Staff and cashiers run Open-POS without interacting with a command prompt:
-- **`Open_POS.vbs`:** A clean VBScript wrapper that invokes `Start_POS.bat` in hidden mode (`0`), preventing console windows from flashing on screen.
-- **`Start_POS.bat`:**
-  - Automatically verifies and bootstraps the Python virtual environment (`venv/`) from `requirements.txt` if missing.
-  - Initializes `.env` from `.env.example` if not already present.
-  - Executes `run.py` using `venv\Scripts\python.exe`.
-  - Features error traps that pause with diagnostic advice if execution fails.
+- **Core Module:** `core/notifications.py` provides a thread-safe rolling in-memory queue (`maxlen=100`) backed by a persistent log trace on disk at `data/logs/open_pos.log`.
+- **API Endpoints:**
+  - `GET /api/notifications`: Returns current notifications array and unread count.
+  - `POST /api/notifications/clear`: Clears the notification queue.
+  - `POST /api/notifications/test`: Synthetic test alert generator.
+- **Client Polling:** `static/js/notifications.js` polls every 5 seconds, dynamically toggling the unread badge and rendering formatted severity chips (`INFO`, `WARNING`, `ERROR`, `CRITICAL`).
 
 ---
 
-## 11. Isolated Private Data Directory Architecture (`data/`)
+## 6. Terminal Logs & Live Subsystem Monitor
+
+- **Route:** `GET /manager/logs` (`manager/templates/logs.html`).
+- **Telemetry Endpoints:**
+  - `GET /api/logs`: Retrieves recent structured logs with timestamp, subsystem, level, and message.
+  - `GET /api/logs/export?format=csv`: Downloads log traces in standard RFC 4180 CSV format.
+  - `GET /api/logs/download`: Direct stream download of raw `data/logs/open_pos.log`.
+  - `GET /api/logs/live_stream?subsystem=<name>`: Server-Sent Events (SSE) streaming daemon output line-by-line in real time into a styled retro-dark terminal container with pause and clear controls.
+
+---
+
+## 7. Configure Manager Admin Panel
+
+- **Route:** `GET /manager/configure_manager` (`manager/templates/configure_manager.html`).
+- **Access Control & Employee Lockout:**
+  - Enforces manager PIN/password before allowing access to sensitive administrative modules.
+  - Configuration saved to `data/config/manager_auth.json` (untracked by git).
+  - Passwords are salted using `secrets.token_hex(16)` and hashed with SHA-256 (`hashlib.sha256`).
+- **Startup & Register Bypass:**
+  - "Bypass Manager on Boot" toggle saves to `manager_auth.json`. When enabled, supervisor launches directly into the Cashier Register UI.
+- **Python Dependency Maintenance:**
+  - `GET /api/system/packages`: Runs `pip list --outdated --format=json` in the active virtual environment.
+  - `POST /api/system/packages/upgrade`: Upgrades individual packages safely with input validation.
+  - Core peripheral updates (`waitress`, `pywebview`, `flask`, `pystray`) trigger a warning banner prompting a restart via `POST /api/system/restart`.
+
+---
+
+## 8. Isolated Private Data Directory Architecture (`data/`)
 
 All store-specific data is strictly quarantined inside an untracked `data/` directory to prevent git collision during upstream repository pulls:
 - `data/db/`: SQLite database files (`pos_store.db`, `shop_inventory.db`).
 - `data/cache/`: Cached card artwork and metadata.
 - `data/uploads/`: Store brand logos and uploaded images.
-- `data/logs/`: Application telemetry and execution traces.
+- `data/logs/`: Application telemetry and execution traces (`open_pos.log`).
+- `data/config/`: Security policies, PIN hashes (`manager_auth.json`).
 - `data/custom_addons/`: Custom site-specific addons.
 - All folders are tracked in git via `.gitkeep` files while `.gitignore` ignores all actual data files.
+
 
 

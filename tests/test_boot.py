@@ -46,19 +46,27 @@ def test_run_boot_sequence():
     assert any("finishing" in m.lower() for m in messages)
 
 def test_splash_view_route(client):
-    """Asserts that GET /manager/splash renders the splash template."""
+    """Asserts that GET /manager/splash renders the overhauled splash template with docked tray."""
     res = client.get("/manager/splash")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
     assert "Open-POS System Startup" in html
-    assert "splash-frame" in html
-    assert "progressBar" in html
-    assert "statusLabel" in html
+    assert "splash-graphic-container" in html
+    assert "progress-tray" in html
+    assert "progressFill" in html
+    assert "splashStatus" in html
+    assert "splashPercent" in html
     assert "updateProgress" in html
 
 def test_splash_image_route(client):
-    """Asserts that GET /manager/splash_image returns the splash graphic."""
+    """Asserts that GET /manager/splash_image and /manager/open_pos_splash.png return the splash graphic."""
     res = client.get("/manager/splash_image")
     assert res.status_code == 200
     assert res.content_type == "image/png"
     assert len(res.data) > 1000
+
+    res2 = client.get("/manager/open_pos_splash.png")
+    assert res2.status_code == 200
+    assert res2.content_type == "image/png"
+    assert len(res2.data) > 1000
+
