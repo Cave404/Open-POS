@@ -1,0 +1,12 @@
+{
+  "cash_payout_rate": 60.0,
+  "credit_payout_rate": 80.0,
+  "daily_trade_limit": 10,
+  "condition_multipliers": {
+    "NM": 1.0,
+    "LP": 0.85,
+    "MP": 0.70,
+    "HP": 0.50,
+    "DMG": 0.30
+  }
+}

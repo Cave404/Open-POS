@@ -362,12 +362,22 @@ def manager_placeholder(applet_id):
     Renders an informative placeholder page with prominent return navigation,
     guaranteeing that no applet or newly registered addon ever leads to a dead end.
     """
-    meta = APPLETS_META.get(applet_id, {
-        "title": applet_id.replace('_', ' ').title(),
-        "icon": "⚙️",
-        "category": "System Module",
-        "description": "This management applet is slated for an upcoming development sprint."
-    })
+    from core.addons import addon_manager
+    addon = addon_manager.get_addon(applet_id)
+    if addon:
+        meta = {
+            "title": addon.get("name", applet_id.replace('_', ' ').title()),
+            "icon": addon.get("icon") if addon.get("icon") and not str(addon["icon"]).endswith('.png') else "🧩",
+            "category": addon.get("category", "Desktop Apps"),
+            "description": addon.get("description", "This installed extension is active and currently being initialized.")
+        }
+    else:
+        meta = APPLETS_META.get(applet_id, {
+            "title": applet_id.replace('_', ' ').title(),
+            "icon": "⚙️",
+            "category": "System Module",
+            "description": "This management applet is slated for an upcoming development sprint."
+        })
     return render_template('placeholder.html', applet=meta)
 
 
@@ -406,6 +416,35 @@ def manager_addons():
     return render_template('addons.html', is_locked=is_section_locked('addons'))
 
 
+@api_bp.route('/addons/import', methods=['POST'])
+@manager_bp.route('/api/addons/import', methods=['POST'])
+def api_import_addon():
+    """Accepts a .zip archive, validates its manifest.json, and installs to data/custom_addons/."""
+    file = request.files.get('file') or request.files.get('addon_zip')
+    if not file or not file.filename:
+        return jsonify({"status": "error", "message": "No addon ZIP file provided."}), 400
+
+    if not file.filename.lower().endswith('.zip'):
+        return jsonify({"status": "error", "message": "Invalid file format. Please upload a .zip archive."}), 400
+
+    from core.addons import addon_manager
+    result = addon_manager.import_addon_zip(file)
+    status_code = 200 if result.get('success') else 400
+    return jsonify(result), status_code
+
+
+@api_bp.route('/addons/<addon_id>', methods=['DELETE'])
+@api_bp.route('/addons/<addon_id>/delete', methods=['POST'])
+@manager_bp.route('/api/addons/<addon_id>', methods=['DELETE'])
+@manager_bp.route('/api/addons/<addon_id>/delete', methods=['POST'])
+def api_uninstall_addon(addon_id):
+    """Uninstalls a custom addon from data/custom_addons/ and removes from registry."""
+    from core.addons import addon_manager
+    result = addon_manager.uninstall_addon(addon_id)
+    status_code = 200 if result.get('success') else 400
+    return jsonify(result), status_code
+
+
 @manager_bp.route('/api/addons', methods=['GET'])
 def get_addons():
     """Returns a list of all discovered addons, statuses, and runtime diagnostics."""
@@ -433,16 +472,29 @@ def get_addon_diagnostics(addon_id):
     return jsonify(addon)
 
 
+def _is_route_registered(url_path: str) -> bool:
+    try:
+        from flask import current_app
+        adapter = current_app.url_map.bind('localhost')
+        path_only = url_path.split('?')[0]
+        adapter.match(path_only)
+        return True
+    except Exception:
+        return False
+
+
 @manager_bp.route('/api/applets')
 def list_applets():
     """
     Returns a dynamic list of built-in applets and discovered addon manifests.
+    Ensures any addon without a valid route points safely to fallback placeholder.
     """
     applets = list(BUILTIN_APPLETS)
     from core.addons import addon_manager
     for addon in addon_manager.get_all_addons():
         if not any(a["id"] == addon["id"] for a in BUILTIN_APPLETS):
-            target_url = addon.get("settings_route") or f"/addons/{addon['id']}/status"
+            raw_target = addon.get("settings_route") or f"/addons/{addon['id']}/status"
+            target_url = raw_target if _is_route_registered(raw_target) else f"/manager/placeholder/{addon['id']}"
             applets.append({
                 "id": addon["id"],
                 "title": addon["name"],
@@ -553,6 +605,23 @@ def handle_update_settings():
     # Validate City/State Location
     if 'store_location' in data:
         validated['store_location'] = str(data['store_location']).strip()
+
+    # Validate Currency Symbol (1-8 chars)
+    if 'currency_symbol' in data:
+        sym = str(data['currency_symbol']).strip()
+        if not sym or len(sym) > 8:
+            return jsonify({"status": "error", "message": "Currency symbol must be 1 to 8 characters."}), 400
+        validated['currency_symbol'] = sym
+
+    # Validate Tax Rate (0.0 to 100.0)
+    if 'tax_rate' in data:
+        try:
+            val = float(data['tax_rate'])
+            if not (0.0 <= val <= 100.0):
+                raise ValueError("Out of range")
+            validated['tax_rate'] = round(val, 4)
+        except (ValueError, TypeError):
+            return jsonify({"status": "error", "message": "Tax rate must be a percentage between 0 and 100."}), 400
 
     # Validate Cash Payout Rate (Percentage between 0.0 and 100.0)
     if 'cash_payout_rate' in data:
@@ -676,10 +745,11 @@ def handle_logo_upload():
     if len(file_data) > MAX_LOGO_SIZE:
         return jsonify({"status": "error", "message": "File size exceeds 2MB limit."}), 400
 
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    upload_folder = getattr(Config, 'UPLOAD_DIR', UPLOAD_FOLDER)
+    os.makedirs(upload_folder, exist_ok=True)
     # Remove previous store logo versions to avoid disk bloat
     for old_ext in ALLOWED_LOGO_EXTENSIONS:
-        old_file = os.path.join(UPLOAD_FOLDER, f"store_logo.{old_ext}")
+        old_file = os.path.join(upload_folder, f"store_logo.{old_ext}")
         if os.path.isfile(old_file):
             try:
                 os.remove(old_file)
@@ -687,7 +757,7 @@ def handle_logo_upload():
                 pass
 
     target_name = f"store_logo.{ext}"
-    target_path = os.path.join(UPLOAD_FOLDER, target_name)
+    target_path = os.path.join(upload_folder, target_name)
     with open(target_path, 'wb') as f:
         f.write(file_data)
 
@@ -699,9 +769,10 @@ def handle_logo_upload():
 
 def handle_logo_delete():
     """Removes the store logo asset and clears the store_logo_url setting."""
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    upload_folder = getattr(Config, 'UPLOAD_DIR', UPLOAD_FOLDER)
+    os.makedirs(upload_folder, exist_ok=True)
     for ext in ALLOWED_LOGO_EXTENSIONS:
-        path = os.path.join(UPLOAD_FOLDER, f"store_logo.{ext}")
+        path = os.path.join(upload_folder, f"store_logo.{ext}")
         if os.path.isfile(path):
             try:
                 os.remove(path)
@@ -757,7 +828,9 @@ def api_get_settings():
 
 
 @api_bp.route('/settings', methods=['POST'])
+@api_bp.route('/settings/store', methods=['POST'])
 @manager_bp.route('/api/settings', methods=['POST'])
+@manager_bp.route('/api/settings/store', methods=['POST'])
 def api_post_settings():
     return handle_update_settings()
 
@@ -1268,7 +1341,7 @@ def api_live_logs_stream():
             ],
             "DISCORD": [
                 ("INFO", "Discord Gateway WebSocket heartbeat acknowledged (ping: 26ms)."),
-                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.6 Cashiers'."),
+                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.7 Cashiers'."),
                 ("INFO", "Daily trade webhooks channel #pos-trades listener healthy."),
                 ("INFO", "Discord bot queue empty. 0 outgoing transaction summaries pending.")
             ]
@@ -1310,12 +1383,15 @@ def api_live_logs_stream():
 def api_admin_auth_status():
     """Returns access control configuration without exposing salt or hash."""
     cfg = _read_auth_file()
+    is_auth = session.get('manager_authenticated') is True
     return jsonify({
         "status": "success",
         "has_password": bool(cfg.get("password_hash")),
         "require_password": bool(cfg.get("require_password", False)),
         "protected_sections": cfg.get("protected_sections", ["branding", "database", "admin"]),
-        "bypass_manager_on_boot": bool(cfg.get("bypass_manager_on_boot", False))
+        "bypass_manager_on_boot": bool(cfg.get("bypass_manager_on_boot", False)),
+        "authenticated": is_auth,
+        "authorized": is_auth
     })
 
 

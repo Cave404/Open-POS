@@ -1,4 +1,4 @@
-# Open-POS Developer Wiki & Technical Reference (v1.0.6)
+# Open-POS Developer Wiki & Technical Reference (v1.0.7)
 
 Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, security controls, and testing standards for the project.
 
@@ -142,7 +142,7 @@ To prevent layout shifting and guarantee tactile navigation across every subview
               </div>
           </div>
           <span class="status-pill status-online">Engine: Online</span>
-          <a href="/manager/about" class="version-badge-link">v1.0.6</a>
+          <a href="/manager/about" class="version-badge-link">v1.0.7</a>
       </div>
   </header>
   ```
@@ -243,7 +243,25 @@ All store-specific data is strictly quarantined inside an untracked `data/` dire
 - **Addons Control Center (`manager/templates/addons.html`):**
   - Real-time enable/disable toggling persisted to SQLite/PostgreSQL `settings` table without server restarts.
   - Diagnostic error trace modal rendering exact Python tracebacks for quick developer debugging.
+  - One-click ZIP package import (`POST /api/addons/import`) with automated structure validation and zip-slip path traversal guards.
+  - Custom addon uninstallation (`DELETE /api/addons/<addon_id>`) with confirmation modal and core built-in addon deletion protection.
 
+---
 
+## 11. Test Isolation, Error Guardians & Session Persistence (v1.0.7)
 
-
+- **Absolute Test Isolation (`tests/conftest.py`):**
+  - Autouse fixture `isolate_test_environment` guarantees automated test suites (`pytest`) execute strictly in an isolated temporary directory (`tmp_path`).
+  - Active store databases (`data/db/pos_store.db`), logo uploads, and credentials are never touched, mutated, or seeded with mock test data.
+  - Default settings initialization uses `INSERT ... ON CONFLICT DO NOTHING` to prevent overwriting existing user-configured branding.
+- **Global Error Handlers (`app.py`, `manager/templates/error.html`):**
+  - Global `@app.errorhandler(404)` and `@app.errorhandler(500)` intercept all broken routes or uncaught runtime exceptions.
+  - Standardized OpenPOS error page styled in dark theme with error code badge, requested route chip, and prominent `← Return to System Manager` button.
+  - Unregistered addon applet routes gracefully resolve to `/manager/placeholder/<addon_id>` instead of dead-ending on a 404.
+- **Persistent Manager Session & Lockout Guard (`core/config.py`, `manager/routes.py`, `static/js/lockout_guard.js`):**
+  - `SECRET_KEY` is permanently generated and persisted to `data/config/.env` on first boot, preventing session invalidation on server reloads.
+  - `SESSION_COOKIE_HTTPONLY = True` and `SESSION_COOKIE_SAMESITE = 'Lax'` ensure reliable, secure cookie transport.
+  - Once manager credentials are authenticated (`session['manager_authenticated'] = True`), client-side lockout guards immediately bypass password prompts across all subviews.
+- **Decoupled Generic Retail Branding:**
+  - Store branding is restricted strictly to retail identity: Store Name, Legal Entity Name, City/State, Currency Symbol, Tax Rate (%), and Store Logo.
+  - TCG-specific trade-in rules, cash/credit payout ratios, and condition multipliers are decoupled from core into `addons/tcg_pos/default_rules.json`.

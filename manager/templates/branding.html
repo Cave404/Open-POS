@@ -41,15 +41,15 @@
                 </div>
             </div>
             <span class="status-pill status-online">Engine: Online</span>
-            <a href="/manager/about" class="version-badge-link">v1.0.6</a>
+            <a href="/manager/about" class="version-badge-link">v1.0.7</a>
         </div>
     </header>
 
     <!-- Native Content View Container -->
     <div class="view-container {% if is_locked %}locked{% endif %}">
         <div class="settings-header">
-            <h1>Store Identity &amp; Rules Configuration</h1>
-            <p>Customize store brand metadata, custom logo assets, buy-list cash &amp; credit payout margins, daily limits, and card condition multipliers.</p>
+            <h1>Store Identity &amp; Retail Configuration</h1>
+            <p>Configure store name, corporate legal entity, location, currency symbol, default tax rate, and brand logo assets.</p>
         </div>
 
         <form id="brandingForm" onsubmit="return false;">
@@ -106,76 +106,26 @@
                     </div>
                 </div>
 
-                <!-- Section 2: Trade-In & Buylist Rules -->
-                <div class="form-card" id="cardTradeRules">
+                <!-- Section 2: Retail & Currency Localization -->
+                <div class="form-card" id="cardRetailSettings">
                     <div class="card-header">
-                        <span class="card-icon">💳</span>
-                        <h2>Trade-In &amp; Buylist Rules</h2>
+                        <span class="card-icon">🏷️</span>
+                        <h2>Retail &amp; Currency Localization</h2>
                     </div>
                     <div class="card-body">
                         <div class="form-group">
-                            <label for="cash_payout_rate">Cash Payout Rate</label>
-                            <div class="input-with-addon">
-                                <input type="number" id="cash_payout_rate" name="cash_payout_rate" min="0" max="100" step="0.5" required>
-                                <span class="input-addon">%</span>
-                            </div>
-                            <span class="form-hint">Percentage of market value paid out in cash (Default: 60.0%).</span>
+                            <label for="currency_symbol">Currency Symbol</label>
+                            <input type="text" id="currency_symbol" name="currency_symbol" placeholder="e.g. $" maxlength="8" value="$" required>
+                            <span class="form-hint">Symbol rendered before transaction prices and ledger totals (Default: $).</span>
                         </div>
 
                         <div class="form-group">
-                            <label for="credit_payout_rate">Store Credit Payout Rate</label>
+                            <label for="tax_rate">Default Sales Tax Rate</label>
                             <div class="input-with-addon">
-                                <input type="number" id="credit_payout_rate" name="credit_payout_rate" min="0" max="100" step="0.5" required>
+                                <input type="number" id="tax_rate" name="tax_rate" min="0" max="100" step="0.01" placeholder="8.25" value="8.25" required>
                                 <span class="input-addon">%</span>
                             </div>
-                            <span class="form-hint">Percentage of market value paid in store credit (Default: 80.0%).</span>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="daily_trade_limit">Daily Customer Trade Limit</label>
-                            <div class="input-with-addon">
-                                <input type="number" id="daily_trade_limit" name="daily_trade_limit" min="1" step="1" required>
-                                <span class="input-addon">cards</span>
-                            </div>
-                            <span class="form-hint">Maximum card items a customer can trade per calendar day.</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section 3: Condition Multipliers -->
-                <div class="form-card" id="cardConditionMultipliers">
-                    <div class="card-header">
-                        <span class="card-icon">⚖️</span>
-                        <h2>Condition Multipliers</h2>
-                    </div>
-                    <div class="card-body card-body-full">
-                        <p class="form-hint" style="margin-bottom: 12px;">Decimal weights applied to market pricing based on card condition grading.</p>
-                        <div class="multipliers-grid">
-                            <div class="multiplier-item">
-                                <span class="multiplier-tag tag-nm">NM</span>
-                                <span class="multiplier-desc">Near Mint</span>
-                                <input type="number" id="cond_nm" min="0" max="2.0" step="0.05" required>
-                            </div>
-                            <div class="multiplier-item">
-                                <span class="multiplier-tag tag-lp">LP</span>
-                                <span class="multiplier-desc">Lightly Played</span>
-                                <input type="number" id="cond_lp" min="0" max="2.0" step="0.05" required>
-                            </div>
-                            <div class="multiplier-item">
-                                <span class="multiplier-tag tag-mp">MP</span>
-                                <span class="multiplier-desc">Mod. Played</span>
-                                <input type="number" id="cond_mp" min="0" max="2.0" step="0.05" required>
-                            </div>
-                            <div class="multiplier-item">
-                                <span class="multiplier-tag tag-hp">HP</span>
-                                <span class="multiplier-desc">Heavily Played</span>
-                                <input type="number" id="cond_hp" min="0" max="2.0" step="0.05" required>
-                            </div>
-                            <div class="multiplier-item">
-                                <span class="multiplier-tag tag-dmg">DMG</span>
-                                <span class="multiplier-desc">Damaged</span>
-                                <input type="number" id="cond_dmg" min="0" max="2.0" step="0.05" required>
-                            </div>
+                            <span class="form-hint">Default sales tax rate applied to register line items.</span>
                         </div>
                     </div>
                 </div>
@@ -245,29 +195,14 @@ function populateForm(data) {
     if (data.store_location !== undefined) {
         document.getElementById('store_location').value = data.store_location;
     }
-    if (data.cash_payout_rate !== undefined) {
-        document.getElementById('cash_payout_rate').value = data.cash_payout_rate;
+    if (data.currency_symbol !== undefined) {
+        document.getElementById('currency_symbol').value = data.currency_symbol || "$";
     }
-    if (data.credit_payout_rate !== undefined) {
-        document.getElementById('credit_payout_rate').value = data.credit_payout_rate;
-    }
-    if (data.daily_trade_limit !== undefined) {
-        document.getElementById('daily_trade_limit').value = data.daily_trade_limit;
+    if (data.tax_rate !== undefined) {
+        document.getElementById('tax_rate').value = data.tax_rate !== null ? data.tax_rate : 8.25;
     }
 
     updateLogoPreview(data.store_logo_url || "");
-
-    let mults = data.condition_multipliers;
-    if (typeof mults === 'string') {
-        try { mults = JSON.parse(mults); } catch (e) { mults = {}; }
-    }
-    mults = mults || {};
-
-    document.getElementById('cond_nm').value = mults.NM !== undefined ? mults.NM : 1.0;
-    document.getElementById('cond_lp').value = mults.LP !== undefined ? mults.LP : 0.85;
-    document.getElementById('cond_mp').value = mults.MP !== undefined ? mults.MP : 0.70;
-    document.getElementById('cond_hp').value = mults.HP !== undefined ? mults.HP : 0.50;
-    document.getElementById('cond_dmg').value = mults.DMG !== undefined ? mults.DMG : 0.30;
 }
 
 // File Upload Handler
@@ -333,17 +268,9 @@ async function saveSettings() {
         store_name: document.getElementById('store_name').value.trim(),
         store_legal_entity: document.getElementById('store_legal_entity').value.trim(),
         store_location: document.getElementById('store_location').value.trim(),
-        cash_payout_rate: parseFloat(document.getElementById('cash_payout_rate').value),
-        credit_payout_rate: parseFloat(document.getElementById('credit_payout_rate').value),
-        daily_trade_limit: parseInt(document.getElementById('daily_trade_limit').value, 10),
-        store_logo_url: currentLogoUrl,
-        condition_multipliers: {
-            NM: parseFloat(document.getElementById('cond_nm').value),
-            LP: parseFloat(document.getElementById('cond_lp').value),
-            MP: parseFloat(document.getElementById('cond_mp').value),
-            HP: parseFloat(document.getElementById('cond_hp').value),
-            DMG: parseFloat(document.getElementById('cond_dmg').value)
-        }
+        currency_symbol: document.getElementById('currency_symbol').value.trim() || "$",
+        tax_rate: parseFloat(document.getElementById('tax_rate').value) || 0.0,
+        store_logo_url: currentLogoUrl
     };
 
     try {
@@ -356,7 +283,7 @@ async function saveSettings() {
         const result = await res.json();
         if (res.ok && result.status === 'success') {
             originalSettings = payload;
-            showToast('Store branding and business rules updated successfully.');
+            showToast('Store branding and retail settings updated successfully.');
         } else {
             showToast(result.message || 'Failed to save settings.', true);
         }

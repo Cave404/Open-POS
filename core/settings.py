@@ -8,6 +8,8 @@ DEFAULT_SETTINGS = {
     "store_name": "Open-POS System",
     "store_legal_entity": "Open-POS Retail LLC",
     "store_location": "Local Network",
+    "tax_rate": 8.25,
+    "currency_symbol": "$",
     "cash_payout_rate": 60.0,
     "credit_payout_rate": 80.0,
     "daily_trade_limit": 10,
@@ -19,8 +21,7 @@ DEFAULT_SETTINGS = {
 def seed_default_settings(force: bool = False) -> None:
     """
     Seeds default configuration settings into the settings table.
-    If force=False, ensures any missing default keys are inserted without
-    overwriting existing user configuration. If force=True, re-applies all defaults.
+    Ensures missing default keys are inserted without overwriting existing user configuration.
     """
     init_db()
     with get_db_connection() as conn:
@@ -37,17 +38,15 @@ def seed_default_settings(force: bool = False) -> None:
                     (key, str_val),
                 )
             else:
-                cur = execute_sql(conn, "SELECT 1 FROM settings WHERE key = ?", (key,))
-                if not cur.fetchone():
-                    execute_sql(
-                        conn,
-                        """
-                        INSERT INTO settings (key, value)
-                        VALUES (?, ?)
-                        ON CONFLICT (key) DO UPDATE SET value = excluded.value
-                        """,
-                        (key, str_val),
-                    )
+                execute_sql(
+                    conn,
+                    """
+                    INSERT INTO settings (key, value)
+                    VALUES (?, ?)
+                    ON CONFLICT (key) DO NOTHING
+                    """,
+                    (key, str_val),
+                )
 
 def get_setting(key: str, default: any = None) -> any:
     """
@@ -86,7 +85,7 @@ def get_setting(key: str, default: any = None) -> any:
             return default
 
     # If default is None, convert standard known numeric keys
-    if key in ('cash_payout_rate', 'credit_payout_rate'):
+    if key in ('cash_payout_rate', 'credit_payout_rate', 'tax_rate'):
         try:
             return float(raw_val)
         except (ValueError, TypeError):
@@ -128,6 +127,9 @@ def set_setting(key: str, value: any) -> bool:
         logger.error(f"Failed to persist setting '{key}': {e}")
         return False
 
+# Convenient alias for set_setting
+update_setting = set_setting
+
 def get_all_settings() -> dict:
     """
     Returns a dictionary of all active configuration keys and values.
@@ -142,7 +144,7 @@ def get_all_settings() -> dict:
                 k = row['key'] if hasattr(row, '__getitem__') and not isinstance(row, tuple) else row[0]
                 v = row['value'] if hasattr(row, '__getitem__') and not isinstance(row, tuple) else row[1]
 
-                if k in ('cash_payout_rate', 'credit_payout_rate'):
+                if k in ('cash_payout_rate', 'credit_payout_rate', 'tax_rate'):
                     try:
                         v = float(v)
                     except (ValueError, TypeError):

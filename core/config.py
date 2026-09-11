@@ -25,9 +25,29 @@ else:
 for _directory in (DATA_DIR, DB_DIR, CACHE_DIR, UPLOAD_DIR, LOGS_DIR, CUSTOM_ADDONS_DIR, CONFIG_DIR):
     os.makedirs(_directory, exist_ok=True)
 
+# Ensure persistent SECRET_KEY saved in data/config/.env
+persistent_secret = os.environ.get('SECRET_KEY')
+if not persistent_secret:
+    import secrets
+    persistent_secret = secrets.token_hex(32)
+    config_env_file = os.path.join(CONFIG_DIR, '.env')
+    try:
+        content = ""
+        if os.path.isfile(config_env_file):
+            with open(config_env_file, 'r', encoding='utf-8') as ef:
+                content = ef.read()
+        if 'SECRET_KEY=' not in content:
+            with open(config_env_file, 'a+', encoding='utf-8') as ef:
+                if content and not content.endswith('\n'):
+                    ef.write('\n')
+                ef.write(f"SECRET_KEY={persistent_secret}\n")
+    except Exception:
+        pass
+    os.environ['SECRET_KEY'] = persistent_secret
+
 class Config:
-    VERSION = "v1.0.6"
-    SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(24).hex())
+    VERSION = "v1.0.7"
+    SECRET_KEY = persistent_secret or os.environ.get('SECRET_KEY', 'default_openpos_secret_key')
     FERNET_KEY = os.environ.get('FERNET_KEY', '')
     HOST = os.environ.get('HOST', '0.0.0.0')
     PORT = int(os.environ.get('PORT', 5000))

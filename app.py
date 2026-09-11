@@ -33,9 +33,31 @@ def create_app():
     def serve_data_uploads(filename):
         return send_from_directory(Config.UPLOAD_DIR, filename)
 
-    @app.route('/data/cache/<path:filename>')
-    def serve_data_cache(filename):
-        return send_from_directory(Config.CACHE_DIR, filename)
+    # Configure persistent session cookies
+    app.config['SESSION_PERMANENT'] = False
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+    # Global Error Handlers - Eliminate raw dead-end error pages
+    from flask import render_template, request
+
+    @app.errorhandler(404)
+    def handle_404(err):
+        return render_template('error.html',
+            error_code=404,
+            error_title="Page or Endpoint Not Found",
+            error_message="The requested system route is not registered or has been moved.",
+            request_path=getattr(request, 'path', '')
+        ), 404
+
+    @app.errorhandler(500)
+    def handle_500(err):
+        return render_template('error.html',
+            error_code=500,
+            error_title="Internal Server Failure",
+            error_message="An unexpected error occurred while processing your request.",
+            request_path=getattr(request, 'path', '')
+        ), 500
 
     return app
 

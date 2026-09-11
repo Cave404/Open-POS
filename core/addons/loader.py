@@ -339,8 +339,17 @@ class AddonManager:
                 # Check if blueprint is already registered
                 if bp.name not in self.app.blueprints:
                     prefix = f"/addons/{record.id}"
-                    self.app.register_blueprint(bp, url_prefix=prefix)
-                    logger.info(f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{prefix}'.")
+                    was_handled = getattr(self.app, '_got_first_request', False)
+                    if was_handled:
+                        self.app._got_first_request = False
+                    try:
+                        self.app.register_blueprint(bp, url_prefix=prefix)
+                        logger.info(f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{prefix}'.")
+                    except Exception as bpe:
+                        logger.warning(f"Could not register dynamic blueprint '{bp.name}' directly: {bpe}")
+                    finally:
+                        if was_handled:
+                            self.app._got_first_request = True
 
     def _register_hooks(self, record: AddonRecord) -> None:
         """Extracts and registers lifecycle hook listeners defined in the addon entrypoint."""
@@ -426,6 +435,120 @@ class AddonManager:
     def emit_hook(self, event_name: str, *args, **kwargs) -> List[Any]:
         """Dispatches an event to all active subscribed addon listeners."""
         return self.hook_bus.emit(event_name, *args, **kwargs)
+
+    def import_addon_zip(self, zip_source) -> Dict[str, Any]:
+        """
+        Extracts a .zip archive containing an addon extension, validates manifest.json,
+        installs it into data/custom_addons/<addon_id>/, and mounts it into the runtime engine.
+        """
+        import zipfile
+        import shutil
+
+        try:
+            with zipfile.ZipFile(zip_source, 'r') as zf:
+                namelist = zf.namelist()
+                manifest_entry = None
+                prefix = ""
+                for name in namelist:
+                    parts = name.replace('\\', '/').split('/')
+                    if parts[-1] == 'manifest.json':
+                        manifest_entry = name
+                        prefix = "/".join(parts[:-1])
+                        if prefix:
+                            prefix += "/"
+                        break
+
+                if not manifest_entry:
+                    return {"success": False, "error": "Invalid addon package: manifest.json not found in ZIP archive."}
+
+                try:
+                    with zf.open(manifest_entry) as mf:
+                        manifest_data = json.load(mf)
+                except Exception as je:
+                    return {"success": False, "error": f"Invalid manifest.json in ZIP archive: {je}"}
+
+                self._validate_manifest(manifest_data)
+                addon_id = manifest_data['id']
+
+                custom_dir = getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))
+                os.makedirs(custom_dir, exist_ok=True)
+                target_dir = os.path.join(custom_dir, addon_id)
+
+                if os.path.isdir(target_dir):
+                    shutil.rmtree(target_dir, ignore_errors=True)
+                os.makedirs(target_dir, exist_ok=True)
+
+                # Extract files with zip-slip path traversal prevention
+                resolved_target = os.path.realpath(target_dir)
+                for member in zf.infolist():
+                    member_path = member.filename.replace('\\', '/')
+                    if prefix and member_path.startswith(prefix):
+                        rel_path = member_path[len(prefix):]
+                    else:
+                        rel_path = member_path
+
+                    if not rel_path or rel_path.endswith('/'):
+                        continue
+
+                    dest_file = os.path.join(target_dir, *rel_path.split('/'))
+                    dest_real = os.path.realpath(dest_file)
+                    if not (dest_real == resolved_target or dest_real.startswith(resolved_target + os.sep)):
+                        continue
+
+                    os.makedirs(os.path.dirname(dest_file), exist_ok=True)
+                    with zf.open(member) as src, open(dest_file, 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+
+                # Load into runtime
+                record = self.load_addon(target_dir, dir_type="custom")
+                return {
+                    "success": record.status != STATE_ERROR,
+                    "id": addon_id,
+                    "name": record.name,
+                    "status": record.status,
+                    "error": record.error,
+                    "message": f"Addon '{record.name}' installed successfully."
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to import addon ZIP: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    def uninstall_addon(self, addon_id: str) -> Dict[str, Any]:
+        """
+        Uninstalls and safely deletes a custom addon from data/custom_addons/.
+        Protects built-in core addons from deletion.
+        """
+        import shutil
+
+        rec = self.addons.get(addon_id)
+        if not rec:
+            return {"success": False, "error": f"Addon '{addon_id}' not found."}
+
+        if rec.dir_type != "custom":
+            return {
+                "success": False,
+                "error": f"Cannot remove built-in core addon '{rec.name}'. You can disable it using the toggle instead."
+            }
+
+        # Unregister hooks
+        self.hook_bus.unregister_for_addon(addon_id)
+
+        # Remove files
+        if os.path.isdir(rec.dir_path):
+            try:
+                shutil.rmtree(rec.dir_path, ignore_errors=True)
+            except Exception as e:
+                return {"success": False, "error": f"Failed to delete directory: {e}"}
+
+        # Purge from registry
+        self.addons.pop(addon_id, None)
+
+        return {
+            "success": True,
+            "id": addon_id,
+            "message": f"Addon '{rec.name}' has been uninstalled successfully."
+        }
 
 
 # Global singleton instance

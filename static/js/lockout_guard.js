@@ -334,6 +334,7 @@
 
             if (!data.require_password) return; // No lockout configured
             if (!data.has_password) return;     // Password not yet set — allow access
+            if (data.authenticated || data.authorized) return; // Already authenticated in active session
 
             const protected_sections = data.protected_sections || [];
 
