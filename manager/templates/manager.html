@@ -43,7 +43,7 @@
 
         <div class="sidebar-footer">
             <span>Engine: Online</span>
-            <a href="/manager/about" class="version-badge-link" title="View System Credits &amp; Documentation">v1.0.5</a>
+            <a href="/manager/about" class="version-badge-link" title="View System Credits &amp; Documentation">v1.0.6</a>
         </div>
     </aside>
 
@@ -63,10 +63,10 @@
                             <button id="clearNotifsBtn" class="btn-text-action">Clear</button>
                         </div>
                         <div id="notifList" class="notif-dropdown-body">
-                            <!-- Populated dynamically -->
+                            <!-- Populated dynamically via notifications.js -->
                         </div>
                         <div class="notif-dropdown-footer">
-                            <a href="/manager/logs" class="btn-full-action">Open Terminal Logs →</a>
+                            <a href="/manager/logs" class="btn-full-action">Open Terminal Logs &rarr;</a>
                         </div>
                     </div>
                 </div>
@@ -74,7 +74,7 @@
             </div>
         </header>
 
-        <div class="view-container">
+        <div class="dashboard-body">
             <!-- Dedicated Tools Grid -->
             <div class="cards-grid" id="toolsGrid">
                 <!-- Cards dynamically loaded -->
@@ -94,7 +94,8 @@ const ICONS = {
     'cache': '🧹',
     'logs': '📜',
     'about': 'ℹ️',
-    'configure_manager': '🛡️'
+    'configure_manager': '🛡️',
+    'addons': '🧩'
 };
 
 const DESCRIPTIONS = {
@@ -104,7 +105,8 @@ const DESCRIPTIONS = {
     'cache': 'Inspect and purge card artwork cache files to reclaim disk space.',
     'logs': 'View live system execution traces, background worker logs, and diagnostic dumps.',
     'about': 'System credits, contributors ledger, and third-party dependency licensing audit.',
-    'configure_manager': 'Manager PIN/password protection, startup bypass modes, and dependency upgrade tooling.'
+    'configure_manager': 'Manager PIN/password protection, startup bypass modes, and dependency upgrade tooling.',
+    'addons': 'Inspect, enable/disable, configure, and troubleshoot installed system extensions and custom applets.'
 };
 
 async function initDashboard() {

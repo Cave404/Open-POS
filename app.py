@@ -16,6 +16,10 @@ def create_app():
     app.register_blueprint(manager_bp)
     app.register_blueprint(api_bp)
 
+    # Initialize dynamic Addon & Plugin Engine
+    from core.addons import addon_manager
+    addon_manager.init_app(app)
+
     @app.route('/')
     def index():
         return redirect(url_for('manager.manager_index'))

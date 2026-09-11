@@ -195,14 +195,14 @@ def test_about_view_route(client):
     assert "Return to Dashboard" in html
     assert "Third-Party Dependencies" in html
     assert "Cave404" in html
-    assert "v1.0.5" in html
+    assert "v1.0.6" in html
 
 def test_api_system_credits(client):
-    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.5."""
+    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.6."""
     res = client.get("/api/system/credits")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["version"] == "v1.0.5"
+    assert data["version"] == "v1.0.6"
     assert "https://github.com/Cave404/Open-POS" in data["repository"]
     assert len(data["authors"]) >= 1
     assert len(data["dependencies"]) >= 5
@@ -350,7 +350,7 @@ def test_manager_dashboard_home_view(client):
     html = res.get_data(as_text=True)
     assert "Quick-Access Dashboard" in html
     assert "Home" in html
-    assert "v1.0.5" in html
+    assert "v1.0.6" in html
     assert "notifBellBtn" in html
     assert "configure_manager" in html
 
@@ -365,7 +365,7 @@ def test_logs_view_route(client):
     assert "btnExportCsv" in html
     assert "btnDownloadLog" in html
     assert "btnOpenLiveTerminal" in html
-    assert "v1.0.5" in html
+    assert "v1.0.6" in html
 
 def test_configure_manager_view_route(client):
     """Asserts that GET /manager/configure_manager renders the Configure Manager view."""
@@ -379,7 +379,7 @@ def test_configure_manager_view_route(client):
     assert "bypassManagerToggle" in html
     assert "btnScanPackages" in html
     assert "password-grid" in html
-    assert "v1.0.5" in html
+    assert "v1.0.6" in html
 
 def test_notifications_service_and_apis(client):
     """Asserts that notification queue operations and REST endpoints function correctly."""

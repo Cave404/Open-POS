@@ -26,7 +26,7 @@ for _directory in (DATA_DIR, DB_DIR, CACHE_DIR, UPLOAD_DIR, LOGS_DIR, CUSTOM_ADD
     os.makedirs(_directory, exist_ok=True)
 
 class Config:
-    VERSION = "v1.0.5"
+    VERSION = "v1.0.6"
     SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(24).hex())
     FERNET_KEY = os.environ.get('FERNET_KEY', '')
     HOST = os.environ.get('HOST', '0.0.0.0')

@@ -1,0 +1,14 @@
+{
+  "id": "test_addon",
+  "name": "Test Diagnostics Addon",
+  "version": "1.0.0",
+  "author": "OpenPOS Team",
+  "description": "Verification plugin for testing addon sandboxing, routing, and lifecycle hooks.",
+  "category": "Desktop_Apps",
+  "icon": "puzzle.png",
+  "entrypoint": "plugin.py",
+  "requires_db": true,
+  "min_core_version": "1.0.0",
+  "dependencies": [],
+  "settings_route": "/addons/test_addon/status"
+}

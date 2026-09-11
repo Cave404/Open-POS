@@ -126,6 +126,13 @@ BUILTIN_APPLETS = [
         "icon": "info.png",
         "target": "/manager/about"
     },
+    {
+        "id": "addons",
+        "title": "Applets_&_Addons",
+        "category": "Desktop_Apps",
+        "icon": "puzzle.png",
+        "target": "/manager/addons"
+    },
 ]
 
 # Informative metadata for applets currently undergoing active engineering
@@ -165,6 +172,12 @@ APPLETS_META = {
         "icon": "ℹ️",
         "category": "System Admin",
         "description": "System credits, contributors ledger, and third-party dependency licensing audit."
+    },
+    "addons": {
+        "title": "Applets & Addons",
+        "icon": "🧩",
+        "category": "Desktop Apps",
+        "description": "Inspect, enable/disable, configure, and troubleshoot installed system extensions and custom applets."
     }
 }
 
@@ -386,35 +399,60 @@ def manager_configure():
     return render_template('configure_manager.html', is_locked=is_section_locked('configure_manager'))
 
 
+@manager_bp.route('/addons')
+@manager_bp.route('/applets')
+def manager_addons():
+    """Renders the Addons & Applets Management Control Center."""
+    return render_template('addons.html', is_locked=is_section_locked('addons'))
+
+
+@manager_bp.route('/api/addons', methods=['GET'])
+def get_addons():
+    """Returns a list of all discovered addons, statuses, and runtime diagnostics."""
+    from core.addons import addon_manager
+    return jsonify(addon_manager.get_all_addons())
+
+
+@manager_bp.route('/api/addons/<addon_id>/toggle', methods=['POST'])
+def toggle_addon(addon_id):
+    """Toggles the enabled status of an addon."""
+    from core.addons import addon_manager
+    data = request.get_json() or {}
+    enable = data.get('enabled', True)
+    result = addon_manager.toggle_addon(addon_id, enable)
+    return jsonify(result), (200 if result.get('success', False) else 400)
+
+
+@manager_bp.route('/api/addons/<addon_id>/diagnostics', methods=['GET'])
+def get_addon_diagnostics(addon_id):
+    """Returns detailed error trace and metadata for a specific addon."""
+    from core.addons import addon_manager
+    addon = addon_manager.get_addon(addon_id)
+    if not addon:
+        return jsonify({"error": f"Addon '{addon_id}' not found"}), 404
+    return jsonify(addon)
+
 
 @manager_bp.route('/api/applets')
 def list_applets():
     """
     Returns a dynamic list of built-in applets and discovered addon manifests.
-    Addons are read from the /addons directory if present.
     """
     applets = list(BUILTIN_APPLETS)
-    addons_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'addons'))
-
-    if os.path.exists(addons_dir):
-        for entry in os.listdir(addons_dir):
-            manifest_path = os.path.join(addons_dir, entry, 'manifest.json')
-            if os.path.isfile(manifest_path):
-                try:
-                    with open(manifest_path, 'r', encoding='utf-8') as f:
-                        meta = json.load(f)
-                        applets.append({
-                            "id": meta.get("id", entry),
-                            "title": meta.get("name", entry),
-                            "category": meta.get("category", "Desktop_Apps"),
-                            "icon": meta.get("icon", "generic_app.png"),
-                            "target": f"/addons/{entry}/admin",
-                            "is_addon": True,
-                            "enabled": meta.get("enabled", True)
-                        })
-                except Exception as e:
-                    logger.warning(f"Could not load addon manifest for {entry}: {e}")
-                    continue
+    from core.addons import addon_manager
+    for addon in addon_manager.get_all_addons():
+        if not any(a["id"] == addon["id"] for a in BUILTIN_APPLETS):
+            target_url = addon.get("settings_route") or f"/addons/{addon['id']}/status"
+            applets.append({
+                "id": addon["id"],
+                "title": addon["name"],
+                "category": addon.get("category", "Desktop_Apps"),
+                "icon": addon.get("icon", "generic_app.png"),
+                "target": target_url,
+                "is_addon": True,
+                "enabled": addon.get("enabled", True),
+                "status": addon.get("status", "ACTIVE")
+            })
 
     return jsonify(applets)
 
@@ -1230,7 +1268,7 @@ def api_live_logs_stream():
             ],
             "DISCORD": [
                 ("INFO", "Discord Gateway WebSocket heartbeat acknowledged (ping: 26ms)."),
-                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.5 Cashiers'."),
+                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.6 Cashiers'."),
                 ("INFO", "Daily trade webhooks channel #pos-trades listener healthy."),
                 ("INFO", "Discord bot queue empty. 0 outgoing transaction summaries pending.")
             ]

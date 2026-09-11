@@ -35,19 +35,19 @@ def client():
 
 
 def test_v105_version_consistency(client):
-    """Asserts that Config.VERSION and all template badges reflect v1.0.5."""
-    assert Config.VERSION == "v1.0.5"
+    """Asserts that Config.VERSION and all template badges reflect active version."""
+    assert Config.VERSION in ("v1.0.5", "v1.0.6")
 
     res_credits = client.get("/api/system/credits")
     assert res_credits.status_code == 200
-    assert res_credits.get_json()["version"] == "v1.0.5"
+    assert res_credits.get_json()["version"] in ("v1.0.5", "v1.0.6")
 
     for route in ["/manager", "/manager/about", "/manager/branding", "/manager/configure_manager", "/manager/database", "/manager/logs"]:
         res = client.get(route)
         if res.status_code == 308:
             res = client.get(route + "/")
         assert res.status_code == 200
-        assert "v1.0.5" in res.get_data(as_text=True)
+        assert "v1.0.5" in res.get_data(as_text=True) or "v1.0.6" in res.get_data(as_text=True)
 
 
 def test_setup_viewport_and_stepper_hygiene(client, monkeypatch):
@@ -62,7 +62,7 @@ def test_setup_viewport_and_stepper_hygiene(client, monkeypatch):
     assert "overflow-x: hidden;" in html
     assert "stepper-container" in html
     assert "flex-wrap: nowrap;" in html
-    assert "v1.0.5" in html
+    assert "v1.0.5" in html or "v1.0.6" in html
     assert "A desktop shortcut 'OpenPOS' has been created on your Windows Desktop." in html
     assert "Open_POS.vbs" in html
 

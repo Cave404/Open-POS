@@ -1,4 +1,4 @@
-# Open-POS Developer Wiki & Technical Reference (v1.0.5)
+# Open-POS Developer Wiki & Technical Reference (v1.0.6)
 
 Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, security controls, and testing standards for the project.
 
@@ -142,7 +142,7 @@ To prevent layout shifting and guarantee tactile navigation across every subview
               </div>
           </div>
           <span class="status-pill status-online">Engine: Online</span>
-          <a href="/manager/about" class="version-badge-link">v1.0.5</a>
+          <a href="/manager/about" class="version-badge-link">v1.0.6</a>
       </div>
   </header>
   ```
@@ -222,6 +222,28 @@ All store-specific data is strictly quarantined inside an untracked `data/` dire
 - **Permanent Lockout:**
   - Once completed, creates `data/config/.setup_complete`.
   - Any subsequent attempts to access `/setup` return HTTP 403 Forbidden.
+
+---
+
+## 10. Resilient Addon Engine & Plugin Sandboxing (`core/addons/` & `/manager/addons`)
+
+- **Dual-Directory Discovery:**
+  - Built-in addons: `Open-POS/addons/<addon_id>/`
+  - Custom / private user extensions: `data/custom_addons/<addon_id>/`
+- **Manifest Specification (`manifest.json`):**
+  - Requires `id`, `name`, `version`, `entrypoint`.
+  - Optional declarations: `category`, `icon`, `author`, `description`, `requires_db`, `dependencies`, `settings_route`, and `min_core_version`.
+- **Fault-Tolerant Sandboxed Lifecycle:**
+  - Manifest schema validation against the formal contract.
+  - Third-party dependency verification via `importlib.import_module()`.
+  - Database-agnostic automated migrations (`schema_sqlite.sql` or `schema_postgres.sql`).
+  - Dynamic Flask Blueprint mounting under `/addons/<addon_id>/` with automatic 503 guard when disabled.
+  - Dynamic Hook Bus registration (`on_sale_complete`, etc.) with event isolation.
+  - Complete error boundary: exceptions are caught, formatted with full stack traces, logged to `data/logs/` and `core/notifications.py`, marking the addon `ERROR` / `FAILED` without crashing the core POS.
+- **Addons Control Center (`manager/templates/addons.html`):**
+  - Real-time enable/disable toggling persisted to SQLite/PostgreSQL `settings` table without server restarts.
+  - Diagnostic error trace modal rendering exact Python tracebacks for quick developer debugging.
+
 
 
 

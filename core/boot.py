@@ -146,26 +146,22 @@ def run_boot_sequence(
         # =====================================================================
         _notify(75, "Registering system addons & applets...")
 
-        addons_dir = os.path.join(BASE_DIR, 'addons')
-        discovered_addons = []
-
-        if os.path.isdir(addons_dir):
-            for entry in os.listdir(addons_dir):
-                entry_path = os.path.join(addons_dir, entry)
-                if os.path.isdir(entry_path):
-                    manifest_path = os.path.join(entry_path, 'manifest.json')
-                    if os.path.isfile(manifest_path):
-                        try:
-                            with open(manifest_path, 'r', encoding='utf-8') as mf:
-                                manifest_data = json.load(mf)
-                                discovered_addons.append({
-                                    "id": manifest_data.get("id", entry),
-                                    "name": manifest_data.get("name", entry),
-                                    "version": manifest_data.get("version", "1.0.0"),
-                                    "enabled": manifest_data.get("enabled", True)
-                                })
-                        except Exception as m_err:
-                            logger.warning(f"Error parsing addon manifest {manifest_path}: {m_err}")
+        try:
+            from core.addons import addon_manager
+            all_addons = addon_manager.discover_and_load_all()
+            discovered_addons = [
+                {
+                    "id": a.id,
+                    "name": a.name,
+                    "version": a.version,
+                    "enabled": a.enabled,
+                    "status": a.status
+                }
+                for a in all_addons.values()
+            ]
+        except Exception as add_err:
+            logger.warning(f"Error during addon discovery in boot sequence: {add_err}")
+            discovered_addons = []
 
         boot_log["addons"] = discovered_addons
         addon_count = len(discovered_addons)
