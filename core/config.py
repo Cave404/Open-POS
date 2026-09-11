@@ -12,16 +12,23 @@ CACHE_DIR = os.path.join(DATA_DIR, 'cache')
 UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
 LOGS_DIR = os.path.join(DATA_DIR, 'logs')
 CUSTOM_ADDONS_DIR = os.path.join(DATA_DIR, 'custom_addons')
-
 CONFIG_DIR = os.path.join(DATA_DIR, 'config')
+
+# Priority: Load environment variables from data/config/.env first, falling back to root .env
+env_path = os.path.join(CONFIG_DIR, '.env')
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+else:
+    load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # Automatically ensure private data directories exist on startup
 for _directory in (DATA_DIR, DB_DIR, CACHE_DIR, UPLOAD_DIR, LOGS_DIR, CUSTOM_ADDONS_DIR, CONFIG_DIR):
     os.makedirs(_directory, exist_ok=True)
 
 class Config:
-    VERSION = "v1.0.2"
+    VERSION = "v1.0.3"
     SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(24).hex())
+    FERNET_KEY = os.environ.get('FERNET_KEY', '')
     HOST = os.environ.get('HOST', '0.0.0.0')
     PORT = int(os.environ.get('PORT', 5000))
 
@@ -34,7 +41,6 @@ class Config:
     LOGS_DIR = LOGS_DIR
     CUSTOM_ADDONS_DIR = CUSTOM_ADDONS_DIR
     CONFIG_DIR = CONFIG_DIR
-
 
     # Database Settings
     DB_ENGINE = os.environ.get('DB_ENGINE', 'sqlite').lower()
@@ -58,11 +64,16 @@ class Config:
     CASH_PAYOUT_PERCENT = float(os.environ.get('CASH_PAYOUT_PERCENT', 60.0))
     CREDIT_PAYOUT_PERCENT = float(os.environ.get('CREDIT_PAYOUT_PERCENT', 80.0))
 
-# Migration check: if legacy root pos_store.db exists and data/db/pos_store.db does not, migrate it
+# Migration & cleanup check: relocate stray root pos_store.db into data/db/pos_store.db
 _legacy_root_db = os.path.join(BASE_DIR, 'pos_store.db')
 _target_data_db = os.path.join(DB_DIR, 'pos_store.db')
-if os.path.isfile(_legacy_root_db) and not os.path.isfile(_target_data_db):
+if os.path.isfile(_legacy_root_db):
+    if not os.path.isfile(_target_data_db):
+        try:
+            shutil.copy2(_legacy_root_db, _target_data_db)
+        except Exception:
+            pass
     try:
-        shutil.copy2(_legacy_root_db, _target_data_db)
+        os.remove(_legacy_root_db)
     except Exception:
         pass

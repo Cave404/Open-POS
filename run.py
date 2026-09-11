@@ -35,6 +35,7 @@ from pystray import MenuItem as item
 
 from core.config import Config
 from core.boot import run_boot_sequence
+from core.setup import is_setup_complete
 from app import create_app
 
 # -----------------------------------------------------------------------------
@@ -240,11 +241,27 @@ if __name__ == '__main__':
     )
     server_thread.start()
 
-    # Step B: Launch Pystray in detached (non-blocking) thread mode
+    # Step B: Check if first-run onboarding setup is required
+    if not is_setup_complete():
+        # Bypass normal dashboard and splash screen; launch Setup Wizard
+        active_window = webview.create_window(
+            title="OpenPOS - Initial Setup & Security Initialization",
+            url=f"http://127.0.0.1:{Config.PORT}/setup",
+            width=840,
+            height=700,
+            min_size=(780, 600),
+            resizable=True,
+            confirm_close=False
+        )
+        active_window.events.closing += on_window_closing
+        webview.start()
+        exit_open_pos()
+
+    # Step C: Launch Pystray in detached (non-blocking) thread mode
     tray_instance = initialize_system_tray()
     tray_instance.run_detached()
 
-    # Step C: Measure exact splash image dimensions and instantiate borderless window with docked tray
+    # Step D: Measure exact splash image dimensions and instantiate borderless window with docked tray
     splash_path = os.path.join(Config.BASE_DIR, 'manager', 'open_pos_splash.png')
     img_w, img_h = 656, 404
     if os.path.isfile(splash_path):
@@ -267,8 +284,8 @@ if __name__ == '__main__':
         on_top=True
     )
 
-    # Step D: Start WebView event loop on MAIN thread with boot worker callback
+    # Step E: Start WebView event loop on MAIN thread with boot worker callback
     webview.start(boot_orchestration_worker)
 
-    # Step E: Clean exit cleanup once main loop terminates
+    # Step F: Clean exit cleanup once main loop terminates
     exit_open_pos()

@@ -1,4 +1,4 @@
-# Open-POS Developer Wiki & Technical Reference (v1.0.2)
+# Open-POS Developer Wiki & Technical Reference (v1.0.3)
 
 Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, security controls, and testing standards for the project.
 
@@ -142,7 +142,7 @@ To prevent layout shifting and guarantee tactile navigation across every subview
               </div>
           </div>
           <span class="status-pill status-online">Engine: Online</span>
-          <a href="/manager/about" class="version-badge-link">v1.0.2</a>
+          <a href="/manager/about" class="version-badge-link">v1.0.3</a>
       </div>
   </header>
   ```
@@ -152,7 +152,7 @@ To prevent layout shifting and guarantee tactile navigation across every subview
 
 ## 5. Persistent Notification Service
 
-- **Core Module:** `core/notifications.py` provides a thread-safe rolling in-memory queue (`maxlen=100`) backed by a persistent log trace on disk at `data/logs/open_pos.log`.
+- **Core Module:** `core/notifications.py` provides a thread-safe rolling in-memory queue (`maxlen=100`) backed by a persistent log trace on disk at `data/logs/openpos_system.log`.
 - **API Endpoints:**
   - `GET /api/notifications`: Returns current notifications array and unread count.
   - `POST /api/notifications/clear`: Clears the notification queue.
@@ -166,8 +166,8 @@ To prevent layout shifting and guarantee tactile navigation across every subview
 - **Route:** `GET /manager/logs` (`manager/templates/logs.html`).
 - **Telemetry Endpoints:**
   - `GET /api/logs`: Retrieves recent structured logs with timestamp, subsystem, level, and message.
-  - `GET /api/logs/export?format=csv`: Downloads log traces in standard RFC 4180 CSV format.
-  - `GET /api/logs/download`: Direct stream download of raw `data/logs/open_pos.log`.
+  - `GET /api/logs/export/csv` (or `/api/logs/export`): Downloads log traces in standard RFC 4180 CSV format.
+  - `GET /api/logs/download/txt` (or `/api/logs/download`): Direct stream download of raw `data/logs/openpos_system.log`.
   - `GET /api/logs/live_stream?subsystem=<name>`: Server-Sent Events (SSE) streaming daemon output line-by-line in real time into a styled retro-dark terminal container with pause and clear controls.
 
 ---
@@ -175,6 +175,9 @@ To prevent layout shifting and guarantee tactile navigation across every subview
 ## 7. Configure Manager Admin Panel
 
 - **Route:** `GET /manager/configure_manager` (`manager/templates/configure_manager.html`).
+- **Password Layout & Alignment:**
+  - Password inputs align in a uniform 3-column CSS grid (`.password-grid`): Current Password, New PIN/Password, Confirm Password.
+  - When no password exists in `data/config/manager_auth.json`, "Current Password" is disabled with placeholder "No current password set", and "Require Manager Password" defaults to unchecked (`False`).
 - **Access Control & Employee Lockout:**
   - Enforces manager PIN/password before allowing access to sensitive administrative modules.
   - Configuration saved to `data/config/manager_auth.json` (untracked by git).
@@ -194,10 +197,28 @@ All store-specific data is strictly quarantined inside an untracked `data/` dire
 - `data/db/`: SQLite database files (`pos_store.db`, `shop_inventory.db`).
 - `data/cache/`: Cached card artwork and metadata.
 - `data/uploads/`: Store brand logos and uploaded images.
-- `data/logs/`: Application telemetry and execution traces (`open_pos.log`).
-- `data/config/`: Security policies, PIN hashes (`manager_auth.json`).
+- `data/logs/`: Application telemetry and execution traces (`openpos_system.log`).
+- `data/config/`: Configuration `.env`, security policies (`manager_auth.json`), and setup lock (`.setup_complete`).
 - `data/custom_addons/`: Custom site-specific addons.
-- All folders are tracked in git via `.gitkeep` files while `.gitignore` ignores all actual data files.
+- All folders are tracked in git via `.gitkeep` files while `.gitignore` ignores all actual data files, keys, and DBs.
+
+---
+
+## 9. First-Run Setup Wizard (`core/setup/` & `/setup`)
+
+- **Onboarding Pipeline:**
+  - On application boot, `run.py` checks for `data/config/.setup_complete`.
+  - If missing, launches the Setup Wizard (`840x700`, title="OpenPOS - Initial Setup & Security Initialization") to guide store owners through initial configuration.
+- **6-Step Setup Flow:**
+  1. Prerequisites check: Verifies Python 3.12+, DB drivers, cryptography, and writable `data/` directories.
+  2. Store identity: Collects Store Name, Legal Entity Name, City/State, and optional Store Logo image upload.
+  3. Security & Manager Credentials: Sets admin password/PIN and lockout preference.
+  4. Database Engine: Standalone SQLite (`data/db/pos_store.db`) vs. Network PostgreSQL.
+  5. Cryptographic Initialization: Generates 32-byte Fernet AES-128 key, 32-byte Flask secret key, Emergency Recovery Token, and runs read/write roundtrip test.
+  6. Recovery Key Sheet: Displays high-contrast Master Recovery Key, supports saving `.txt` recovery key file and printing via `@media print` formatted for 8.5x11 paper or PDF printer.
+- **Permanent Lockout:**
+  - Once completed, creates `data/config/.setup_complete`.
+  - Any subsequent attempts to access `/setup` return HTTP 403 Forbidden.
 
 
 

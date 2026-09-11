@@ -219,6 +219,7 @@ __marimo__/
 
 # Security & Secrets
 .env
+*.env
 *.key
 encryption.key
 secrets.json
@@ -252,4 +253,8 @@ data/*
 !data/logs/.gitkeep
 !data/custom_addons/.gitkeep
 !data/config/.gitkeep
+data/config/*
+!data/config/.gitkeep
+data/db/*
+!data/db/.gitkeep
 

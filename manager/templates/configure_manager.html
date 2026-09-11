@@ -98,6 +98,18 @@
             font-size: 11px;
             font-weight: 700;
         }
+        .password-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            align-items: end;
+        }
+
+        @media (max-width: 768px) {
+            .password-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body class="manager-body">
@@ -132,7 +144,7 @@
                 </div>
             </div>
             <span class="status-pill status-online">Engine: Online</span>
-            <a href="/manager/about" class="version-badge-link">v1.0.2</a>
+            <a href="/manager/about" class="version-badge-link">v1.0.3</a>
         </div>
     </header>
 
@@ -199,10 +211,10 @@
                     <!-- Password Management Form -->
                     <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-top: 6px;">
                         <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-main);">Set / Change Manager Admin Password</h4>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                            <div class="form-group" id="currentPassGroup" style="display: none;">
+                        <div class="password-grid">
+                            <div class="form-group" id="currentPassGroup">
                                 <label for="currentPassword">Current Password</label>
-                                <input type="password" id="currentPassword" class="log-input" placeholder="Enter current password">
+                                <input type="password" id="currentPassword" class="log-input" placeholder="No current password set" disabled>
                             </div>
                             <div class="form-group">
                                 <label for="newPassword">New PIN / Password</label>
@@ -301,12 +313,19 @@ async function loadAdminStatus() {
         if (!res.ok) return;
         authConfig = await res.json();
 
-        document.getElementById('requirePasswordToggle').checked = !!authConfig.require_password;
-        document.getElementById('bypassManagerToggle').checked = !!authConfig.bypass_manager_on_boot;
-
+        const curPassInput = document.getElementById('currentPassword');
         if (authConfig.has_password) {
-            document.getElementById('currentPassGroup').style.display = 'block';
+            curPassInput.disabled = false;
+            curPassInput.placeholder = 'Enter current password';
+            document.getElementById('requirePasswordToggle').checked = !!authConfig.require_password;
+        } else {
+            curPassInput.disabled = true;
+            curPassInput.value = '';
+            curPassInput.placeholder = 'No current password set';
+            document.getElementById('requirePasswordToggle').checked = false;
         }
+
+        document.getElementById('bypassManagerToggle').checked = !!authConfig.bypass_manager_on_boot;
 
         const sections = authConfig.protected_sections || [];
         document.getElementById('chkProtectBranding').checked = sections.includes('branding');
@@ -339,6 +358,7 @@ async function saveSecurityPolicy() {
         require_password: requirePw,
         current_password: currentPw,
         new_password: newPw,
+        confirm_password: confirmPw,
         protected_sections: sections,
         bypass_manager_on_boot: document.getElementById('bypassManagerToggle').checked
     };

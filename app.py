@@ -20,6 +20,11 @@ def create_app():
     def index():
         return redirect(url_for('manager.manager_index'))
 
+    @app.route('/setup')
+    def setup_root():
+        from manager.routes import manager_setup
+        return manager_setup()
+
     @app.route('/data/uploads/<path:filename>')
     def serve_data_uploads(filename):
         return send_from_directory(Config.UPLOAD_DIR, filename)

@@ -195,14 +195,14 @@ def test_about_view_route(client):
     assert "Return to Dashboard" in html
     assert "Third-Party Dependencies" in html
     assert "Cave404" in html
-    assert "v1.0.2" in html
+    assert "v1.0.3" in html
 
 def test_api_system_credits(client):
-    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.2."""
+    """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.3."""
     res = client.get("/api/system/credits")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["version"] == "v1.0.2"
+    assert data["version"] == "v1.0.3"
     assert "https://github.com/Cave404/Open-POS" in data["repository"]
     assert len(data["authors"]) >= 1
     assert len(data["dependencies"]) >= 5
@@ -330,7 +330,7 @@ def test_data_directory_structure():
     assert os.path.isdir(Config.CONFIG_DIR)
 
 def test_manager_dashboard_home_view(client):
-    """Asserts that GET /manager renders the Home view as default with v1.0.2 footer and notification bell."""
+    """Asserts that GET /manager renders the Home view as default with v1.0.3 footer and notification bell."""
     res = client.get('/manager')
     assert res.status_code in (200, 308)
     if res.status_code == 308:
@@ -338,7 +338,7 @@ def test_manager_dashboard_home_view(client):
     html = res.get_data(as_text=True)
     assert "Quick-Access Dashboard" in html
     assert "Home" in html
-    assert "v1.0.2" in html
+    assert "v1.0.3" in html
     assert "notifBellBtn" in html
     assert "configure_manager" in html
 
@@ -353,7 +353,7 @@ def test_logs_view_route(client):
     assert "btnExportCsv" in html
     assert "btnDownloadLog" in html
     assert "btnOpenLiveTerminal" in html
-    assert "v1.0.2" in html
+    assert "v1.0.3" in html
 
 def test_configure_manager_view_route(client):
     """Asserts that GET /manager/configure_manager renders the Configure Manager view."""
@@ -366,7 +366,8 @@ def test_configure_manager_view_route(client):
     assert "requirePasswordToggle" in html
     assert "bypassManagerToggle" in html
     assert "btnScanPackages" in html
-    assert "v1.0.2" in html
+    assert "password-grid" in html
+    assert "v1.0.3" in html
 
 def test_notifications_service_and_apis(client):
     """Asserts that notification queue operations and REST endpoints function correctly."""
@@ -413,16 +414,18 @@ def test_terminal_logs_api(client):
     assert data["status"] == "success"
     assert isinstance(data["logs"], list)
 
-    # 2. Export CSV
-    csv_res = client.get('/api/logs/export?format=csv')
-    assert csv_res.status_code == 200
-    assert "text/csv" in csv_res.content_type
-    assert "Timestamp,Subsystem,Level,Message" in csv_res.get_data(as_text=True)
+    # 2. Export CSV (both /api/logs/export/csv and /api/logs/export)
+    for csv_url in ['/api/logs/export/csv', '/api/logs/export?format=csv']:
+        csv_res = client.get(csv_url)
+        assert csv_res.status_code == 200
+        assert "text/csv" in csv_res.content_type
+        assert "Timestamp,Subsystem,Level,Message" in csv_res.get_data(as_text=True)
 
-    # 3. Download txt
-    txt_res = client.get('/api/logs/download')
-    assert txt_res.status_code == 200
-    assert "text/plain" in txt_res.content_type
+    # 3. Download txt (both /api/logs/download/txt and /api/logs/download)
+    for txt_url in ['/api/logs/download/txt', '/api/logs/download']:
+        txt_res = client.get(txt_url)
+        assert txt_res.status_code == 200
+        assert "text/plain" in txt_res.content_type
 
     # 4. SSE live stream endpoint verification
     stream_res = client.get('/api/logs/live_stream?subsystem=CORE')
@@ -449,15 +452,33 @@ def test_admin_auth_and_lockout_api(client, tmp_path, monkeypatch):
     })
     assert bad_req.status_code == 400
 
-    # Configure new admin password
-    set_res = client.post('/api/admin/auth/configure', json={
+    # Password confirmation mismatch test
+    mismatch_req = client.post('/api/admin/auth/configure', json={
+        "new_password": "password123",
+        "confirm_password": "differentPassword"
+    })
+    assert mismatch_req.status_code == 400
+    assert "do not match" in mismatch_req.get_json()["message"]
+
+    # Initial password setup (no current password exists, should succeed without current_password)
+    set_res = client.post('/api/settings/security', json={
         "require_password": True,
         "new_password": "posSecurePassword123",
+        "confirm_password": "posSecurePassword123",
         "protected_sections": ["branding", "database"],
         "bypass_manager_on_boot": True
     })
     assert set_res.status_code == 200
     assert set_res.get_json()["status"] == "success"
+
+    # Now that password exists, attempting to change without valid current_password fails
+    bad_current = client.post('/api/admin/auth/configure', json={
+        "current_password": "wrongOldPassword",
+        "new_password": "newSecurePassword456",
+        "confirm_password": "newSecurePassword456"
+    })
+    assert bad_current.status_code == 400
+    assert "Current password does not match" in bad_current.get_json()["message"]
 
     # Verify status reflects updated policy
     status_res = client.get('/api/admin/auth/status')

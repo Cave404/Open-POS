@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenPOS - Initial Setup &amp; Security Initialization</title>
+    <link rel="stylesheet" href="/static/css/manager.css">
+    <style>
+        :root {
+            --wizard-bg: #12141a;
+            --wizard-card: #1a1d24;
+            --wizard-card-hover: #222631;
+            --wizard-border: #2d3343;
+            --wizard-accent: #3b82f6;
+            --wizard-accent-hover: #2563eb;
+            --wizard-success: #10b981;
+            --wizard-warning: #f59e0b;
+            --wizard-danger: #ef4444;
+            --wizard-text: #f1f5f9;
+            --wizard-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body.wizard-body {
+            background-color: var(--wizard-bg);
+            color: var(--wizard-text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        .wizard-header {
+            background-color: var(--wizard-card);
+            border-bottom: 1px solid var(--wizard-border);
+            padding: 16px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .wizard-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #fff;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        .brand-text h1 {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+        }
+
+        .brand-text p {
+            font-size: 12px;
+            color: var(--wizard-muted);
+        }
+
+        .version-pill {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Step Progress Stepper */
+        .stepper-container {
+            background: #161922;
+            border-bottom: 1px solid var(--wizard-border);
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            overflow-x: auto;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0.45;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .step-item.active {
+            opacity: 1;
+        }
+
+        .step-item.completed {
+            opacity: 0.9;
+        }
+
+        .step-num {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--wizard-border);
+            color: var(--wizard-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        .step-item.active .step-num {
+            background: var(--wizard-accent);
+            color: #fff;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        .step-item.completed .step-num {
+            background: var(--wizard-success);
+            color: #fff;
+        }
+
+        .step-label {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .step-item.active .step-label {
+            color: #fff;
+        }
+
+        .step-divider {
+            flex: 1;
+            height: 1px;
+            background: var(--wizard-border);
+            margin: 0 12px;
+            min-width: 16px;
+        }
+
+        /* Wizard Content Area */
+        .wizard-main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 32px 20px;
+        }
+
+        .wizard-stage-card {
+            background: var(--wizard-card);
+            border: 1px solid var(--wizard-border);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 760px;
+            padding: 28px 32px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            display: none;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        .wizard-stage-card.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stage-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stage-desc {
+            font-size: 13px;
+            color: var(--wizard-muted);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--wizard-text);
+        }
+
+        .form-label .optional {
+            font-size: 11px;
+            color: var(--wizard-muted);
+            font-weight: 400;
+        }
+
+        .form-input {
+            width: 100%;
+            background: #12141a;
+            border: 1px solid var(--wizard-border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            color: #fff;
+            font-size: 13px;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--wizard-accent);
+        }
+
+        .form-input:disabled {
+            background: #1e222d;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 13px;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--wizard-accent);
+            cursor: pointer;
+        }
+
+        /* Prerequisite List */
+        .prereq-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .prereq-item {
+            background: #141720;
+            border: 1px solid var(--wizard-border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .prereq-info h4 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .prereq-info p {
+            font-size: 11px;
+            color: var(--wizard-muted);
+        }
+
+        .prereq-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .prereq-pass {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .prereq-fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .prereq-opt {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        /* Database Choice Cards */
+        .db-cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .db-card {
+            background: #141720;
+            border: 2px solid var(--wizard-border);
+            border-radius: 10px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .db-card:hover {
+            border-color: #475569;
+            background: #191d28;
+        }
+
+        .db-card.selected {
+            border-color: var(--wizard-accent);
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .db-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .db-card-title {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .db-card-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #222631;
+            color: #94a3b8;
+        }
+
+        .db-card.selected .db-card-badge {
+            background: var(--wizard-accent);
+            color: #fff;
+        }
+
+        .db-card-desc {
+            font-size: 12px;
+            color: var(--wizard-muted);
+            line-height: 1.4;
+        }
+
+        /* Encryption Verification Card */
+        .crypto-card {
+            background: #141720;
+            border: 1px solid var(--wizard-border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .crypto-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 12px;
+        }
+
+        .crypto-row:last-child {
+            border-bottom: none;
+        }
+
+        .crypto-mono {
+            font-family: monospace;
+            font-size: 11px;
+            color: #93c5fd;
+            background: #0f172a;
+            padding: 3px 6px;
+            border-radius: 4px;
+            max-width: 320px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Master Recovery Key High-Contrast Card */
+        .recovery-key-card {
+            background: #0f172a;
+            border: 2px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+
+        .recovery-token-display {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: #60a5fa;
+            background: #020617;
+            border: 1px solid #1e3a8a;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin: 14px 0;
+            word-break: break-all;
+            user-select: all;
+        }
+
+        .warning-notice {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: #fca5a5;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .warning-notice strong {
+            color: #ef4444;
+        }
+
+        /* Button Trays */
+        .wizard-btn-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 28px;
+            padding-top: 18px;
+            border-top: 1px solid var(--wizard-border);
+        }
+
+        .btn-wizard {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-wizard-secondary {
+            background: #222631;
+            color: var(--wizard-text);
+            border: 1px solid var(--wizard-border);
+        }
+
+        .btn-wizard-secondary:hover {
+            background: #2b303c;
+        }
+
+        .btn-wizard-primary {
+            background: var(--wizard-accent);
+            color: #fff;
+        }
+
+        .btn-wizard-primary:hover {
+            background: var(--wizard-accent-hover);
+        }
+
+        .btn-wizard-success {
+            background: var(--wizard-success);
+            color: #fff;
+        }
+
+        .btn-wizard-success:hover {
+            background: #059669;
+        }
+
+        .btn-wizard:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Print Specific Styles */
+        @media print {
+            body.wizard-body {
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+
+            .wizard-header,
+            .stepper-container,
+            .wizard-btn-row,
+            .btn-wizard,
+            .stage-1, .stage-2, .stage-3, .stage-4, .stage-5 {
+                display: none !important;
+            }
+
+            .wizard-stage-card {
+                box-shadow: none !important;
+                border: 1px solid #000 !important;
+                background: #fff !important;
+                max-width: 100% !important;
+                padding: 20px !important;
+                display: block !important;
+            }
+
+            .stage-6 {
+                display: block !important;
+            }
+
+            .recovery-key-card {
+                background: #f8fafc !important;
+                border: 2px solid #000 !important;
+                color: #000 !important;
+                box-shadow: none !important;
+            }
+
+            .recovery-token-display {
+                background: #f1f5f9 !important;
+                color: #000000 !important;
+                border: 1px solid #000 !important;
+            }
+
+            .warning-notice {
+                background: #fef2f2 !important;
+                border: 1px solid #dc2626 !important;
+                color: #991b1b !important;
+            }
+        }
+    </style>
+</head>
+<body class="wizard-body">
+
+    <!-- Top Branding Header -->
+    <header class="wizard-header">
+        <div class="wizard-brand">
+            <div class="brand-icon">OP</div>
+            <div class="brand-text">
+                <h1>OpenPOS Setup Wizard</h1>
+                <p>Initial Store &amp; Cryptographic Provisioning</p>
+            </div>
+        </div>
+        <span class="version-pill">v1.0.3</span>
+    </header>
+
+    <!-- Progress Stepper -->
+    <div class="stepper-container" id="stepperContainer">
+        <div class="step-item active" id="stepIndicator1">
+            <div class="step-num">1</div>
+            <span class="step-label">Prerequisites</span>
+        </div>
+        <div class="step-divider"></div>
+
+        <div class="step-item" id="stepIndicator2">
+            <div class="step-num">2</div>
+            <span class="step-label">Store Identity</span>
+        </div>
+        <div class="step-divider"></div>
+
+        <div class="step-item" id="stepIndicator3">
+            <div class="step-num">3</div>
+            <span class="step-label">Security &amp; PIN</span>
+        </div>
+        <div class="step-divider"></div>
+
+        <div class="step-item" id="stepIndicator4">
+            <div class="step-num">4</div>
+            <span class="step-label">Database</span>
+        </div>
+        <div class="step-divider"></div>
+
+        <div class="step-item" id="stepIndicator5">
+            <div class="step-num">5</div>
+            <span class="step-label">Encryption</span>
+        </div>
+        <div class="step-divider"></div>
+
+        <div class="step-item" id="stepIndicator6">
+            <div class="step-num">6</div>
+            <span class="step-label">Recovery Key</span>
+        </div>
+    </div>
+
+    <!-- Main Content Stage Area -->
+    <main class="wizard-main">
+
+        <!-- ================================================================= -->
+        <!-- Stage 1: Welcome & Prerequisite Check -->
+        <!-- ================================================================= -->
+        <div class="wizard-stage-card active stage-1" id="stage1">
+            <h2 class="stage-title">🔍 Welcome to OpenPOS</h2>
+            <p class="stage-desc">
+                Before initializing your point of sale register, we verify your system environment, database drivers, and isolated storage permissions.
+            </p>
+
+            <div class="prereq-list" id="prereqList">
+                <div style="text-align: center; color: var(--wizard-muted); padding: 24px;">
+                    Scanning runtime environment...
+                </div>
+            </div>
+
+            <div class="wizard-btn-row">
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnRescanPrereq">
+                    <span>🔄</span> Re-scan Environment
+                </button>
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext1">
+                    Continue to Store Identity →
+                </button>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- Stage 2: Store Identity -->
+        <!-- ================================================================= -->
+        <div class="wizard-stage-card stage-2" id="stage2">
+            <h2 class="stage-title">🏪 Store Identity</h2>
+            <p class="stage-desc">
+                Configure your retail store name, registered legal entity, and optional receipt logo.
+            </p>
+
+            <div class="form-group">
+                <label class="form-label" for="inputStoreName">Store Name <span style="color: var(--wizard-danger);">*</span></label>
+                <input type="text" id="inputStoreName" class="form-input" placeholder="e.g. Main Street Games" value="Main Street Games" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="inputLegalName">Legal Entity Name <span class="optional">(Optional)</span></label>
+                <input type="text" id="inputLegalName" class="form-input" placeholder="e.g. Main Street Games LLC">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="inputLocation">City, State / Region <span class="optional">(Optional)</span></label>
+                <input type="text" id="inputLocation" class="form-input" placeholder="e.g. Austin, TX">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="inputLogoFile">Store Logo Image <span class="optional">(Optional PNG, JPG, SVG - max 2MB)</span></label>
+                <input type="file" id="inputLogoFile" class="form-input" accept="image/png, image/jpeg, image/svg+xml, image/webp">
+                <p id="logoUploadStatus" style="font-size: 11px; color: var(--wizard-muted); margin-top: 4px;"></p>
+            </div>
+
+            <div class="wizard-btn-row">
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack2">← Back</button>
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext2">Continue to Security →</button>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- Stage 3: Security & Manager Credentials -->
+        <!-- ================================================================= -->
+        <div class="wizard-stage-card stage-3" id="stage3">
+            <h2 class="stage-title">🛡️ Manager Credentials</h2>
+            <p class="stage-desc">
+                Set an administrative PIN or password to govern manager settings, refunds, and rate adjustments.
+            </p>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="inputAdminPassword">Admin Password / PIN</label>
+                    <input type="password" id="inputAdminPassword" class="form-input" placeholder="Enter secure PIN or password">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="inputConfirmPassword">Confirm Password / PIN</label>
+                    <input type="password" id="inputConfirmPassword" class="form-input" placeholder="Re-enter password">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 10px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="checkRequirePassword">
+                    <span>Require Manager Password to Access Settings <span style="color: var(--wizard-muted); font-size: 11px;">(Default: Off)</span></span>
+                </label>
+            </div>
+
+            <p style="font-size: 12px; color: var(--wizard-muted); margin-top: 12px;">
+                💡 You can leave this blank to run without a manager password during testing, or set one now.
+            </p>
+
+            <div class="wizard-btn-row">
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack3">← Back</button>
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext3">Continue to Database →</button>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- Stage 4: Database Engine Selection -->
+        <!-- ================================================================= -->
+        <div class="wizard-stage-card stage-4" id="stage4">
+            <h2 class="stage-title">💾 Database Engine</h2>
+            <p class="stage-desc">
+                Choose the storage engine for your product catalog, transactions, and trade records.
+            </p>
+
+            <div class="db-cards-grid">
+                <div class="db-card selected" id="cardSqlite">
+                    <div class="db-card-header">
+                        <span class="db-card-title">SQLite (Standalone)</span>
+                        <span class="db-card-badge">RECOMMENDED</span>
+                    </div>
+                    <p class="db-card-desc">
+                        Zero-configuration local storage stored safely in <code>data/db/pos_store.db</code>. Ideal for single-register stores and local workstations.
+                    </p>
+                </div>
+
+                <div class="db-card" id="cardPostgres">
+                    <div class="db-card-header">
+                        <span class="db-card-title">PostgreSQL (Network)</span>
+                        <span class="db-card-badge">ENTERPRISE</span>
+                    </div>
+                    <p class="db-card-desc">
+                        Connects to a centralized PostgreSQL database server for multi-lane register topologies and synchronized live inventory.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Conditional PostgreSQL Inputs -->
+            <div id="postgresFields" style="display: none; background: #141720; border: 1px solid var(--wizard-border); border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="inputPgHost">Host</label>
+                        <input type="text" id="inputPgHost" class="form-input" value="127.0.0.1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="inputPgPort">Port</label>
+                        <input type="text" id="inputPgPort" class="form-input" value="5432">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="inputPgDb">Database Name</label>
+                        <input type="text" id="inputPgDb" class="form-input" value="pos_store">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="inputPgUser">User</label>
+                        <input type="text" id="inputPgUser" class="form-input" value="postgres">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="inputPgPassword">Password</label>
+                    <input type="password" id="inputPgPassword" class="form-input" placeholder="Database user password">
+                </div>
+            </div>
+
+            <div class="wizard-btn-row">
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack4">← Back</button>
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext4">Initialize Encryption →</button>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- Stage 5: Cryptography & Initialization -->
+        <!-- ================================================================= -->
+        <div class="wizard-stage-card stage-5" id="stage5">
+            <h2 class="stage-title">🔐 Cryptographic Initialization</h2>
+            <p class="stage-desc">
+                Generating symmetric Fernet encryption keys, Flask session keys, and running persistence roundtrip verification.
+            </p>
+
+            <div class="crypto-card">
+                <div class="crypto-row">
+                    <span>Symmetric Fernet Key (32-byte):</span>
+                    <span class="crypto-mono" id="dispFernetKey">Generating...</span>
+                </div>
+                <div class="crypto-row">
+                    <span>Flask Secret Token (32-byte):</span>
+                    <span class="crypto-mono" id="dispSecretKey">Generating...</span>
+                </div>
+                <div class="crypto-row">
+                    <span>Storage Engine:</span>
+                    <span class="crypto-mono" id="dispEngine">SQLite (data/db/pos_store.db)</span>
+                </div>
+                <div class="crypto-row">
+                    <span>Roundtrip Integrity Status:</span>
+                    <span id="dispRoundtripStatus" style="font-weight: 700; color: var(--wizard-warning);">Testing...</span>
+                </div>
+            </div>
+
+            <div id="cryptoErrorMsg" style="display: none; color: var(--wizard-danger); font-size: 13px; margin-bottom: 16px;"></div>
+
+            <div class="wizard-btn-row">
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack5">← Back</button>
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext5" disabled>
+                    View Recovery Key Sheet →
+                </button>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- Stage 6: Printable Recovery Key Sheet & Permanent Handoff -->
+        <!-- ================================================================= -->
+        <div class="wizard-stage-card stage-6" id="stage6">
+            <h2 class="stage-title">📜 Emergency Recovery Sheet</h2>
+            <p class="stage-desc">
+                Save or print your Master Recovery Key. This token is required to recover encrypted store databases if your password is forgotten.
+            </p>
+
+            <div class="recovery-key-card">
+                <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700;">
+                    Master Emergency Recovery Token
+                </div>
+                <div class="recovery-token-display" id="dispRecoveryToken">
+                    OPOS-REC-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+                </div>
+                <div style="display: flex; justify-content: center; gap: 12px; margin-top: 12px;">
+                    <button type="button" class="btn-wizard btn-wizard-secondary" id="btnDownloadRecoveryFile">
+                        <span>💾</span> Save Recovery File (.txt)
+                    </button>
+                    <button type="button" class="btn-wizard btn-wizard-secondary" id="btnPrintRecoverySheet">
+                        <span>🖨️</span> Print Recovery Sheet
+                    </button>
+                </div>
+            </div>
+
+            <div class="warning-notice">
+                <strong>CRITICAL SECURITY WARNING:</strong>
+                This recovery key will <strong>NEVER</strong> be shown again after setup is completed. OpenPOS developers do not possess a backdoor and cannot restore your database if this key is lost. Please store it on an offline drive or paper printout in a safe.
+            </div>
+
+            <div class="wizard-btn-row">
+                <span style="font-size: 12px; color: var(--wizard-muted);">Step 6 of 6 Complete</span>
+                <button type="button" class="btn-wizard btn-wizard-success" id="btnFinishSetup">
+                    <span>🚀</span> Finish Setup &amp; Launch OpenPOS
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+<script>
+let currentStep = 1;
+let prereqPassed = false;
+let selectedEngine = 'sqlite';
+let generatedCrypto = {
+    fernet_key: '',
+    secret_key: '',
+    recovery_token: ''
+};
+
+// ---------------------------------------------------------------------------
+// Step Navigation Helper
+// ---------------------------------------------------------------------------
+function showStep(step) {
+    currentStep = step;
+    for (let i = 1; i <= 6; i++) {
+        const card = document.getElementById(`stage${i}`);
+        const ind = document.getElementById(`stepIndicator${i}`);
+        if (card) {
+            card.classList.toggle('active', i === step);
+        }
+        if (ind) {
+            ind.classList.remove('active', 'completed');
+            if (i === step) ind.classList.add('active');
+            else if (i < step) ind.classList.add('completed');
+        }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ---------------------------------------------------------------------------
+// 1. Prerequisites Scanner
+// ---------------------------------------------------------------------------
+async function scanPrerequisites() {
+    const listEl = document.getElementById('prereqList');
+    listEl.innerHTML = '<div style="text-align: center; color: var(--wizard-muted); padding: 24px;">Scanning runtime environment...</div>';
+    document.getElementById('btnNext1').disabled = true;
+
+    try {
+        const res = await fetch('/api/setup/prerequisites');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        
+        prereqPassed = data.all_passed;
+        listEl.innerHTML = '';
+
+        data.checks.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'prereq-item';
+            
+            let badgeClass = c.status ? 'prereq-pass' : (c.required ? 'prereq-fail' : 'prereq-opt');
+            let badgeText = c.status ? '✓ PASSED' : (c.required ? '✗ FAILED' : '⚠ OPTIONAL');
+
+            item.innerHTML = `
+                <div class="prereq-info">
+                    <h4>${c.name}</h4>
+                    <p>${c.detail}</p>
+                </div>
+                <div class="prereq-badge ${badgeClass}">${badgeText}</div>
+            `;
+            listEl.appendChild(item);
+        });
+
+        document.getElementById('btnNext1').disabled = !prereqPassed;
+    } catch (err) {
+        listEl.innerHTML = `<div style="color: var(--wizard-danger); padding: 20px;">Failed to scan prerequisites: ${err.message}</div>`;
+        document.getElementById('btnNext1').disabled = true;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2. Database Selection Toggle
+// ---------------------------------------------------------------------------
+document.getElementById('cardSqlite').addEventListener('click', () => {
+    selectedEngine = 'sqlite';
+    document.getElementById('cardSqlite').classList.add('selected');
+    document.getElementById('cardPostgres').classList.remove('selected');
+    document.getElementById('postgresFields').style.display = 'none';
+});
+
+document.getElementById('cardPostgres').addEventListener('click', () => {
+    selectedEngine = 'postgresql';
+    document.getElementById('cardPostgres').classList.add('selected');
+    document.getElementById('cardSqlite').classList.remove('selected');
+    document.getElementById('postgresFields').style.display = 'block';
+});
+
+// ---------------------------------------------------------------------------
+// 3. Setup Submission & Encryption Engine (Step 5)
+// ---------------------------------------------------------------------------
+async function executeSetupPersistence() {
+    const errorEl = document.getElementById('cryptoErrorMsg');
+    const nextBtn = document.getElementById('btnNext5');
+    errorEl.style.display = 'none';
+    nextBtn.disabled = true;
+
+    document.getElementById('dispRoundtripStatus').textContent = 'Testing encryption roundtrip & database write...';
+    document.getElementById('dispRoundtripStatus').style.color = 'var(--wizard-warning)';
+    document.getElementById('dispEngine').textContent = selectedEngine === 'sqlite' ? 'SQLite (data/db/pos_store.db)' : 'PostgreSQL';
+
+    const payload = {
+        store_name: document.getElementById('inputStoreName').value.trim() || 'Main Street Games',
+        store_legal_name: document.getElementById('inputLegalName').value.trim(),
+        store_location: document.getElementById('inputLocation').value.trim(),
+        admin_password: document.getElementById('inputAdminPassword').value.trim(),
+        require_password: document.getElementById('checkRequirePassword').checked,
+        db_engine: selectedEngine,
+        db_host: document.getElementById('inputPgHost').value.trim(),
+        db_port: document.getElementById('inputPgPort').value.trim(),
+        db_name: document.getElementById('inputPgDb').value.trim(),
+        db_user: document.getElementById('inputPgUser').value.trim(),
+        db_password: document.getElementById('inputPgPassword').value.trim()
+    };
+
+    try {
+        const res = await fetch('/api/setup/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status === 'error') {
+            throw new Error(data.message || `Setup submission failed (HTTP ${res.status})`);
+        }
+
+        generatedCrypto.fernet_key = data.fernet_key;
+        generatedCrypto.secret_key = data.secret_key;
+        generatedCrypto.recovery_token = data.recovery_token;
+
+        document.getElementById('dispFernetKey').textContent = data.fernet_key.substring(0, 16) + '... (Encrypted)';
+        document.getElementById('dispSecretKey').textContent = data.secret_key.substring(0, 16) + '...';
+        document.getElementById('dispRoundtripStatus').textContent = '✓ Verified & Decryptable';
+        document.getElementById('dispRoundtripStatus').style.color = 'var(--wizard-success)';
+
+        document.getElementById('dispRecoveryToken').textContent = data.recovery_token;
+        nextBtn.disabled = false;
+
+    } catch (err) {
+        document.getElementById('dispRoundtripStatus').textContent = '✗ Error';
+        document.getElementById('dispRoundtripStatus').style.color = 'var(--wizard-danger)';
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 4. Logo Upload Handler (Step 2)
+// ---------------------------------------------------------------------------
+document.getElementById('inputLogoFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    const statusEl = document.getElementById('logoUploadStatus');
+    if (!file) return;
+
+    statusEl.textContent = 'Uploading store logo...';
+    const formData = new FormData();
+    formData.append('logo', file);
+
+    try {
+        const res = await fetch('/api/settings/logo', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            statusEl.textContent = '✓ Logo uploaded and configured.';
+            statusEl.style.color = 'var(--wizard-success)';
+        } else {
+            statusEl.textContent = `Upload failed: ${data.message}`;
+            statusEl.style.color = 'var(--wizard-danger)';
+        }
+    } catch (err) {
+        statusEl.textContent = `Upload error: ${err.message}`;
+        statusEl.style.color = 'var(--wizard-danger)';
+    }
+});
+
+// ---------------------------------------------------------------------------
+// 5. Recovery Key Export & Print
+// ---------------------------------------------------------------------------
+document.getElementById('btnDownloadRecoveryFile').addEventListener('click', () => {
+    const storeName = encodeURIComponent(document.getElementById('inputStoreName').value.trim() || 'Store');
+    const token = encodeURIComponent(generatedCrypto.recovery_token);
+    const fernet = encodeURIComponent(generatedCrypto.fernet_key);
+    window.location.href = `/api/setup/recovery_file?store_name=${storeName}&recovery_token=${token}&fernet_key=${fernet}`;
+});
+
+document.getElementById('btnPrintRecoverySheet').addEventListener('click', () => {
+    window.print();
+});
+
+// ---------------------------------------------------------------------------
+// 6. Complete Setup & Launch OpenPOS
+// ---------------------------------------------------------------------------
+document.getElementById('btnFinishSetup').addEventListener('click', async () => {
+    const finishBtn = document.getElementById('btnFinishSetup');
+    finishBtn.disabled = true;
+    finishBtn.innerHTML = '<span>⏳</span> Finalizing Security Lockout...';
+
+    try {
+        const res = await fetch('/api/setup/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                completed_by: 'installer',
+                store_name: document.getElementById('inputStoreName').value.trim()
+            })
+        });
+        const data = await res.json();
+        if (!res.ok || data.status === 'error') {
+            throw new Error(data.message || 'Failed to complete setup');
+        }
+
+        // Setup permanently locked out! Transition to System Manager
+        window.location.href = '/manager';
+    } catch (err) {
+        alert(`Error finishing setup: ${err.message}`);
+        finishBtn.disabled = false;
+        finishBtn.innerHTML = '<span>🚀</span> Finish Setup &amp; Launch OpenPOS';
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Stepper Navigation Button Event Listeners
+// ---------------------------------------------------------------------------
+document.getElementById('btnRescanPrereq').addEventListener('click', scanPrerequisites);
+document.getElementById('btnNext1').addEventListener('click', () => showStep(2));
+document.getElementById('btnBack2').addEventListener('click', () => showStep(1));
+document.getElementById('btnNext2').addEventListener('click', () => {
+    const name = document.getElementById('inputStoreName').value.trim();
+    if (!name) {
+        alert('Please enter your store name.');
+        return;
+    }
+    showStep(3);
+});
+document.getElementById('btnBack3').addEventListener('click', () => showStep(2));
+document.getElementById('btnNext3').addEventListener('click', () => {
+    const p1 = document.getElementById('inputAdminPassword').value.trim();
+    const p2 = document.getElementById('inputConfirmPassword').value.trim();
+    if (p1 && p1 !== p2) {
+        alert('Admin passwords do not match. Please re-enter.');
+        return;
+    }
+    showStep(4);
+});
+document.getElementById('btnBack4').addEventListener('click', () => showStep(3));
+document.getElementById('btnNext4').addEventListener('click', () => {
+    showStep(5);
+    executeSetupPersistence();
+});
+document.getElementById('btnBack5').addEventListener('click', () => showStep(4));
+document.getElementById('btnNext5').addEventListener('click', () => showStep(6));
+
+// Scan prerequisites immediately on load
+document.addEventListener('DOMContentLoaded', scanPrerequisites);
+</script>
+</body>
+</html>

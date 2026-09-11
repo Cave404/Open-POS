@@ -32,6 +32,13 @@ from core.notifications import (
     clear_alerts,
     get_system_logs
 )
+from core.setup import (
+    is_setup_complete,
+    mark_setup_complete,
+    check_prerequisites,
+    save_setup_configuration,
+    get_recovery_key_text
+)
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +244,27 @@ def manager_splash_image():
     return send_file(splash_path, mimetype='image/png')
 
 
+@manager_bp.route('/setup')
+def manager_setup():
+    """
+    Renders the First-Run Setup & Security Wizard.
+    Enforces permanent one-way lockout once setup is completed.
+    """
+    if is_setup_complete():
+        return Response(
+            "<!DOCTYPE html><html><head><title>403 Forbidden - OpenPOS</title></head>"
+            "<body style='background:#12141a;color:#f85149;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:60px 20px;text-align:center;'>"
+            "<div style='max-width:560px;margin:0 auto;background:#1a1d24;border:1px solid #3d4455;border-radius:12px;padding:32px;'>"
+            "<h2 style='margin-top:0;'>403 - Setup Wizard Locked</h2>"
+            "<p style='color:#cbd5e1;font-size:15px;line-height:1.6;'>Initial store setup has already been completed and cryptographically locked on this system.</p>"
+            "<p style='color:#94a3b8;font-size:13px;'>To re-run the wizard, an administrator must remove <code>data/config/.setup_complete</code> and restart OpenPOS.</p>"
+            "<br><a href='/manager' style='display:inline-block;padding:10px 20px;background:#3b82f6;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;'>Return to System Manager &rarr;</a>"
+            "</div></body></html>",
+            status=403,
+            mimetype="text/html"
+        )
+    return render_template('setup_wizard.html')
+
 
 @manager_bp.route('/branding')
 def manager_branding():
@@ -378,7 +406,7 @@ def get_system_credits():
             logger.error(f"Error reading requirements.txt: {e}")
 
     credits_payload = {
-        "version": "v1.0.2",
+        "version": Config.VERSION,
         "repository": "https://github.com/Cave404/Open-POS",
         "authors": [
             {"name": "Cave404", "role": "Lead Architect & Maintainer"},
@@ -715,7 +743,9 @@ def api_get_logs():
     })
 
 
+@api_bp.route('/logs/export/csv', methods=['GET'])
 @api_bp.route('/logs/export', methods=['GET'])
+@manager_bp.route('/api/logs/export/csv', methods=['GET'])
 @manager_bp.route('/api/logs/export', methods=['GET'])
 def api_export_logs_csv():
     """Exports log traces as a downloadable CSV formatted file."""
@@ -728,23 +758,86 @@ def api_export_logs_csv():
     return Response(
         csv_body,
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=open_pos_logs.csv"}
+        headers={"Content-Disposition": "attachment; filename=openpos_system_logs.csv"}
     )
 
 
+@api_bp.route('/logs/download/txt', methods=['GET'])
 @api_bp.route('/logs/download', methods=['GET'])
+@manager_bp.route('/api/logs/download/txt', methods=['GET'])
 @manager_bp.route('/api/logs/download', methods=['GET'])
 def api_download_logs_txt():
-    """Downloads raw system log file (.txt) from data/logs/open_pos.log."""
-    log_path = os.path.join(Config.LOGS_DIR, 'open_pos.log')
+    """Downloads raw system log file (.txt) from data/logs/openpos_system.log."""
+    log_path = os.path.join(Config.LOGS_DIR, 'openpos_system.log')
     if not os.path.isfile(log_path):
+        os.makedirs(Config.LOGS_DIR, exist_ok=True)
         with open(log_path, 'w', encoding='utf-8') as f:
-            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} [CORE] [INFO] Open-POS system telemetry log initialized.\n")
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} [CORE] INFO - Open-POS system telemetry log initialized.\n")
     return send_file(
         log_path,
         mimetype="text/plain",
         as_attachment=True,
-        download_name="open_pos_system.log"
+        download_name="openpos_system.log"
+    )
+
+
+# -----------------------------------------------------------------------------
+# Setup Wizard REST APIs
+# -----------------------------------------------------------------------------
+@api_bp.route('/setup/prerequisites', methods=['GET'])
+@manager_bp.route('/api/setup/prerequisites', methods=['GET'])
+def api_setup_prerequisites():
+    """Validates runtime prerequisites for the onboarding setup wizard."""
+    return jsonify(check_prerequisites())
+
+
+@api_bp.route('/setup/submit', methods=['POST'])
+@manager_bp.route('/api/setup/submit', methods=['POST'])
+def api_setup_submit():
+    """Persists initial configuration, generates crypto keys, and performs roundtrip tests."""
+    if is_setup_complete():
+        return jsonify({"status": "error", "message": "Setup is already completed and permanently locked."}), 403
+
+    data = request.get_json(silent=True) or {}
+    result = save_setup_configuration(data)
+    if result.get("status") == "error":
+        return jsonify(result), 400
+    return jsonify(result), 200
+
+
+@api_bp.route('/setup/complete', methods=['POST'])
+@manager_bp.route('/api/setup/complete', methods=['POST'])
+def api_setup_complete():
+    """Marks onboarding setup permanently complete by creating .setup_complete."""
+    if is_setup_complete():
+        return jsonify({"status": "error", "message": "Setup is already completed and permanently locked."}), 403
+
+    data = request.get_json(silent=True) or {}
+    success = mark_setup_complete(data)
+    if not success:
+        return jsonify({"status": "error", "message": "Failed to create setup completion marker."}), 500
+    return jsonify({"status": "success", "message": "Setup permanently completed and locked."}), 200
+
+
+@api_bp.route('/setup/recovery_file', methods=['GET', 'POST'])
+@manager_bp.route('/api/setup/recovery_file', methods=['GET', 'POST'])
+def api_setup_recovery_file():
+    """Downloads plain text emergency system recovery credential sheet."""
+    store_name = request.args.get('store_name') or "Main Street Games"
+    recovery_token = request.args.get('recovery_token') or "OPOS-REC-XXXX-XXXX-XXXX"
+    fernet_key = request.args.get('fernet_key') or ""
+
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        store_name = data.get('store_name', store_name)
+        recovery_token = data.get('recovery_token', recovery_token)
+        fernet_key = data.get('fernet_key', fernet_key)
+
+    content = get_recovery_key_text(store_name, recovery_token, fernet_key)
+    return Response(
+        content,
+        mimetype="text/plain",
+        headers={"Content-Disposition": "attachment; filename=OpenPOS_Emergency_Recovery_Key.txt"}
     )
 
 
@@ -795,7 +888,7 @@ def api_live_logs_stream():
             ],
             "DISCORD": [
                 ("INFO", "Discord Gateway WebSocket heartbeat acknowledged (ping: 26ms)."),
-                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.2 Cashiers'."),
+                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.3 Cashiers'."),
                 ("INFO", "Daily trade webhooks channel #pos-trades listener healthy."),
                 ("INFO", "Discord bot queue empty. 0 outgoing transaction summaries pending.")
             ]
@@ -877,6 +970,8 @@ def api_admin_auth_status():
 
 @api_bp.route('/admin/auth/configure', methods=['POST'])
 @manager_bp.route('/api/admin/auth/configure', methods=['POST'])
+@api_bp.route('/settings/security', methods=['POST'])
+@manager_bp.route('/api/settings/security', methods=['POST'])
 def api_admin_auth_configure():
     """Configures administrative lockout policy, PIN/password, and startup bypass."""
     data = request.get_json(silent=True) or {}
@@ -885,8 +980,12 @@ def api_admin_auth_configure():
     require_password = bool(data.get('require_password', False))
     current_password = str(data.get('current_password', ''))
     new_password = str(data.get('new_password', '')).strip()
+    confirm_password = str(data.get('confirm_password', '')).strip()
     protected_sections = data.get('protected_sections')
     bypass_manager = bool(data.get('bypass_manager_on_boot', False))
+
+    if new_password and confirm_password and new_password != confirm_password:
+        return jsonify({"status": "error", "message": "New passwords do not match."}), 400
 
     if isinstance(protected_sections, list):
         cfg["protected_sections"] = [str(s).strip() for s in protected_sections]

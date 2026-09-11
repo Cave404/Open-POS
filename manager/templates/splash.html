@@ -10,20 +10,24 @@
             padding: 0;
             user-select: none;
         }
-        body, html {
-            width: 100%;
-            height: 100%;
+        html, body {
+            width: 100vw;
+            height: 100vh;
             overflow: hidden;
-            background-color: #12141a;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
             display: flex;
             flex-direction: column;
+            background-color: #12141a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         /* Top Splash Graphic Area */
         .splash-graphic-container {
             width: 100%;
-            flex-grow: 1;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
             display: flex;
             background-color: #ffffff; /* Matches clean white splash art */
         }
@@ -37,12 +41,16 @@
         /* Dedicated Docked Bottom Tray */
         .progress-tray {
             height: 54px;
+            min-height: 54px;
+            max-height: 54px;
+            flex-shrink: 0;
             background-color: #1a1d24;
             border-top: 1px solid #2d3340;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             position: relative;
+            box-sizing: border-box;
         }
 
         .status-row {

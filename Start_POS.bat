@@ -41,23 +41,12 @@ if not exist "venv\Scripts\python.exe" (
     echo [*] Virtual environment configured successfully.
 )
 
-:: 2. Check if .env configuration exists
-if not exist ".env" (
-    if exist ".env.example" (
-        echo [*] Initializing .env configuration from .env.example...
-        copy ".env.example" ".env" >nul
-    ) else (
-        echo [WARN] .env.example not found. Creating default .env configuration...
-        (
-            echo # Open-POS Configuration Defaults
-            echo PORT=5000
-            echo HOST=0.0.0.0
-            echo DB_ENGINE=sqlite
-            echo DB_NAME=pos_store.db
-            echo STORE_NAME="Open-POS System"
-        ) > ".env"
-    )
-)
+:: 2. Ensure isolated data directory structure exists
+if not exist "data\config" mkdir "data\config"
+if not exist "data\db" mkdir "data\db"
+if not exist "data\logs" mkdir "data\logs"
+if not exist "data\uploads" mkdir "data\uploads"
+if not exist "data\cache" mkdir "data\cache"
 
 :: 3. Execute application through virtual environment
 echo [*] Starting Open-POS Engine...
