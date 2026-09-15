@@ -94,7 +94,8 @@ Open-POS/
 │       └── notifications.js   # Client-side 5s polling tray, badge counter, and dropdown controller
 │
 ├── docs/
-│   └── WIKI.md                # Developer wiki and architectural documentation (this document)
+│   ├── WIKI.md                # Developer wiki and architectural documentation (this document)
+│   └── ADDON_SPEC.md          # Official Addon & Extension Specification contract
 │
 └── tests/
     ├── test_settings.py       # Automated pytest test suite covering settings, routes, and APIs
@@ -227,6 +228,10 @@ All store-specific data is strictly quarantined inside an untracked `data/` dire
 
 ## 10. Resilient Addon Engine & Plugin Sandboxing (`core/addons/` & `/manager/addons`)
 
+> [!NOTE]
+> The official, authoritative integration standards, directory contracts, manifest schema, blueprint exposure, data isolation rules, and UI guidelines are codified in the [OpenPOS Addon Specification](file:///f:/AntiGravity%20Files/Open-POS/docs/ADDON_SPEC.md).
+
+- **Official Addon Specification:** See [`docs/ADDON_SPEC.md`](file:///f:/AntiGravity%20Files/Open-POS/docs/ADDON_SPEC.md) for detailed contracts on packaging, `manifest.json`, blueprint exports, database migrations, and UI standards.
 - **Dual-Directory Discovery:**
   - Built-in addons: `Open-POS/addons/<addon_id>/`
   - Custom / private user extensions: `data/custom_addons/<addon_id>/`
