@@ -140,7 +140,7 @@ Upstream dependencies, package licensing audits, and project contributors can be
 
 Portions of the source code in this repository (including logic, route handlers, migration scripts, and test suites) were generated or co-authored with the assistance of AI language models. All AI-assisted code has been reviewed, tested, and accepted by the project maintainers.
 
-**Artwork, splash screens, logos, and graphical assets are not AI-generated.** All rights to supplied artwork and imagery are reserved by their respective owners. No AI-generated artwork is included in this project.
+**Artwork, splash screens (currently using as a place holder while I commission artists for genuine human work; Sorry), logos, and graphical assets are not AI-generated.** All rights to supplied artwork and imagery are reserved by their respective owners. No AI-generated artwork is included in this project.
 
 ---
 
