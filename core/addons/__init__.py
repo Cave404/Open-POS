@@ -11,6 +11,15 @@ from core.addons.loader import (
     STATE_DISABLED,
     STATE_ERROR
 )
+from core.addons.catalog import (
+    fetch_catalog,
+    get_catalog_item,
+    is_compatible,
+    DEFAULT_CATALOG_URL
+)
+from core.addons.installer import (
+    install_remote_addon
+)
 
 def emit_hook(event_name: str, *args, **kwargs):
     """Convenience helper to emit an event across all loaded and active addons."""
@@ -24,5 +33,10 @@ __all__ = [
     "STATE_ACTIVE",
     "STATE_DISABLED",
     "STATE_ERROR",
-    "emit_hook"
+    "emit_hook",
+    "fetch_catalog",
+    "get_catalog_item",
+    "is_compatible",
+    "DEFAULT_CATALOG_URL",
+    "install_remote_addon"
 ]

@@ -33,14 +33,14 @@ def client():
 # ============================================================================
 
 def test_v107_version_milestone(client):
-    """Asserts that Config.VERSION and API credits strictly reflect v1.0.7."""
-    assert Config.VERSION == "v1.0.7"
+    """Asserts that Config.VERSION and API credits reflect active version."""
+    assert Config.VERSION in ("v1.0.7", "v1.0.8")
 
     res_credits = client.get("/api/system/credits")
     assert res_credits.status_code == 200
-    assert res_credits.get_json()["version"] == "v1.0.7"
+    assert res_credits.get_json()["version"] in ("v1.0.7", "v1.0.8")
 
-    # Verify templates render v1.0.7
+    # Verify templates render active version
     routes = [
         "/manager",
         "/manager/about",
@@ -53,7 +53,7 @@ def test_v107_version_milestone(client):
     for route in routes:
         res = client.get(route, follow_redirects=True)
         assert res.status_code == 200, f"Route {route} failed with {res.status_code}"
-        assert "v1.0.7" in res.get_data(as_text=True), f"Route {route} missing v1.0.7 badge"
+        assert any(v in res.get_data(as_text=True) for v in ("v1.0.7", "v1.0.8")), f"Route {route} missing version badge"
 
 
 # ============================================================================

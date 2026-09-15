@@ -472,6 +472,63 @@ def get_addon_diagnostics(addon_id):
     return jsonify(addon)
 
 
+@api_bp.route('/addons/catalog', methods=['GET'])
+@manager_bp.route('/api/addons/catalog', methods=['GET'])
+def api_get_addons_catalog():
+    """Returns catalog of remote addons enriched with installation and compatibility status."""
+    from core.addons.catalog import fetch_catalog, is_compatible, parse_version
+    from core.addons import addon_manager
+    from core.config import Config
+
+    force_refresh = request.args.get('refresh', '').lower() in ('1', 'true', 'yes')
+    catalog_items = fetch_catalog(force_refresh=force_refresh)
+    installed_addons = {a['id']: a for a in addon_manager.get_all_addons()}
+
+    enriched = []
+    for item in catalog_items:
+        addon_id = item.get('id')
+        installed = installed_addons.get(addon_id)
+        is_inst = installed is not None
+        inst_ver = installed['version'] if is_inst else None
+
+        min_ver = item.get('min_core_version', '1.0.0')
+        compat = is_compatible(min_ver, Config.VERSION)
+
+        has_upd = False
+        if is_inst and inst_ver and item.get('version'):
+            try:
+                has_upd = parse_version(item['version']) > parse_version(inst_ver)
+            except Exception:
+                has_upd = False
+
+        card_data = dict(item)
+        card_data.update({
+            "is_installed": is_inst,
+            "installed_version": inst_ver,
+            "has_update": has_upd,
+            "is_compatible": compat,
+            "core_version": Config.VERSION
+        })
+        enriched.append(card_data)
+
+    return jsonify(enriched), 200
+
+
+@api_bp.route('/addons/install_remote', methods=['POST'])
+@manager_bp.route('/api/addons/install_remote', methods=['POST'])
+def api_install_remote_addon():
+    """Downloads and installs a remote addon by ID from the catalog."""
+    data = request.get_json(silent=True) or {}
+    addon_id = data.get('addon_id') or request.form.get('addon_id')
+    if not addon_id:
+        return jsonify({"status": "error", "message": "Missing 'addon_id' in request."}), 400
+
+    from core.addons.installer import install_remote_addon
+    result = install_remote_addon(addon_id)
+    status_code = 200 if result.get("status") == "success" else 400
+    return jsonify(result), status_code
+
+
 def _is_route_registered(url_path: str) -> bool:
     try:
         from flask import current_app
@@ -1341,7 +1398,7 @@ def api_live_logs_stream():
             ],
             "DISCORD": [
                 ("INFO", "Discord Gateway WebSocket heartbeat acknowledged (ping: 26ms)."),
-                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.7 Cashiers'."),
+                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.8 Cashiers'."),
                 ("INFO", "Daily trade webhooks channel #pos-trades listener healthy."),
                 ("INFO", "Discord bot queue empty. 0 outgoing transaction summaries pending.")
             ]

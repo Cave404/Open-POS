@@ -691,7 +691,7 @@
                 <p>Initial Store &amp; Cryptographic Provisioning</p>
             </div>
         </div>
-        <span class="version-pill">v1.0.7</span>
+        <span class="version-pill">v1.0.8</span>
     </header>
 
     <!-- Progress Stepper -->
@@ -722,12 +722,18 @@
 
         <div class="step-item" id="stepIndicator5">
             <div class="step-num">5</div>
-            <span class="step-label">Encryption</span>
+            <span class="step-label">Optional Addons</span>
         </div>
         <div class="step-divider"></div>
 
         <div class="step-item" id="stepIndicator6">
             <div class="step-num">6</div>
+            <span class="step-label">Encryption</span>
+        </div>
+        <div class="step-divider"></div>
+
+        <div class="step-item" id="stepIndicator7">
+            <div class="step-num">7</div>
             <span class="step-label">Recovery Key</span>
         </div>
     </div>
@@ -912,14 +918,40 @@
 
             <div class="wizard-btn-row">
                 <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack4">← Back</button>
-                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext4">Initialize Encryption →</button>
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext4">Choose Addons →</button>
             </div>
         </div>
 
         <!-- ================================================================= -->
-        <!-- Stage 5: Cryptography & Initialization -->
+        <!-- Stage 5: Optional Integrations & Addons -->
         <!-- ================================================================= -->
         <div class="wizard-stage-card stage-5" id="stage5">
+            <h2 class="stage-title">🧩 Optional Integrations &amp; Addons</h2>
+            <p class="stage-desc">
+                Select optional modular extensions to automatically download, migrate, and provision for your store.
+            </p>
+
+            <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12.5px; color: #93c5fd; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 18px;">💡</span>
+                <span>You can also install or remove addons at any time from the System Manager.</span>
+            </div>
+
+            <div id="wizardAddonsContainer" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
+                <div style="text-align: center; color: var(--wizard-muted); padding: 24px; font-size: 13px;">
+                    <span>⏳ Loading available catalog extensions...</span>
+                </div>
+            </div>
+
+            <div class="wizard-btn-row">
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack5">← Back</button>
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext5">Initialize Encryption →</button>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- Stage 6: Cryptography & Initialization -->
+        <!-- ================================================================= -->
+        <div class="wizard-stage-card stage-6" id="stage6">
             <h2 class="stage-title">🔐 Cryptographic Initialization</h2>
             <p class="stage-desc">
                 Generating symmetric Fernet encryption keys, Flask session keys, and running persistence roundtrip verification.
@@ -947,17 +979,17 @@
             <div id="cryptoErrorMsg" style="display: none; color: var(--wizard-danger); font-size: 13px; margin-bottom: 16px;"></div>
 
             <div class="wizard-btn-row">
-                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack5">← Back</button>
-                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext5" disabled>
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack6">← Back</button>
+                <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext6" disabled>
                     View Recovery Key Sheet →
                 </button>
             </div>
         </div>
 
         <!-- ================================================================= -->
-        <!-- Stage 6: Printable Recovery Key Sheet & Permanent Handoff -->
+        <!-- Stage 7: Printable Recovery Key Sheet & Permanent Handoff -->
         <!-- ================================================================= -->
-        <div class="wizard-stage-card stage-6" id="stage6">
+        <div class="wizard-stage-card stage-7" id="stage7">
             <h2 class="stage-title">📜 Emergency Recovery Sheet</h2>
             <p class="stage-desc">
                 Save or print your Master Recovery Key. This token is required to recover encrypted store databases if your password is forgotten.
@@ -994,7 +1026,7 @@
                 <div style="border: 1px solid #999999; padding: 12px 16px; margin-bottom: 16px; background: #f8fafc; font-size: 13px; line-height: 1.6;">
                     <div><strong>Store Name:</strong> <span id="printStoreName">Store</span></div>
                     <div><strong>Generated:</strong> <span id="printDate">&#8212;</span></div>
-                    <div><strong>System Version:</strong> v1.0.7</div>
+                    <div><strong>System Version:</strong> v1.0.8</div>
                 </div>
                 <div style="margin-bottom: 14px;">
                     <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Master Emergency Recovery Token:</div>
@@ -1033,7 +1065,7 @@
             </div>
 
             <div class="wizard-btn-row">
-                <span style="font-size: 12px; color: var(--wizard-muted);">Step 6 of 6 Complete</span>
+                <span style="font-size: 12px; color: var(--wizard-muted);">Step 7 of 7 Complete</span>
                 <button type="button" class="btn-wizard btn-wizard-success" id="btnFinishSetup">
                     <span>🚀</span> Finish Setup &amp; Launch OpenPOS
                 </button>
@@ -1057,7 +1089,7 @@ let generatedCrypto = {
 // ---------------------------------------------------------------------------
 function showStep(step) {
     currentStep = step;
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         const card = document.getElementById(`stage${i}`);
         const ind = document.getElementById(`stepIndicator${i}`);
         if (card) {
@@ -1070,6 +1102,67 @@ function showStep(step) {
         }
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+let wizardCatalogLoaded = false;
+async function loadWizardAddons() {
+    if (wizardCatalogLoaded) return;
+    const container = document.getElementById('wizardAddonsContainer');
+    if (!container) return;
+
+    try {
+        const res = await fetch('/api/addons/catalog');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const list = await res.json();
+        wizardCatalogLoaded = true;
+
+        if (!list || list.length === 0) {
+            container.innerHTML = `
+                <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--wizard-border, #2b3245); border-radius: 8px; padding: 20px; text-align: center; color: var(--wizard-muted, #94a3b8); font-size: 13px;">
+                    No remote extensions currently available or device is offline. You can install addons at any time from System Manager.
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = '';
+        list.forEach(addon => {
+            const row = document.createElement('label');
+            row.style.cssText = 'display: flex; align-items: flex-start; gap: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--wizard-border, #2b3245); border-radius: 8px; padding: 14px 16px; cursor: pointer; transition: border-color 0.15s;';
+            row.onmouseover = () => row.style.borderColor = '#3b82f6';
+            row.onmouseout = () => row.style.borderColor = 'var(--wizard-border, #2b3245)';
+
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.className = 'wizard-addon-checkbox';
+            chk.value = addon.id;
+            chk.dataset.name = addon.name || addon.id;
+            chk.style.cssText = 'margin-top: 3px; width: 18px; height: 18px; accent-color: #3b82f6; cursor: pointer;';
+
+            const info = document.createElement('div');
+            info.style.cssText = 'flex: 1;';
+            info.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <strong style="color: #ffffff; font-size: 14px;">${addon.name || addon.id}</strong>
+                    <span style="font-size: 11px; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: #94a3b8;">v${addon.version || '1.0.0'}</span>
+                    ${addon.requires_db ? '<span style="font-size: 11px; background: rgba(59,130,246,0.15); color: #60a5fa; padding: 2px 6px; border-radius: 4px;">Database Required</span>' : ''}
+                </div>
+                <div style="font-size: 12px; color: var(--wizard-muted, #94a3b8); line-height: 1.4;">${addon.description || 'No description provided.'}</div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">by ${addon.author || 'Open-POS Community'}</div>
+            `;
+
+            row.appendChild(chk);
+            row.appendChild(info);
+            container.appendChild(row);
+        });
+    } catch (err) {
+        console.warn('loadWizardAddons error:', err);
+        container.innerHTML = `
+            <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--wizard-border, #2b3245); border-radius: 8px; padding: 20px; text-align: center; color: var(--wizard-muted, #94a3b8); font-size: 13px;">
+                Offline mode: Online addon catalog unavailable. You can install extensions later from System Manager.
+            </div>
+        `;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1353,8 +1446,28 @@ document.getElementById('btnPrintRecoverySheet').addEventListener('click', () =>
 document.getElementById('btnFinishSetup').addEventListener('click', async () => {
     const finishBtn = document.getElementById('btnFinishSetup');
     finishBtn.disabled = true;
-    finishBtn.innerHTML = '<span>⏳</span> Finalizing Setup &amp; Launching OpenPOS...';
 
+    // Optional Step 5: Install selected remote addons in sequence with real-time feedback
+    const checkedAddons = Array.from(document.querySelectorAll('.wizard-addon-checkbox:checked'));
+    if (checkedAddons.length > 0) {
+        for (let i = 0; i < checkedAddons.length; i++) {
+            const item = checkedAddons[i];
+            const aId = item.value;
+            const aName = item.dataset.name || aId;
+            finishBtn.innerHTML = `<span>⏳</span> Downloading and installing ${aName} addon...`;
+            try {
+                await fetch('/api/addons/install_remote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ addon_id: aId })
+                });
+            } catch (ae) {
+                console.warn(`Could not install addon ${aId} during setup:`, ae);
+            }
+        }
+    }
+
+    finishBtn.innerHTML = '<span>⏳</span> Finalizing Setup &amp; Launching OpenPOS...';
     const storeName = document.getElementById('inputStoreName').value.trim() || 'Store';
 
     // Desktop mode: Native clean exit, close window, and spawn detached Start_POS.bat
@@ -1420,10 +1533,15 @@ document.getElementById('btnNext3').addEventListener('click', () => {
 document.getElementById('btnBack4').addEventListener('click', () => showStep(3));
 document.getElementById('btnNext4').addEventListener('click', () => {
     showStep(5);
-    executeSetupPersistence();
+    loadWizardAddons();
 });
 document.getElementById('btnBack5').addEventListener('click', () => showStep(4));
-document.getElementById('btnNext5').addEventListener('click', () => showStep(6));
+document.getElementById('btnNext5').addEventListener('click', () => {
+    showStep(6);
+    executeSetupPersistence();
+});
+document.getElementById('btnBack6').addEventListener('click', () => showStep(5));
+document.getElementById('btnNext6').addEventListener('click', () => showStep(7));
 
 // ---------------------------------------------------------------------------
 // Re-Configuration Authentication Gate Handlers (Tamper Protection)

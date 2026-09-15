@@ -1,4 +1,4 @@
-# Open-POS Developer Wiki & Technical Reference (v1.0.7)
+# Open-POS Developer Wiki & Technical Reference (v1.0.8)
 
 Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, security controls, and testing standards for the project.
 
@@ -142,7 +142,7 @@ To prevent layout shifting and guarantee tactile navigation across every subview
               </div>
           </div>
           <span class="status-pill status-online">Engine: Online</span>
-          <a href="/manager/about" class="version-badge-link">v1.0.7</a>
+          <a href="/manager/about" class="version-badge-link">v1.0.8</a>
       </div>
   </header>
   ```
@@ -265,3 +265,49 @@ All store-specific data is strictly quarantined inside an untracked `data/` dire
 - **Decoupled Generic Retail Branding:**
   - Store branding is restricted strictly to retail identity: Store Name, Legal Entity Name, City/State, Currency Symbol, Tax Rate (%), and Store Logo.
   - TCG-specific trade-in rules, cash/credit payout ratios, and condition multipliers are decoupled from core into `addons/tcg_pos/default_rules.json`.
+
+---
+
+## 12. Remote Addon Catalog Engine, Network Downloader & Setup Provisioning (v1.0.8)
+
+### Remote Addon Catalog Specification (`core/addons/catalog.py`)
+Open-POS supports dynamic discovery and one-click installation of community and internal extensions via remote JSON registries.
+
+- **Catalog Registry URL:** Configured in `settings` table via `addon_catalog_url` (default: `https://raw.githubusercontent.com/Cave404/Open-POS/main/addons_catalog.json`).
+- **Catalog JSON Schema:**
+  ```json
+  [
+    {
+      "id": "tcg_pos",
+      "name": "TCG POS & Singles Engine",
+      "version": "1.0.0",
+      "author": "Open-POS Community",
+      "description": "Inventory, buylist trade-in calculator, and singles sales for Magic: The Gathering and Pokémon.",
+      "category": "Desktop_Apps",
+      "icon_url": "https://raw.githubusercontent.com/Cave404/Open-POS/main/static/img/addons/cards.png",
+      "download_url": "https://github.com/Cave404/Open-POS-TCG/archive/refs/heads/main.zip",
+      "dependencies": ["requests"],
+      "requires_db": true,
+      "min_core_version": "1.0.0"
+    }
+  ]
+  ```
+- **Resilient Caching & Offline Fallback:**
+  - `fetch_catalog(force_refresh=False)` caches the catalog in `data/cache/catalog_cache.json` for 6 hours.
+  - Remote fetches enforce a non-blocking 5-second timeout. If offline or if the registry is unreachable, stale cache or a clean empty array `[]` is returned without raising unhandled exceptions or disrupting local operations.
+
+### Automated Network Downloader & Installation Pipeline (`core/addons/installer.py`)
+- **Compatibility Check:** Inspects `min_core_version` against `Config.VERSION`. Outdated core versions are rejected with actionable upgrade messages.
+- **Streaming Download:** Downloads the `.zip` archive to `data/cache/temp_<addon_id>.zip`.
+- **Zip-Slip Protection & Extraction:** Inspects and validates `manifest.json`, extracting files strictly into `data/custom_addons/<addon_id>/`.
+- **Automated Database Migrations:** If `requires_db` is true, detects the active database engine (`sqlite` vs `postgres`) and executes `migrations/schema_sqlite.sql` or `migrations/schema_postgres.sql`.
+- **Instant Hot-Mount:** Registers the addon blueprint and hooks dynamically via `addon_manager.load_addon()` without requiring a server reboot.
+- **Cleanup:** Automatically deletes temporary downloaded archives.
+
+### Untracked Addon Storage (`data/custom_addons/`)
+- All remotely installed plugins reside exclusively inside `data/custom_addons/<addon_id>/`.
+- The repository `.gitignore` ignores `data/*` while preserving `.gitkeep`, ensuring custom addons and store data are never committed to the core Git repository.
+
+### Setup Wizard Provisioning Step
+- Setup Wizard integrates an optional **Step 5: Optional Integrations & Addons**.
+- Asynchronously queries the catalog registry, presents selectable extension checkboxes, and provisions selected items in sequence during finalization before launching OpenPOS.

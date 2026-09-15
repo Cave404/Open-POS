@@ -455,6 +455,138 @@
             color: #ffffff;
         }
 
+        /* Primary View Mode Segmented Control */
+        .segmented-control-wrap {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .segmented-control {
+            display: inline-flex;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .segmented-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 18px;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .segmented-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .segmented-btn.active {
+            background: var(--bg-card);
+            color: #ffffff;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+        }
+
+        .catalog-live-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            font-size: 10px;
+            font-weight: 700;
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-compat-ok {
+            background: rgba(16, 185, 129, 0.15) !important;
+            color: #34d399 !important;
+            border-color: rgba(16, 185, 129, 0.35) !important;
+        }
+
+        .tag-compat-err {
+            background: rgba(239, 68, 68, 0.15) !important;
+            color: #f87171 !important;
+            border-color: rgba(239, 68, 68, 0.35) !important;
+        }
+
+        .btn-installed-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #34d399;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .btn-install-addon {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-install-addon:hover:not(:disabled) {
+            filter: brightness(1.12);
+            transform: translateY(-1px);
+        }
+
+        .btn-install-addon:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-refresh-catalog {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-refresh-catalog:hover {
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
         /* Empty State */
         .empty-state {
             grid-column: 1 / -1;
@@ -690,55 +822,89 @@
                 </div>
             </div>
             <span class="status-pill status-online">Engine: Online</span>
-            <a href="/manager/about" class="version-badge-link">v1.0.7</a>
+            <a href="/manager/about" class="version-badge-link">v1.0.8</a>
         </div>
     </header>
 
     <div class="view-container {% if is_locked %}locked{% endif %}">
         <div class="addons-container">
 
-            <!-- Metrics Summary Row -->
-            <div class="metrics-row">
-                <div class="metric-card">
-                    <div class="metric-label"><span>📦</span> Total Addons</div>
-                    <div class="metric-value" id="statTotalAddons">0</div>
-                    <div class="metric-sub">Discovered across system &amp; user stores</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label"><span>🟢</span> Active Plugins</div>
-                    <div class="metric-value" id="statActiveAddons" style="color: #34d399;">0</div>
-                    <div class="metric-sub">Mounted and running normally</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label"><span>⚪</span> Disabled</div>
-                    <div class="metric-value" id="statDisabledAddons" style="color: #94a3b8;">0</div>
-                    <div class="metric-sub">Toggled off in configuration</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label"><span>⚠️</span> Faulty / Degraded</div>
-                    <div class="metric-value" id="statErrorAddons" style="color: #f87171;">0</div>
-                    <div class="metric-sub">Isolated to protect core POS engine</div>
+            <!-- Primary View Mode Segmented Control -->
+            <div class="segmented-control-wrap">
+                <div class="segmented-control" role="tablist">
+                    <button type="button" class="segmented-btn active" id="tabInstalledAddons" role="tab" aria-selected="true" onclick="switchMainTab('installed')">
+                        <span>📦</span> Installed Addons
+                    </button>
+                    <button type="button" class="segmented-btn" id="tabAddonCatalog" role="tab" aria-selected="false" onclick="switchMainTab('catalog')">
+                        <span>🌐</span> Addon Catalog <span class="catalog-live-badge">Online</span>
+                    </button>
                 </div>
             </div>
 
-            <!-- Toolbar & Filter Controls -->
-            <div class="toolbar-card">
-                <div class="search-box-wrap">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="addonSearchInput" class="search-input" placeholder="Search addons by name, description, or ID...">
+            <!-- View Mode 1: Installed Addons -->
+            <div id="installedAddonsView">
+                <!-- Metrics Summary Row -->
+                <div class="metrics-row">
+                    <div class="metric-card">
+                        <div class="metric-label"><span>📦</span> Total Addons</div>
+                        <div class="metric-value" id="statTotalAddons">0</div>
+                        <div class="metric-sub">Discovered across system &amp; user stores</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label"><span>🟢</span> Active Plugins</div>
+                        <div class="metric-value" id="statActiveAddons" style="color: #34d399;">0</div>
+                        <div class="metric-sub">Mounted and running normally</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label"><span>⚪</span> Disabled</div>
+                        <div class="metric-value" id="statDisabledAddons" style="color: #94a3b8;">0</div>
+                        <div class="metric-sub">Toggled off in configuration</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label"><span>⚠️</span> Faulty / Degraded</div>
+                        <div class="metric-value" id="statErrorAddons" style="color: #f87171;">0</div>
+                        <div class="metric-sub">Isolated to protect core POS engine</div>
+                    </div>
                 </div>
 
-                <div class="filter-tabs">
-                    <button class="filter-tab active" data-filter="ALL" onclick="setFilter('ALL', this)">All</button>
-                    <button class="filter-tab" data-filter="ACTIVE" onclick="setFilter('ACTIVE', this)">Active</button>
-                    <button class="filter-tab" data-filter="DISABLED" onclick="setFilter('DISABLED', this)">Disabled</button>
-                    <button class="filter-tab" data-filter="ERROR" onclick="setFilter('ERROR', this)">Failed</button>
+                <!-- Toolbar & Filter Controls -->
+                <div class="toolbar-card">
+                    <div class="search-box-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="addonSearchInput" class="search-input" placeholder="Search addons by name, description, or ID...">
+                    </div>
+
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-filter="ALL" onclick="setFilter('ALL', this)">All</button>
+                        <button class="filter-tab" data-filter="ACTIVE" onclick="setFilter('ACTIVE', this)">Active</button>
+                        <button class="filter-tab" data-filter="DISABLED" onclick="setFilter('DISABLED', this)">Disabled</button>
+                        <button class="filter-tab" data-filter="ERROR" onclick="setFilter('ERROR', this)">Failed</button>
+                    </div>
+                </div>
+
+                <!-- Addons Cards Grid -->
+                <div class="addons-grid" id="addonsGrid">
+                    <!-- Dynamically populated via loadAddons() -->
                 </div>
             </div>
 
-            <!-- Addons Cards Grid -->
-            <div class="addons-grid" id="addonsGrid">
-                <!-- Dynamically populated via loadAddons() -->
+            <!-- View Mode 2: Online Addon Catalog -->
+            <div id="catalogAddonsView" style="display: none;">
+                <div class="toolbar-card" style="margin-bottom: 24px;">
+                    <div class="search-box-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="catalogSearchInput" class="search-input" placeholder="Search remote catalog extensions...">
+                    </div>
+                    <div>
+                        <button type="button" class="btn-refresh-catalog" id="btnRefreshCatalog" onclick="loadCatalog(true)">
+                            <span>🔄</span> Refresh Catalog
+                        </button>
+                    </div>
+                </div>
+
+                <div class="addons-grid" id="catalogGrid">
+                    <!-- Dynamically populated via renderCatalogGrid() -->
+                </div>
             </div>
 
         </div>
@@ -800,6 +966,10 @@
         let currentFilter = 'ALL';
         let currentSearch = '';
 
+        let activeMainTab = 'installed';
+        let allCatalogAddons = [];
+        let currentCatalogSearch = '';
+
         document.addEventListener('DOMContentLoaded', () => {
             loadAddons();
 
@@ -808,6 +978,14 @@
                 searchInput.addEventListener('input', (e) => {
                     currentSearch = e.target.value.toLowerCase().trim();
                     renderAddonsGrid();
+                });
+            }
+
+            const catalogSearch = document.getElementById('catalogSearchInput');
+            if (catalogSearch) {
+                catalogSearch.addEventListener('input', (e) => {
+                    currentCatalogSearch = e.target.value.toLowerCase().trim();
+                    renderCatalogGrid();
                 });
             }
         });
@@ -1080,6 +1258,202 @@
             } catch (err) {
                 console.error('Error removing addon:', err);
                 alert('Error removing addon. Please check console logs.');
+            }
+        }
+
+        // Tab switching between Installed Addons and Addon Catalog
+        function switchMainTab(tab) {
+            activeMainTab = tab;
+            const btnInstalled = document.getElementById('tabInstalledAddons');
+            const btnCatalog = document.getElementById('tabAddonCatalog');
+            const viewInstalled = document.getElementById('installedAddonsView');
+            const viewCatalog = document.getElementById('catalogAddonsView');
+
+            if (tab === 'catalog') {
+                btnInstalled.classList.remove('active');
+                btnInstalled.setAttribute('aria-selected', 'false');
+                btnCatalog.classList.add('active');
+                btnCatalog.setAttribute('aria-selected', 'true');
+
+                viewInstalled.style.display = 'none';
+                viewCatalog.style.display = 'block';
+
+                loadCatalog();
+            } else {
+                btnCatalog.classList.remove('active');
+                btnCatalog.setAttribute('aria-selected', 'false');
+                btnInstalled.classList.add('active');
+                btnInstalled.setAttribute('aria-selected', 'true');
+
+                viewCatalog.style.display = 'none';
+                viewInstalled.style.display = 'block';
+
+                loadAddons();
+            }
+        }
+
+        // Fetch remote catalog
+        async function loadCatalog(forceRefresh = false) {
+            const grid = document.getElementById('catalogGrid');
+            if (forceRefresh) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔄</div>
+                        <h3>Refreshing Addon Catalog...</h3>
+                        <p>Querying remote extension registry and checking compatibility.</p>
+                    </div>
+                `;
+            }
+
+            try {
+                const res = await fetch(`/manager/api/addons/catalog?refresh=${forceRefresh ? '1' : '0'}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                allCatalogAddons = await res.json();
+                renderCatalogGrid();
+            } catch (err) {
+                console.error('Error fetching catalog:', err);
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <h3>Addon Catalog Unavailable</h3>
+                        <p>Could not load the online addon catalog (${err.message}). If this register is offline, you can install addons manually via ZIP import.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Render catalog cards
+        function renderCatalogGrid() {
+            const grid = document.getElementById('catalogGrid');
+            grid.innerHTML = '';
+
+            let filtered = allCatalogAddons.filter(item => {
+                if (currentCatalogSearch) {
+                    const matchName = (item.name || '').toLowerCase().includes(currentCatalogSearch);
+                    const matchId = (item.id || '').toLowerCase().includes(currentCatalogSearch);
+                    const matchDesc = (item.description || '').toLowerCase().includes(currentCatalogSearch);
+                    return matchName || matchId || matchDesc;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🌐</div>
+                        <h3>No extensions found in catalog</h3>
+                        <p>Try searching for a different keyword or click <strong>Refresh Catalog</strong> to query the registry again.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(addon => {
+                grid.appendChild(createCatalogCard(addon));
+            });
+        }
+
+        function createCatalogCard(addon) {
+            const card = document.createElement('div');
+            card.className = 'addon-card';
+            card.id = `catalog-card-${addon.id}`;
+
+            const iconDisplay = addon.icon_url
+                ? `<img src="${addon.icon_url}" alt="${addon.name}" style="width:32px; height:32px; object-fit:contain;" onerror="this.outerHTML='🧩'">`
+                : (addon.icon || '🧩');
+
+            const isCompatible = addon.is_compatible !== false;
+            const compatBadge = isCompatible
+                ? `<span class="tag-pill tag-compat-ok">✓ Compatible with OpenPOS v1.0.8</span>`
+                : `<span class="tag-pill tag-compat-err">⚠️ Incompatible (Requires OpenPOS ${addon.min_core_version || 'newer'})</span>`;
+
+            const dbBadge = addon.requires_db
+                ? `<span class="tag-pill">Database Required</span>`
+                : '';
+
+            const depsBadge = addon.dependencies && addon.dependencies.length > 0
+                ? `<span class="tag-pill">Deps: ${addon.dependencies.join(', ')}</span>`
+                : '';
+
+            let actionBtnHtml = '';
+            if (addon.is_installed) {
+                if (addon.has_update) {
+                    actionBtnHtml = `<button class="btn-install-addon" onclick="installRemoteAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">🔄 Update to v${addon.version}</button>`;
+                } else {
+                    actionBtnHtml = `<span class="btn-installed-badge">✓ Installed (v${addon.installed_version || addon.version})</span>`;
+                }
+            } else if (isCompatible) {
+                actionBtnHtml = `<button class="btn-install-addon" onclick="installRemoteAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">⬇️ Install Addon</button>`;
+            } else {
+                actionBtnHtml = `<button class="btn-secondary disabled" disabled style="opacity: 0.5; cursor: not-allowed;">Incompatible</button>`;
+            }
+
+            card.innerHTML = `
+                <div class="card-top">
+                    <div class="addon-brand">
+                        <div class="addon-icon-wrap">${iconDisplay}</div>
+                        <div class="addon-meta">
+                            <div class="addon-name">
+                                ${addon.name}
+                                <span class="addon-version">v${addon.version}</span>
+                            </div>
+                            <div class="addon-author">by ${addon.author || 'Open-POS Community'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="addon-desc">${addon.description || 'No description provided.'}</div>
+
+                <div class="addon-tags">
+                    <span class="tag-pill source-custom">Remote Catalog</span>
+                    ${compatBadge}
+                    ${dbBadge}
+                    ${depsBadge}
+                    <span class="tag-pill">ID: ${addon.id}</span>
+                </div>
+
+                <div class="card-actions" style="justify-content: flex-end;">
+                    <div class="action-btns">
+                        ${actionBtnHtml}
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        async function installRemoteAddon(addonId, addonName, btnEl) {
+            const originalHtml = btnEl ? btnEl.innerHTML : '';
+            if (btnEl) {
+                btnEl.innerHTML = '<span>⏳</span> Installing...';
+                btnEl.disabled = true;
+            }
+
+            try {
+                const res = await fetch('/api/addons/install_remote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ addon_id: addonId })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    alert(`✅ ${data.message || addonName + ' installed successfully!'}`);
+                    await loadAddons();
+                    await loadCatalog();
+                } else {
+                    alert(`❌ Installation failed: ${data.message || 'Unknown error occurred.'}`);
+                    if (btnEl) {
+                        btnEl.innerHTML = originalHtml;
+                        btnEl.disabled = false;
+                    }
+                }
+            } catch (err) {
+                console.error('Error installing remote addon:', err);
+                alert(`❌ Network error installing addon: ${err.message}`);
+                if (btnEl) {
+                    btnEl.innerHTML = originalHtml;
+                    btnEl.disabled = false;
+                }
             }
         }
     </script>

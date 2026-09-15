@@ -16,6 +16,7 @@ DEFAULT_SETTINGS = {
     "condition_multipliers": '{"NM": 1.0, "LP": 0.85, "MP": 0.70, "HP": 0.50, "DMG": 0.30}',
     "store_logo_url": "",
     "pinned_tools": '["branding", "database"]',
+    "addon_catalog_url": "https://raw.githubusercontent.com/Cave404/Open-POS/main/addons_catalog.json",
 }
 
 def seed_default_settings(force: bool = False) -> None:
