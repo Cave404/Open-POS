@@ -1,4 +1,4 @@
-# Open-POS Developer Wiki & Technical Reference (v1.0.8)
+# Open-POS Developer Wiki & Technical Reference (v1.0.9)
 
 Welcome to the **Open-POS** internal developer documentation. This living guide defines the runtime architecture, threading model, file layout, applet lifecycle, branding pipeline, security controls, and testing standards for the project.
 
@@ -316,3 +316,36 @@ Open-POS supports dynamic discovery and one-click installation of community and 
 ### Setup Wizard Provisioning Step
 - Setup Wizard integrates an optional **Step 5: Optional Integrations & Addons**.
 - Asynchronously queries the catalog registry, presents selectable extension checkboxes, and provisions selected items in sequence during finalization before launching OpenPOS.
+
+---
+
+## 13. Core Customer Management, Immutable Credit Ledger & Ghost Tag Event Bus (v1.0.9)
+
+### In-Process Event Bus (`core/events.py`)
+- Lightweight pub/sub dispatcher `EventBus` with `subscribe(event_name, handler)` and `dispatch(event_name, **payload)`.
+- Module-level singleton `event_bus` allows any core service or addon to register handlers without circular imports.
+- Per-handler exception isolation: a crash in one subscriber never prevents remaining handlers from firing.
+- Key events: `customer:badge_assigned` (payload: `customer_id`, `nfc_uid`) — consumed by `tcg_pos` and inventory addons to wipe ghost tag records from physical merchandise.
+
+### Customer Database Schema (`migrations/core_002_add_customers.*`)
+- **`customers` table:** `id`, `name`, `phone`, `email`, `nfc_uid UNIQUE`, `store_credit_balance CHECK(>= 0)`, `notes`, `created_at`, `updated_at`.
+- **`customer_credit_ledger` table:** Strictly append-only. `amount`, `balance_after CHECK(>= 0)`, `transaction_type`, `source_addon`, `reference_id`, `notes`, `created_at`. Referenced via `ON DELETE CASCADE` from `customers`.
+- SQLite version uses `REAL` + `COLLATE NOCASE`; PostgreSQL uses `NUMERIC(10,2)` + `CITEXT` extension.
+- Migrations executed automatically at startup via `run_customer_migrations()` called from `app.py`.
+
+### Customer Service (`core/services/customer_service.py`)
+- **`resolve_customer(identifier)`:** Routes lookup by NFC UID (14-char hex regex), phone (≥7 digits), or case-insensitive name/email.
+- **`sanitize_nfc_uid(raw)`:** Strips non-hex chars, uppercases, validates exactly 14 characters.
+- **`assign_nfc_badge(customer_id, nfc_uid)`:** Validates uniqueness, updates record, dispatches `customer:badge_assigned` Ghost Tag Safeguard event.
+- **`deposit_store_credit` / `redeem_store_credit`:** Atomic transactions with `BEGIN IMMEDIATE` (SQLite) or row-level `FOR UPDATE` (PostgreSQL). Ledger rows are append-only; `UPDATE` and `DELETE` are never exposed.
+
+### Customer REST API (`core/routes/customer_routes.py`)
+- Blueprint `core_customers_bp` mounted at `/api/core/customers`.
+- Endpoints: `resolve`, `search` (autocomplete), profile, paginated ledger, create, update, badge assign, credit deposit, credit redeem.
+- Redeem returns HTTP 400 on insufficient balance with descriptive JSON error.
+
+### Customer Directory UI (`/customers`)
+- Premium dark subview: instant debounced search bar, customer table with NFC badge status pills and store credit balance.
+- Slide-in customer profile drawer with editable fields, balance card, full scrollable immutable ledger audit table.
+- Badge Tap modal listening for `openpos:hardware-scan` window events or manual 14-char UID input.
+- Credit Adjustment modal with Deposit/Deduction selection, amount, and mandatory audit reason.

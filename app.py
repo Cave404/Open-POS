@@ -1,20 +1,26 @@
-from flask import Flask, redirect, url_for, send_from_directory
+from flask import Flask, redirect, url_for, render_template, send_from_directory
 from core.config import Config
 from core.db import init_db
 from core.settings import seed_default_settings
 from manager.routes import manager_bp, api_bp
+from core.routes.customer_routes import core_customers_bp
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder='templates')
     app.config.from_object(Config)
 
     # Initialize database schema and default settings
     init_db()
     seed_default_settings()
 
+    # Run Customer Management migrations (idempotent)
+    from core.services.customer_service import run_customer_migrations
+    run_customer_migrations()
+
     # Register blueprints
     app.register_blueprint(manager_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(core_customers_bp)
 
     # Initialize dynamic Addon & Plugin Engine
     from core.addons import addon_manager
@@ -29,6 +35,10 @@ def create_app():
         from manager.routes import manager_setup
         return manager_setup()
 
+    @app.route('/customers')
+    def customers_directory():
+        return render_template('customers/index.html')
+
     @app.route('/data/uploads/<path:filename>')
     def serve_data_uploads(filename):
         return send_from_directory(Config.UPLOAD_DIR, filename)
@@ -39,7 +49,7 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
     # Global Error Handlers - Eliminate raw dead-end error pages
-    from flask import render_template, request
+    from flask import request
 
     @app.errorhandler(404)
     def handle_404(err):

@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Directory - Open-POS</title>
+    <meta name="description" content="Manage customers, store credit balances, and NFC badge assignments in the Open-POS Customer Directory.">
+    <link rel="stylesheet" href="/static/css/manager.css">
+    <script src="/static/js/notifications.js"></script>
+    <style>
+        /* ================================================================
+           Customer Directory — Scoped Styles
+           ================================================================ */
+
+        /* ---- Search bar ---- */
+        .customer-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 15px;
+            pointer-events: none;
+        }
+
+        #customerSearchInput {
+            padding-left: 36px;
+            width: 100%;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 18px;
+            background: var(--accent-blue);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(59,130,246,0.35);
+        }
+
+        /* ---- Customer Table ---- */
+        .customers-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .customers-card table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .customers-card thead th {
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .customers-card tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.1s;
+            cursor: pointer;
+        }
+
+        .customers-card tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .customers-card tbody tr:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .customers-card tbody td {
+            padding: 12px 16px;
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+
+        .customer-name {
+            font-weight: 600;
+        }
+
+        .customer-email {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* ---- Badge Pills ---- */
+        .badge-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-pill.assigned {
+            background: rgba(16,185,129,0.15);
+            border: 1px solid rgba(16,185,129,0.3);
+            color: #34d399;
+        }
+
+        .badge-pill.unassigned {
+            background: rgba(148,163,184,0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-family: var(--font-stack);
+        }
+
+        .credit-balance {
+            font-weight: 700;
+            color: #34d399;
+        }
+
+        .credit-balance.zero {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-icon-sm {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 5px 9px;
+            border-radius: 5px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.12s;
+        }
+
+        .btn-icon-sm:hover {
+            background: rgba(255,255,255,0.12);
+            color: var(--text-main);
+            border-color: var(--border-color-hover);
+        }
+
+        .btn-icon-sm.credit {
+            color: #34d399;
+        }
+
+        .btn-icon-sm.badge-btn {
+            color: #60a5fa;
+        }
+
+        /* ---- Empty state ---- */
+        .empty-state {
+            padding: 64px 24px;
+            text-align: center;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .empty-state .empty-icon {
+            font-size: 40px;
+            margin-bottom: 4px;
+        }
+
+        .empty-state h3 {
+            font-size: 16px;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .empty-state p {
+            font-size: 13px;
+            max-width: 360px;
+            line-height: 1.5;
+        }
+
+        /* ---- Slide-in Profile Drawer ---- */
+        .drawer-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 400;
+            animation: fadeIn 0.18s ease;
+        }
+
+        .profile-drawer {
+            position: fixed;
+            top: 0;
+            right: -520px;
+            width: 500px;
+            max-width: 95vw;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            transition: right 0.28s cubic-bezier(0.16,1,0.3,1);
+            box-shadow: -4px 0 32px rgba(0,0,0,0.4);
+        }
+
+        .profile-drawer.open {
+            right: 0;
+        }
+
+        .drawer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 22px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .drawer-header h3 {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .drawer-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: color 0.12s;
+        }
+
+        .drawer-close:hover {
+            color: var(--text-main);
+        }
+
+        .drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        /* Balance hero card */
+        .balance-hero {
+            background: linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(16,185,129,0.08) 100%);
+            border: 1px solid rgba(59,130,246,0.25);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .balance-hero-amount {
+            font-size: 32px;
+            font-weight: 800;
+            color: #34d399;
+            line-height: 1;
+        }
+
+        .balance-hero-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .btn-adjust-credit {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 14px;
+            background: var(--accent-blue);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-adjust-credit:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Profile edit fields */
+        .profile-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .profile-fields .form-group:first-child {
+            grid-column: 1 / -1;
+        }
+
+        .profile-fields .form-group input,
+        .profile-fields .form-group textarea {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-main);
+            padding: 8px 10px;
+            font-size: 13px;
+            font-family: inherit;
+            transition: border-color 0.15s;
+            width: 100%;
+        }
+
+        .profile-fields .form-group input:focus,
+        .profile-fields .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+        }
+
+        .profile-fields .form-group label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .badge-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-assign-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            background: rgba(96,165,250,0.12);
+            border: 1px solid rgba(96,165,250,0.3);
+            color: #60a5fa;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-assign-badge:hover {
+            background: rgba(96,165,250,0.22);
+        }
+
+        .drawer-save-row {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        /* Ledger audit table */
+        .ledger-section h4 {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .ledger-table thead th {
+            background: var(--bg-card);
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .ledger-table tbody tr {
+            border-bottom: 1px solid rgba(61,68,85,0.5);
+        }
+
+        .ledger-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .ledger-table tbody td {
+            padding: 8px 10px;
+            color: var(--text-main);
+        }
+
+        .ledger-amount.positive {
+            color: #34d399;
+            font-weight: 700;
+        }
+
+        .ledger-amount.negative {
+            color: #f87171;
+            font-weight: 700;
+        }
+
+        .ledger-type-chip {
+            display: inline-flex;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .ledger-type-chip.deposit {
+            background: rgba(16,185,129,0.15);
+            color: #34d399;
+        }
+
+        .ledger-type-chip.redemption {
+            background: rgba(239,68,68,0.12);
+            color: #f87171;
+        }
+
+        .ledger-type-chip.initial_migration {
+            background: rgba(251,191,36,0.12);
+            color: #fbbf24;
+        }
+
+        .ledger-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 20px;
+            font-size: 12px;
+        }
+
+        /* ---- Modals ---- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 600;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+            animation: fadeIn 0.15s ease;
+        }
+
+        .modal-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 440px;
+            max-width: 95vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            animation: slideUp 0.2s cubic-bezier(0.16,1,0.3,1);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 22px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-header h3 {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 3px 7px;
+            border-radius: 4px;
+        }
+
+        .modal-close:hover { color: var(--text-main); }
+
+        .modal-body {
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .modal-footer {
+            padding: 14px 22px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.12s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.12);
+        }
+
+        .btn-danger {
+            padding: 8px 16px;
+            background: rgba(239,68,68,0.15);
+            border: 1px solid rgba(239,68,68,0.3);
+            color: #f87171;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.12s;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239,68,68,0.25);
+        }
+
+        /* Credit adjustment type selector */
+        .credit-type-selector {
+            display: flex;
+            gap: 10px;
+        }
+
+        .credit-type-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+
+        .credit-type-btn.active-deposit {
+            border-color: #34d399;
+            background: rgba(16,185,129,0.12);
+            color: #34d399;
+        }
+
+        .credit-type-btn.active-redeem {
+            border-color: #f87171;
+            background: rgba(239,68,68,0.12);
+            color: #f87171;
+        }
+
+        .uid-input {
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .uid-chars-counter {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: right;
+            margin-top: 2px;
+        }
+
+        .uid-chars-counter.valid { color: #34d399; }
+        .uid-chars-counter.invalid { color: #f87171; }
+
+        /* ---- Subview header ---- */
+        .subview-header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 14px; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .header-divider { width: 1px; height: 20px; background: var(--border-color); }
+        .subview-title { font-size: 15px; font-weight: 700; }
+
+        .status-pill {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        .status-online {
+            background: rgba(16,185,129,0.12);
+            border: 1px solid rgba(16,185,129,0.25);
+            color: #34d399;
+        }
+
+        /* Notification bell */
+        .notification-wrapper { position: relative; }
+        .btn-icon-tray {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 6px 8px;
+            border-radius: 6px;
+            position: relative;
+            transition: color 0.12s;
+        }
+        .btn-icon-tray:hover { color: var(--text-main); }
+        .badge-count {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: #ef4444;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 700;
+            min-width: 16px;
+            height: 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 3px;
+        }
+
+        .notif-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 320px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+            z-index: 200;
+        }
+
+        .notif-dropdown-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .btn-text-action {
+            background: none;
+            border: none;
+            color: var(--accent-blue);
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .notif-dropdown-body { max-height: 260px; overflow-y: auto; }
+
+        .notif-dropdown-footer {
+            padding: 10px 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn-full-action {
+            display: block;
+            text-align: center;
+            color: var(--accent-blue);
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 6px 0;
+        }
+
+        /* ---- Animations ---- */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---- Toast ---- */
+        #toastContainer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            animation: slideUp 0.2s ease;
+            min-width: 240px;
+        }
+
+        .toast.success { background: #059669; }
+        .toast.error { background: #dc2626; }
+        .toast.info { background: #2563eb; }
+    </style>
+</head>
+<body class="manager-body">
+
+    <!-- Standardized Subview Header -->
+    <header class="subview-header">
+        <div class="header-left">
+            <a href="/manager" class="btn-back" id="btnReturnDashboard">
+                <span class="btn-icon">←</span>
+                <span>Return to Dashboard</span>
+            </a>
+            <div class="header-divider"></div>
+            <h2 class="subview-title">Customer Directory</h2>
+        </div>
+        <div class="header-right">
+            <div class="notification-wrapper">
+                <button id="notifBellBtn" class="btn-icon-tray" title="System Notifications">
+                    🔔 <span id="notifBadge" class="badge-count" style="display:none;">0</span>
+                </button>
+                <div id="notifDropdown" class="notif-dropdown-menu" style="display:none;">
+                    <div class="notif-dropdown-header">
+                        <span>System Notifications</span>
+                        <button id="clearNotifsBtn" class="btn-text-action">Clear</button>
+                    </div>
+                    <div id="notifList" class="notif-dropdown-body"></div>
+                    <div class="notif-dropdown-footer">
+                        <a href="/manager/logs" class="btn-full-action">Open Terminal Logs →</a>
+                    </div>
+                </div>
+            </div>
+            <span class="status-pill status-online">Engine: Online</span>
+            <a href="/manager/about" class="version-badge-link">v1.0.9</a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="view-container">
+
+        <!-- Toolbar -->
+        <div class="customer-toolbar">
+            <div class="search-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="customerSearchInput"
+                       placeholder="Search by name, phone, or badge UID…"
+                       autocomplete="off">
+            </div>
+            <button class="btn-primary" id="btnNewCustomer" onclick="openNewCustomerModal()">
+                <span>＋</span> New Customer
+            </button>
+        </div>
+
+        <!-- Customer Table Card -->
+        <div class="customers-card">
+            <table id="customersTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>NFC Badge</th>
+                        <th>Store Credit</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="customersTableBody">
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <div class="empty-icon">👥</div>
+                                <h3>Loading customers…</h3>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div><!-- /.view-container -->
+
+    <!-- ================================================================
+         PROFILE DRAWER
+         ================================================================ -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+    <div class="profile-drawer" id="profileDrawer">
+        <div class="drawer-header">
+            <h3 id="drawerTitle">Customer Profile</h3>
+            <button class="drawer-close" onclick="closeDrawer()">✕</button>
+        </div>
+        <div class="drawer-body" id="drawerBody">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- ================================================================
+         NEW CUSTOMER MODAL
+         ================================================================ -->
+    <div class="modal-overlay" id="newCustomerModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>➕ New Customer</h3>
+                <button class="modal-close" onclick="closeModal('newCustomerModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" id="newName" placeholder="Jane Smith">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" id="newPhone" placeholder="555-123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="text" id="newEmail" placeholder="jane@example.com">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Initial Store Credit ($)</label>
+                    <input type="number" id="newInitialCredit" placeholder="0.00" min="0" step="0.01" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input type="text" id="newNotes" placeholder="Optional notes about this customer">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('newCustomerModal')">Cancel</button>
+                <button class="btn-primary" id="btnCreateCustomer" onclick="createCustomer()">Create Customer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
+         BADGE ASSIGNMENT MODAL
+         ================================================================ -->
+    <div class="modal-overlay" id="badgeModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>📡 Assign NFC Badge</h3>
+                <button class="modal-close" onclick="closeModal('badgeModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-muted);font-size:13px;line-height:1.5;">
+                    Tap an NFC badge on the reader, or type the 14-character hex UID manually below.
+                </p>
+                <div class="form-group">
+                    <label>Badge UID (14 hex characters)</label>
+                    <input type="text" id="badgeUidInput" class="uid-input"
+                           placeholder="04A1B2C3D4E5F6"
+                           maxlength="14"
+                           oninput="validateUidInput(this)">
+                    <div class="uid-chars-counter" id="uidCharCount">0 / 14 characters</div>
+                </div>
+                <p style="font-size:12px;color:var(--text-muted);">
+                    ⚠️ Assigning a badge will immediately notify all installed addons
+                    to remove this UID from physical merchandise records (Ghost Tag Safeguard).
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('badgeModal')">Cancel</button>
+                <button class="btn-primary" id="btnAssignBadge" onclick="assignBadge()">Assign Badge</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
+         CREDIT ADJUSTMENT MODAL
+         ================================================================ -->
+    <div class="modal-overlay" id="creditModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="creditModalTitle">💳 Adjust Store Credit</h3>
+                <button class="modal-close" onclick="closeModal('creditModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="credit-type-selector">
+                    <button class="credit-type-btn active-deposit" id="btnDeposit"
+                            onclick="setCreditType('deposit')">➕ Deposit</button>
+                    <button class="credit-type-btn" id="btnRedeem"
+                            onclick="setCreditType('redeem')">➖ Deduction</button>
+                </div>
+                <div class="form-group">
+                    <label>Amount ($) *</label>
+                    <input type="number" id="creditAmount" placeholder="0.00" min="0.01" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Reference ID</label>
+                    <input type="text" id="creditRefId" placeholder="e.g. TRADE-001 or TXN-042">
+                </div>
+                <div class="form-group">
+                    <label>Audit Reason / Notes *</label>
+                    <input type="text" id="creditNotes" placeholder="Required: reason for this adjustment">
+                </div>
+                <div id="creditBalancePreview" style="font-size:12px;color:var(--text-muted);"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('creditModal')">Cancel</button>
+                <button class="btn-primary" id="btnConfirmCredit" onclick="submitCredit()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <script src="/static/js/customers.js"></script>
+</body>
+</html>

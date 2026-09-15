@@ -46,7 +46,7 @@ if not persistent_secret:
     os.environ['SECRET_KEY'] = persistent_secret
 
 class Config:
-    VERSION = "v1.0.8"
+    VERSION = "v1.0.9"
     SECRET_KEY = persistent_secret or os.environ.get('SECRET_KEY', 'default_openpos_secret_key')
     FERNET_KEY = os.environ.get('FERNET_KEY', '')
     HOST = os.environ.get('HOST', '0.0.0.0')

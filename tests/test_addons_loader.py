@@ -21,12 +21,12 @@ def client():
 
 def test_v106_version_consistency(client):
     """Asserts that Config.VERSION and all manager templates strictly reflect active version."""
-    assert Config.VERSION in ("v1.0.6", "v1.0.7", "v1.0.8")
+    assert Config.VERSION in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")
 
     # API system credits
     res_credits = client.get("/api/system/credits")
     assert res_credits.status_code == 200
-    assert res_credits.get_json()["version"] in ("v1.0.6", "v1.0.7", "v1.0.8")
+    assert res_credits.get_json()["version"] in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")
 
     # Manager view templates
     views_to_check = [
@@ -42,7 +42,7 @@ def test_v106_version_consistency(client):
     for route in views_to_check:
         res = client.get(route, follow_redirects=True)
         assert res.status_code == 200, f"Route {route} returned {res.status_code}"
-        assert any(v in res.get_data(as_text=True) for v in ("v1.0.6", "v1.0.7", "v1.0.8")), f"Route {route} missing version tag"
+        assert any(v in res.get_data(as_text=True) for v in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")), f"Route {route} missing version badge"
 
 def test_test_addon_discovery_and_mounting(client):
     """Asserts that test_addon is discovered, mounted, and exposes /addons/test_addon/status."""
