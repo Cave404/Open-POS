@@ -26,6 +26,7 @@ To ensure 100% stable execution:
 
 import os
 import sys
+import socket
 import threading
 import webbrowser
 import webview
@@ -33,10 +34,11 @@ from PIL import Image, ImageDraw
 import pystray
 from pystray import MenuItem as item
 
-from core.config import Config
+from core.config import Config, REQUIRED_DATA_DIRS
 from core.boot import run_boot_sequence
 from core.setup import is_setup_complete
 from app import create_app
+
 
 # -----------------------------------------------------------------------------
 # Global Runtime State & Shared Handle Registry
@@ -192,21 +194,48 @@ class JSBridge:
 
 
 # -----------------------------------------------------------------------------
-# 1. Background Web Server Worker
+# 1. Background Web Server Worker & Dynamic Port Fallback
 # -----------------------------------------------------------------------------
-def run_backend_server():
+def find_available_port(start_port: int = 5000, max_attempts: int = 10) -> int:
     """
-    Spins up the Flask backend application on a background daemon thread.
-    The WSGI server binds quietly to 127.0.0.1 on the configured port.
+    Attempts to bind to 127.0.0.1:port.
+    If OSError (e.g. WinError 10048), increments port (e.g. 5001, 5002...) and logs:
+    [WARN] Port 5000 is occupied by another service. Shifting OpenPOS to port {port}.
     """
+    for attempt in range(max_attempts):
+        port = start_port + attempt
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(('127.0.0.1', port))
+            sock.close()
+            if attempt > 0:
+                print(f"[WARN] Port {start_port} is occupied by another service. Shifting OpenPOS to port {port}.")
+            return port
+        except OSError:
+            sock.close()
+            continue
+    raise RuntimeError(f"Could not find an available port in range {start_port}-{start_port + max_attempts - 1}")
+
+
+def run_backend_server(port: int = None):
+    """
+    Spins up the backend WSGI server on a background daemon thread.
+    Uses Waitress production WSGI server, falling back to Flask dev server if needed.
+    """
+    target_port = port or Config.PORT
     app = create_app()
-    # use_reloader is set to False to prevent spawning child watcher processes
-    app.run(
-        host="127.0.0.1",
-        port=Config.PORT,
-        debug=False,
-        use_reloader=False
-    )
+    try:
+        from waitress import serve
+        serve(app, host="127.0.0.1", port=target_port, threads=6)
+    except Exception as e:
+        print(f"[WARN] Waitress serve failed ({e}), falling back to Werkzeug development server.")
+        app.run(
+            host="127.0.0.1",
+            port=target_port,
+            debug=False,
+            use_reloader=False
+        )
+
 
 
 # -----------------------------------------------------------------------------
@@ -378,9 +407,18 @@ def boot_orchestration_worker():
 # 6. Main Execution Entry Point
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
+    # Step 0: Ensure required data directories exist
+    for folder in REQUIRED_DATA_DIRS:
+        os.makedirs(os.path.join(Config.BASE_DIR, folder), exist_ok=True)
+
+    # Step 1: Detect available port to prevent collisions
+    resolved_port = find_available_port(start_port=Config.PORT, max_attempts=10)
+    Config.PORT = resolved_port
+
     # Step A: Launch Flask backend on background daemon thread
     server_thread = threading.Thread(
         target=run_backend_server,
+        args=(resolved_port,),
         name="OpenPOS-BackendWorker",
         daemon=True
     )
@@ -391,7 +429,7 @@ if __name__ == '__main__':
         # Bypass normal dashboard and splash screen; launch Setup Wizard
         active_window = webview.create_window(
             title="OpenPOS - Initial Setup & Security Initialization",
-            url=f"http://127.0.0.1:{Config.PORT}/setup",
+            url=f"http://127.0.0.1:{resolved_port}/setup",
             width=980,
             height=800,
             min_size=(900, 720),
@@ -420,7 +458,7 @@ if __name__ == '__main__':
     TRAY_HEIGHT = 54
     splash_window = webview.create_window(
         title="Open-POS Starting",
-        url=f"http://127.0.0.1:{Config.PORT}/manager/splash",
+        url=f"http://127.0.0.1:{resolved_port}/manager/splash",
         width=img_w,
         height=img_h + TRAY_HEIGHT,
         frameless=True,
@@ -435,3 +473,4 @@ if __name__ == '__main__':
 
     # Step F: Clean exit cleanup once main loop terminates
     exit_open_pos()
+

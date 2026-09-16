@@ -217,44 +217,33 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Security & Secrets
-.env
-*.env
-*.key
-encryption.key
-secrets.json
-
-# Local POS Databases & Cache
-*.db
-*.db-wal
-*.db-shm
-*.sqlite3
-static/card_cache/*
-!static/card_cache/.gitkeep
-
-# System & Application Logs
-*.log
-system_logs*.txt
-ui_alerts.json
-
-# Local Backups & Reports
-*.bak
-reports/sales/*
-reports/intake/*
-reports/tournaments/*
-!reports/.gitkeep
-
-# Local Store Data Directory
+# Core Runtime Data Isolation
+data/
+!data/
 data/*
 !data/.gitkeep
-!data/db/.gitkeep
-!data/cache/.gitkeep
-!data/uploads/.gitkeep
-!data/logs/.gitkeep
+!data/custom_addons/
+data/custom_addons/*
 !data/custom_addons/.gitkeep
-!data/config/.gitkeep
+
+# Sensitive Secrets & Databases
+*.hash
+*.key
+*.db
+*.sqlite
+*.sqlite3
+*.log
+.env
 data/config/*
-!data/config/.gitkeep
 data/db/*
-!data/db/.gitkeep
+data/cache/*
+data/logs/*
+data/uploads/*
+
+# Python runtime artifacts
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
 

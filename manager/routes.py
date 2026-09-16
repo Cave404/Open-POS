@@ -1219,7 +1219,7 @@ def api_setup_reauth_status():
 @api_bp.route('/setup/reauth_verify', methods=['POST'])
 @manager_bp.route('/api/setup/reauth_verify', methods=['POST'])
 def api_setup_reauth_verify():
-    """Verifies administrator password against existing manager_auth.json to unlock setup wizard."""
+    """Verifies administrator password against existing manager_auth.json or admin_pin.hash to unlock setup wizard."""
     if is_setup_complete():
         return jsonify({"status": "error", "message": "Setup is already completed and permanently locked."}), 403
 
@@ -1229,8 +1229,19 @@ def api_setup_reauth_verify():
     expected = cfg.get("password_hash", "")
     salt = cfg.get("salt", "")
 
+    if not expected:
+        pin_path = os.path.join(Config.CONFIG_DIR, 'admin_pin.hash')
+        if os.path.isfile(pin_path):
+            try:
+                with open(pin_path, 'r', encoding='utf-8') as pf:
+                    expected = pf.read().strip()
+                    salt = ""
+            except Exception:
+                pass
+
     if expected:
-        if not pwd or _hash_with_salt(pwd, salt) != expected:
+        hashed_input = _hash_with_salt(pwd, salt) if salt else hashlib.sha256(pwd.encode('utf-8')).hexdigest()
+        if not pwd or hashed_input != expected:
             return jsonify({
                 "status": "error",
                 "authorized": False,
@@ -1244,6 +1255,7 @@ def api_setup_reauth_verify():
         "authorized": True,
         "message": "Setup re-configuration unlocked."
     }), 200
+
 
 
 @api_bp.route('/setup/cancel_reauth', methods=['POST'])

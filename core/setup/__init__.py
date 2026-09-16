@@ -9,7 +9,8 @@ from core.setup.wizard import (
     generate_crypto_keys,
     save_setup_configuration,
     get_recovery_key_text,
-    SETUP_MARKER_PATH
+    SETUP_MARKER_PATH,
+    PIN_HASH_PATH
 )
 from core.setup.checks import install_missing_requirements
 from core.setup.shortcut import create_desktop_shortcut
@@ -24,5 +25,7 @@ __all__ = [
     "generate_crypto_keys",
     "save_setup_configuration",
     "get_recovery_key_text",
-    "SETUP_MARKER_PATH"
+    "SETUP_MARKER_PATH",
+    "PIN_HASH_PATH"
 ]
+

@@ -21,9 +21,18 @@ if os.path.exists(env_path):
 else:
     load_dotenv(os.path.join(BASE_DIR, '.env'))
 
+REQUIRED_DATA_DIRS = [
+    "data/config",
+    "data/db",
+    "data/logs",
+    "data/cache",
+    "data/custom_addons",
+    "data/uploads"
+]
+
 # Automatically ensure private data directories exist on startup
-for _directory in (DATA_DIR, DB_DIR, CACHE_DIR, UPLOAD_DIR, LOGS_DIR, CUSTOM_ADDONS_DIR, CONFIG_DIR):
-    os.makedirs(_directory, exist_ok=True)
+for folder in REQUIRED_DATA_DIRS:
+    os.makedirs(os.path.join(BASE_DIR, folder), exist_ok=True)
 
 # Ensure persistent SECRET_KEY saved in data/config/.env
 persistent_secret = os.environ.get('SECRET_KEY')
@@ -61,6 +70,7 @@ class Config:
     LOGS_DIR = LOGS_DIR
     CUSTOM_ADDONS_DIR = CUSTOM_ADDONS_DIR
     CONFIG_DIR = CONFIG_DIR
+    REQUIRED_DATA_DIRS = REQUIRED_DATA_DIRS
 
     # Database Settings
     DB_ENGINE = os.environ.get('DB_ENGINE', 'sqlite').lower()

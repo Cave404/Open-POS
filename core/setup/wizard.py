@@ -28,21 +28,46 @@ from core.setup.shortcut import create_desktop_shortcut
 
 SETUP_MARKER_PATH = os.path.join(Config.CONFIG_DIR, '.setup_complete')
 AUTH_CONFIG_PATH = os.path.join(Config.CONFIG_DIR, 'manager_auth.json')
+PIN_HASH_PATH = os.path.join(Config.CONFIG_DIR, 'admin_pin.hash')
 ENV_CONFIG_PATH = os.path.join(Config.CONFIG_DIR, '.env')
+
+def get_pin_hash_path() -> str:
+    """Returns active admin_pin.hash path, dynamically aligned with AUTH_CONFIG_PATH directory."""
+    default_path = os.path.join(Config.CONFIG_DIR, 'admin_pin.hash')
+    if PIN_HASH_PATH != default_path:
+        return PIN_HASH_PATH
+    if AUTH_CONFIG_PATH and os.path.dirname(AUTH_CONFIG_PATH):
+        return os.path.join(os.path.dirname(AUTH_CONFIG_PATH), 'admin_pin.hash')
+    return PIN_HASH_PATH
 
 def is_setup_complete() -> bool:
     """Checks whether the first-run onboarding wizard has completed."""
-    return os.path.isfile(SETUP_MARKER_PATH)
+    if not os.path.isfile(SETUP_MARKER_PATH):
+        return False
+    # Check if admin_pin.hash or manager_auth.json exists
+    active_pin = get_pin_hash_path()
+    return os.path.isfile(active_pin) or os.path.isfile(AUTH_CONFIG_PATH)
 
 def check_existing_installation() -> dict:
     """
     Checks whether an existing store configuration or credential set is registered,
     even if .setup_complete was removed or deleted.
-    Inspects data/config/manager_auth.json and data/config/.env.
+    Inspects data/config/manager_auth.json, data/config/admin_pin.hash, and data/config/.env.
     """
     has_auth = False
     has_password = False
     has_keys = False
+
+    active_pin = get_pin_hash_path()
+    if os.path.isfile(active_pin):
+        try:
+            with open(active_pin, 'r', encoding='utf-8') as f:
+                if f.read().strip():
+                    has_auth = True
+                    has_password = True
+        except Exception:
+            pass
+
 
     if os.path.isfile(AUTH_CONFIG_PATH):
         try:
@@ -58,13 +83,10 @@ def check_existing_installation() -> dict:
         try:
             with open(ENV_CONFIG_PATH, 'r', encoding='utf-8') as f:
                 content = f.read()
-                if "FERNET_KEY=" in content or "SECRET_KEY=" in content:
+                if "FERNET_KEY=" in content:
                     for line in content.splitlines():
                         line_s = line.strip()
                         if line_s.startswith("FERNET_KEY=") and len(line_s.split("=", 1)[1].strip()) > 8:
-                            has_keys = True
-                            break
-                        if line_s.startswith("SECRET_KEY=") and len(line_s.split("=", 1)[1].strip()) > 8:
                             has_keys = True
                             break
         except Exception:
@@ -76,6 +98,7 @@ def check_existing_installation() -> dict:
         "has_password": has_password,
         "has_keys": has_keys
     }
+
 
 def mark_setup_complete(metadata: dict = None) -> bool:
     """
@@ -94,6 +117,16 @@ def mark_setup_complete(metadata: dict = None) -> bool:
         }
         with open(SETUP_MARKER_PATH, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=2)
+
+        # Ensure admin_pin.hash marker exists on completion
+        active_pin = get_pin_hash_path()
+        if not os.path.isfile(active_pin):
+            try:
+                with open(active_pin, 'w', encoding='utf-8') as pf:
+                    pf.write(sig)
+            except Exception:
+                pass
+
 
         # Generate automated desktop shortcut on completion
         try:
@@ -241,6 +274,16 @@ def save_setup_configuration(data: dict) -> dict:
 
         with open(AUTH_CONFIG_PATH, 'w', encoding='utf-8') as f:
             json.dump(auth_data, f, indent=2)
+
+        # Ensure admin_pin.hash marker is persisted
+        try:
+            pin_to_hash = admin_password if admin_password else "openpos_admin"
+            active_pin = get_pin_hash_path()
+            with open(active_pin, 'w', encoding='utf-8') as pf:
+                pf.write(hashlib.sha256(pin_to_hash.encode('utf-8')).hexdigest())
+        except Exception:
+            pass
+
 
         # 3. Database initialization & seed
         from core.db import init_db
