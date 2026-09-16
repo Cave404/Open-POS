@@ -1166,6 +1166,30 @@ function showStep(step) {
         }
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Step 6 re-entry guard: if crypto keys were already generated on a prior pass,
+    // auto-populate displays and enable the Next button without re-hitting the backend.
+    if (step === 6 && generatedCrypto.fernet_key) {
+        const nextBtn = document.getElementById('btnNext6');
+        if (nextBtn) nextBtn.disabled = false;
+        const roundtripEl = document.getElementById('dispRoundtripStatus');
+        if (roundtripEl && roundtripEl.textContent !== '\u2713 Verified & Decryptable') {
+            roundtripEl.textContent = '\u2713 Verified & Decryptable';
+            roundtripEl.style.color = 'var(--wizard-success)';
+        }
+        const dispFernet = document.getElementById('dispFernetKey');
+        if (dispFernet && !dispFernet.textContent.includes('Encrypted')) {
+            dispFernet.textContent = generatedCrypto.fernet_key.substring(0, 16) + '... (Encrypted)';
+        }
+        const dispSecret = document.getElementById('dispSecretKey');
+        if (dispSecret && !dispSecret.textContent.includes('...')) {
+            dispSecret.textContent = generatedCrypto.secret_key.substring(0, 16) + '...';
+        }
+        const dispToken = document.getElementById('dispRecoveryToken');
+        if (dispToken && !dispToken.textContent) {
+            dispToken.textContent = generatedCrypto.recovery_token;
+        }
+    }
 }
 
 let wizardCatalogLoaded = false;
@@ -1365,9 +1389,7 @@ document.getElementById('cardPostgres').addEventListener('click', () => {
 // ---------------------------------------------------------------------------
 async function executeSetupPersistence() {
     const errorEl = document.getElementById('cryptoErrorMsg');
-    const nextBtn = document.getElementById('btnNext5');
     errorEl.style.display = 'none';
-    nextBtn.disabled = true;
 
     document.getElementById('dispRoundtripStatus').textContent = 'Testing encryption roundtrip & database write...';
     document.getElementById('dispRoundtripStatus').style.color = 'var(--wizard-warning)';
@@ -1405,11 +1427,11 @@ async function executeSetupPersistence() {
 
         document.getElementById('dispFernetKey').textContent = data.fernet_key.substring(0, 16) + '... (Encrypted)';
         document.getElementById('dispSecretKey').textContent = data.secret_key.substring(0, 16) + '...';
-        document.getElementById('dispRoundtripStatus').textContent = '✓ Verified & Decryptable';
+        document.getElementById('dispRoundtripStatus').textContent = '\u2713 Verified & Decryptable';
         document.getElementById('dispRoundtripStatus').style.color = 'var(--wizard-success)';
 
         document.getElementById('dispRecoveryToken').textContent = data.recovery_token;
-        nextBtn.disabled = false;
+        // Navigation advance is handled by the calling click handler (checks generatedCrypto.fernet_key)
 
     } catch (err) {
         document.getElementById('dispRoundtripStatus').textContent = '✗ Error';
@@ -1632,9 +1654,23 @@ if (btnRefreshCatalog) {
     });
 }
 document.getElementById('btnBack5').addEventListener('click', () => showStep(4));
-document.getElementById('btnNext5').addEventListener('click', () => {
-    showStep(6);
-    executeSetupPersistence();
+document.getElementById('btnNext5').addEventListener('click', async () => {
+    // If crypto keys already generated (user navigated back and forward), skip re-submitting.
+    if (generatedCrypto.fernet_key) {
+        showStep(6);
+        return;
+    }
+    // Run persistence first — only advance to Step 6 on success.
+    const nextBtn = document.getElementById('btnNext5');
+    if (nextBtn) nextBtn.disabled = true;
+    await executeSetupPersistence();
+    // executeSetupPersistence enables btnNext5 (mapped here as btnNext6 target) on success.
+    // Only advance if keys were successfully generated.
+    if (generatedCrypto.fernet_key) {
+        showStep(6);
+    } else {
+        if (nextBtn) nextBtn.disabled = false;
+    }
 });
 document.getElementById('btnBack6').addEventListener('click', () => showStep(5));
 document.getElementById('btnNext6').addEventListener('click', () => showStep(7));

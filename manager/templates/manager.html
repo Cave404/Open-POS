@@ -70,6 +70,13 @@
                         </div>
                     </div>
                 </div>
+                <!-- Update Available Badge -->
+                <button id="updateBadgeBtn"
+                    title="A new version of Open-POS is available"
+                    onclick="openUpdateModal()"
+                    style="display:none; align-items:center; gap:6px; padding:4px 12px; background:linear-gradient(135deg,#059669,#10b981); color:#fff; border:none; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; box-shadow:0 0 10px rgba(16,185,129,0.4); animation: pulse-badge 2s ease-in-out infinite;">
+                    ⬆ Update Available
+                </button>
                 <span class="status-pill status-online">Engine: Online</span>
             </div>
         </header>
@@ -81,6 +88,40 @@
             </div>
         </div>
     </main>
+
+    <!-- ================================================================== -->
+    <!-- Update Changelog Modal                                               -->
+    <!-- ================================================================== -->
+    <div id="updateModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center;">
+        <div style="background:#1a1d24; border:1px solid #2d3343; border-radius:16px; max-width:600px; width:92%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.6); overflow:hidden;">
+            <!-- Modal Header -->
+            <div style="padding:22px 26px 16px; border-bottom:1px solid #2d3343; display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+                <div>
+                    <div style="font-size:11px; font-weight:700; color:#10b981; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Update Available</div>
+                    <h2 style="font-size:20px; font-weight:800; color:#f1f5f9; margin:0;">Open-POS <span id="updateModalVersion">—</span></h2>
+                    <div style="font-size:12px; color:#64748b; margin-top:4px;">Released: <span id="updateModalDate">—</span> &nbsp;&bull;&nbsp; Current: <span id="updateModalCurrent">—</span></div>
+                </div>
+                <button onclick="closeUpdateModal()" style="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px;" title="Dismiss">&times;</button>
+            </div>
+            <!-- Changelog Body -->
+            <div id="updateModalChangelog" style="padding:20px 26px; overflow-y:auto; flex:1;"></div>
+            <!-- Progress Bar (hidden initially) -->
+            <div id="updateProgressWrap" style="display:none; padding:0 26px 16px;">
+                <div style="background:#0d1117; border-radius:8px; height:8px; overflow:hidden; margin-bottom:8px;">
+                    <div id="updateProgressBar" style="height:100%; background:linear-gradient(90deg,#3b82f6,#10b981); width:0%; transition:width 0.4s ease; border-radius:8px;"></div>
+                </div>
+                <div id="updateProgressMsg" style="font-size:12px; color:#94a3b8;">Preparing...</div>
+            </div>
+            <!-- Modal Footer -->
+            <div style="padding:16px 26px 22px; border-top:1px solid #2d3343; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <a id="updateModalReleaseLink" href="#" target="_blank" style="font-size:12px; color:#60a5fa; text-decoration:none;">View on GitHub &rarr;</a>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="closeUpdateModal()" id="updateDismissBtn" style="padding:9px 18px; background:rgba(255,255,255,0.06); border:1px solid #2d3343; color:#94a3b8; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">Dismiss</button>
+                    <button id="updateInstallBtn" onclick="installUpdate()" style="padding:9px 20px; background:linear-gradient(135deg,#059669,#10b981); border:none; color:#fff; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700; box-shadow:0 2px 8px rgba(16,185,129,0.3);">&#11015; Install Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 <script>
 let allApplets = [];
@@ -122,6 +163,9 @@ async function initDashboard() {
 
         // 3. Render Dashboard (Defaults to HOME)
         renderGrid();
+
+        // 4. Non-blocking update availability check (once per session)
+        checkForUpdates().catch(() => {});
     } catch (err) {
         console.error('Failed to initialize dashboard:', err);
     }
@@ -303,6 +347,176 @@ function filterCategory(cat, el) {
 }
 
 document.addEventListener('DOMContentLoaded', initDashboard);
+</script>
+
+<style>
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.85; transform: scale(1.05); }
+}
+</style>
+
+<script>
+// ---------------------------------------------------------------------------
+// Update Checker & Changelog Modal
+// ---------------------------------------------------------------------------
+let _updateInfo = null;
+
+async function checkForUpdates() {
+    // Only check once per browser session to avoid hammering the backend
+    if (sessionStorage.getItem('openpos_update_checked')) return;
+    sessionStorage.setItem('openpos_update_checked', '1');
+
+    try {
+        const res = await fetch('/api/update/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        _updateInfo = data;
+
+        if (data.available) {
+            const badge = document.getElementById('updateBadgeBtn');
+            if (badge) {
+                badge.style.display = 'inline-flex';
+            }
+        }
+    } catch (err) {
+        console.warn('[OpenPOS] Update check failed:', err);
+    }
+}
+
+function _formatReleaseDate(iso) {
+    if (!iso) return 'Unknown';
+    try {
+        return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch (e) {
+        return iso;
+    }
+}
+
+function _renderChangelog(sections) {
+    if (!sections || sections.length === 0) {
+        return '<p style="color:#64748b; font-size:13px;">No changelog provided for this release.</p>';
+    }
+    return sections.map(sec => {
+        const items = (sec.items || []).map(item =>
+            `<li style="font-size:13px; color:#cbd5e1; margin-bottom:5px; line-height:1.5;">${item}</li>`
+        ).join('');
+        return `
+            <div style="margin-bottom:18px;">
+                <div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#60a5fa; margin-bottom:8px;">${sec.heading}</div>
+                <ul style="padding-left:18px; margin:0;">${items}</ul>
+            </div>
+        `;
+    }).join('');
+}
+
+function openUpdateModal() {
+    const modal = document.getElementById('updateModal');
+    if (!modal) return;
+
+    const info = _updateInfo || {};
+    const ver   = document.getElementById('updateModalVersion');
+    const date  = document.getElementById('updateModalDate');
+    const curr  = document.getElementById('updateModalCurrent');
+    const log   = document.getElementById('updateModalChangelog');
+    const link  = document.getElementById('updateModalReleaseLink');
+
+    if (ver)  ver.textContent  = info.latest_version  || '—';
+    if (date) date.textContent = _formatReleaseDate(info.release_date);
+    if (curr) curr.textContent = info.current_version || '—';
+    if (log)  log.innerHTML    = _renderChangelog(info.changelog || []);
+    if (link) link.href        = info.html_url || '#';
+
+    // Reset progress area
+    const progressWrap = document.getElementById('updateProgressWrap');
+    if (progressWrap) progressWrap.style.display = 'none';
+    const progressBar = document.getElementById('updateProgressBar');
+    if (progressBar) progressBar.style.width = '0%';
+    const progressMsg = document.getElementById('updateProgressMsg');
+    if (progressMsg) progressMsg.textContent = 'Preparing...';
+
+    const installBtn = document.getElementById('updateInstallBtn');
+    if (installBtn) {
+        installBtn.disabled = false;
+        installBtn.innerHTML = '&#11015; Install Update';
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeUpdateModal() {
+    const modal = document.getElementById('updateModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function installUpdate() {
+    const installBtn    = document.getElementById('updateInstallBtn');
+    const dismissBtn    = document.getElementById('updateDismissBtn');
+    const progressWrap  = document.getElementById('updateProgressWrap');
+    const progressBar   = document.getElementById('updateProgressBar');
+    const progressMsg   = document.getElementById('updateProgressMsg');
+
+    if (installBtn) { installBtn.disabled = true; installBtn.innerHTML = '⏳ Installing...'; }
+    if (dismissBtn) dismissBtn.disabled = true;
+    if (progressWrap) progressWrap.style.display = 'block';
+
+    try {
+        const downloadUrl = _updateInfo && _updateInfo.download_url ? _updateInfo.download_url : null;
+        const body = downloadUrl ? JSON.stringify({ download_url: downloadUrl }) : '{}';
+
+        const response = await fetch('/api/update/install', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    body,
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                const dataLine = line.replace(/^data:\s*/, '').trim();
+                if (!dataLine) continue;
+                try {
+                    const evt = JSON.parse(dataLine);
+                    if (progressBar) progressBar.style.width = `${evt.percent || 0}%`;
+                    if (progressMsg) progressMsg.textContent = evt.message || '';
+                    if (evt.done) {
+                        const result = evt.result || {};
+                        if (result.success) {
+                            if (progressMsg) progressMsg.textContent = '✓ Update installed! Please restart Open-POS.';
+                            if (progressBar) progressBar.style.background = 'linear-gradient(90deg,#059669,#10b981)';
+                            if (installBtn) { installBtn.innerHTML = '✓ Done — Restart Required'; installBtn.style.background = '#059669'; }
+                        } else {
+                            if (progressMsg) progressMsg.textContent = '✗ ' + (result.message || 'Installation failed.');
+                            if (progressBar) progressBar.style.background = 'linear-gradient(90deg,#dc2626,#ef4444)';
+                            if (installBtn) { installBtn.innerHTML = '✗ Failed'; installBtn.style.background = '#dc2626'; }
+                        }
+                        if (dismissBtn) { dismissBtn.disabled = false; }
+                    }
+                } catch (e) {
+                    console.warn('[OpenPOS] SSE parse error:', e, dataLine);
+                }
+            }
+        }
+    } catch (err) {
+        if (progressMsg) progressMsg.textContent = 'Error: ' + err.message;
+        if (installBtn)  { installBtn.disabled = false; installBtn.innerHTML = '&#11015; Retry'; }
+        if (dismissBtn)  dismissBtn.disabled = false;
+    }
+}
+
+// Close modal on backdrop click
+document.getElementById('updateModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeUpdateModal();
+});
 </script>
 </body>
 </html>

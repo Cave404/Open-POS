@@ -1619,3 +1619,107 @@ def api_system_restart():
         "status": "success",
         "message": "POS System restart initiated."
     })
+
+
+# -----------------------------------------------------------------------------
+# 11. In-App Self-Updater REST Endpoints
+# -----------------------------------------------------------------------------
+@api_bp.route('/update/status', methods=['GET'])
+@manager_bp.route('/api/update/status', methods=['GET'])
+def api_update_status():
+    """
+    Returns the cached update check result without hitting GitHub.
+    Safe to call frequently — does not make any network requests.
+    """
+    from core.updater.checker import get_update_status
+    status = get_update_status()
+    return jsonify(status), 200
+
+
+@api_bp.route('/update/check', methods=['POST'])
+@manager_bp.route('/api/update/check', methods=['POST'])
+def api_update_check():
+    """
+    Forces a fresh release check against the GitHub Releases API.
+    Updates the in-memory cache and returns the result immediately.
+    Returns 200 even on network failure (error surfaced in response body).
+    """
+    from core.updater.checker import check_for_updates
+    result = check_for_updates()
+    return jsonify(result), 200
+
+
+@api_bp.route('/update/install', methods=['POST'])
+@manager_bp.route('/api/update/install', methods=['POST'])
+def api_update_install():
+    """
+    Triggers the full update installation pipeline as a Server-Sent Events stream:
+      1. Pre-flight snapshot (data/ and venv/ excluded)
+      2. Download and apply release ZIP
+      3. Post-update health check
+      4. Auto-rollback on health-check failure
+
+    Accepts optional JSON body:
+      { "download_url": str }  -- Override download URL (defaults to cached check result)
+
+    SSE event format:
+      data: {"percent": int, "message": str, "done": bool, "result": {...}}
+    """
+    import queue as queue_module
+
+    from core.updater.checker import get_update_status, check_for_updates
+    from core.updater.installer import install_update
+
+    data = request.get_json(silent=True) or {}
+    download_url = data.get("download_url")
+
+    if not download_url:
+        # Pull from cache, running a fresh check if not yet done
+        status = get_update_status()
+        if not status.get("checked"):
+            status = check_for_updates()
+        download_url = status.get("download_url")
+
+    if not download_url:
+        return jsonify({
+            "status": "error",
+            "message": "No update available or download URL not resolved. Run /api/update/check first."
+        }), 400
+
+    progress_q = queue_module.Queue()
+
+    def _progress_cb(pct: int, msg: str):
+        progress_q.put({"percent": pct, "message": msg, "done": False})
+
+    def _run_install():
+        result = install_update(download_url, progress_cb=_progress_cb)
+        progress_q.put({
+            "percent": 100,
+            "message": result.get("message", "Done."),
+            "done":    True,
+            "result":  result,
+        })
+
+    worker = threading.Thread(target=_run_install, daemon=True)
+    worker.start()
+
+    def generate():
+        while True:
+            try:
+                item = progress_q.get(timeout=120)
+                yield f"data: {json.dumps(item)}\n\n"
+                if item.get("done"):
+                    break
+            except Exception:
+                yield f"data: {json.dumps({'percent': 100, 'message': 'Stream timeout.', 'done': True})}\n\n"
+                break
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control":     "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection":        "keep-alive",
+        }
+    )

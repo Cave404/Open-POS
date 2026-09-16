@@ -26,6 +26,13 @@ def create_app():
     from core.addons import addon_manager
     addon_manager.init_app(app)
 
+    # Start background update checker (30-second boot delay, then hourly)
+    try:
+        from core.updater.checker import start_background_checker
+        start_background_checker(app)
+    except Exception:
+        pass  # Never block startup on updater failure
+
     @app.route('/')
     def index():
         return redirect(url_for('manager.manager_index'))
