@@ -18,7 +18,21 @@ from core.settings import get_setting
 logger = logging.getLogger(__name__)
 
 DEFAULT_CATALOG_URL = "https://raw.githubusercontent.com/Cave404/Open-POS/main/addons_catalog.json"
+DEFAULT_CATALOG_FALLBACK_PATH = os.path.join(os.path.dirname(__file__), 'default_catalog.json')
 CACHE_TTL_SECONDS = 6 * 3600  # 6 hours
+
+
+def _get_bundled_catalog() -> List[Dict[str, Any]]:
+    """Loads bundled fallback catalog from core/addons/default_catalog.json."""
+    if os.path.isfile(DEFAULT_CATALOG_FALLBACK_PATH):
+        try:
+            with open(DEFAULT_CATALOG_FALLBACK_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+        except Exception as e:
+            logger.warning(f"Could not load bundled default_catalog.json: {e}")
+    return []
 
 
 def _get_cache_path() -> str:
@@ -58,10 +72,11 @@ def is_compatible(min_core_version: str, current_version: Optional[str] = None) 
 
 def fetch_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
     """
-    Fetches the remote addon catalog.
-    - Inspects data/cache/catalog_cache.json if younger than 6 hours (unless force_refresh is True).
-    - Fetches via non-blocking requests.get() with a 5-second timeout.
-    - If network is unreachable or offline, returns cached catalog or clean empty list [] without crashing.
+    Fetches the remote addon catalog implementing a three-tier fallback:
+    - Tier 1 (Remote): Attempt requests.get() to configured catalog URL with 4-second timeout.
+      On HTTP 200, caches to data/cache/catalog_cache.json and returns.
+    - Tier 2 (Cache): If remote fails or times out, read from data/cache/catalog_cache.json.
+    - Tier 3 (Bundled Fallback): If no cache exists or cache is empty, load core/addons/default_catalog.json.
     """
     cache_file = _get_cache_path()
     now = time.time()
@@ -71,9 +86,9 @@ def fetch_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
     if os.path.isfile(cache_file):
         try:
             with open(cache_file, 'r', encoding='utf-8') as f:
-                cached_data = json.load(f)
-                if not isinstance(cached_data, list):
-                    cached_data = None
+                loaded = json.load(f)
+                if isinstance(loaded, list) and len(loaded) > 0:
+                    cached_data = loaded
         except Exception as e:
             logger.warning(f"Could not parse catalog cache file: {e}")
             cached_data = None
@@ -86,14 +101,14 @@ def fetch_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
         except Exception:
             pass
 
-    # 2. Remote fetch with 5-second timeout
+    # Tier 1 (Remote): Attempt requests.get with 4-second timeout
     catalog_url = get_setting("addon_catalog_url", DEFAULT_CATALOG_URL)
     try:
         logger.info(f"Fetching remote addon catalog from {catalog_url}...")
-        resp = requests.get(catalog_url, timeout=5)
+        resp = requests.get(catalog_url, timeout=4)
         if resp.status_code == 200:
             catalog_list = resp.json()
-            if isinstance(catalog_list, list):
+            if isinstance(catalog_list, list) and len(catalog_list) > 0:
                 try:
                     with open(cache_file, 'w', encoding='utf-8') as f:
                         json.dump(catalog_list, f, indent=2)
@@ -101,18 +116,25 @@ def fetch_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
                     logger.warning(f"Failed to persist catalog cache: {we}")
                 return catalog_list
             else:
-                logger.error(f"Catalog response is not a list: {type(catalog_list)}")
+                logger.warning(f"Catalog response is not a valid list: {catalog_list}")
         else:
             logger.warning(f"Catalog URL returned HTTP {resp.status_code}")
     except Exception as exc:
         logger.warning(f"Network error fetching addon catalog ({exc}). Entering offline resilience mode.")
 
-    # 3. Fallback: return stale cached catalog if available, else empty list
-    if cached_data is not None:
-        logger.info("Using stale catalog cache due to network unavailability.")
+    # Tier 2 (Cache): Return cached data if present
+    if cached_data is not None and len(cached_data) > 0:
+        logger.info("Using cached catalog due to network unavailability.")
         return cached_data
 
+    # Tier 3 (Bundled Fallback): Return bundled default catalog
+    bundled = _get_bundled_catalog()
+    if bundled:
+        logger.info("Using bundled default_catalog.json fallback.")
+        return bundled
+
     return []
+
 
 
 def get_catalog_item(addon_id: str) -> Optional[Dict[str, Any]]:

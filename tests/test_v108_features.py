@@ -117,8 +117,8 @@ def test_catalog_caching_and_ttl(tmp_path, monkeypatch):
 
 
 def test_catalog_offline_resilience(tmp_path, monkeypatch):
-    """Asserts that network failures, timeouts, and offline status gracefully return cached data or []."""
-    # 1. Stale cache fallback when network fails
+    """Asserts that network failures, timeouts, and offline status gracefully return cached data or bundled default catalog."""
+    # 1. Stale cache fallback when network fails (Tier 2)
     cache_file = _get_cache_path()
     stale_data = [{"id": "cached_addon", "name": "Cached Addon"}]
     with open(cache_file, "w", encoding="utf-8") as f:
@@ -129,11 +129,21 @@ def test_catalog_offline_resilience(tmp_path, monkeypatch):
         assert len(result) == 1
         assert result[0]["id"] == "cached_addon"
 
-    # 2. When no cache exists and network fails, returns empty list without raising exception
+    # 2. When no cache exists and network fails, returns bundled catalog from default_catalog.json (Tier 3)
     if os.path.isfile(cache_file):
         os.remove(cache_file)
 
     with patch("requests.get", side_effect=requests.Timeout("Connection timed out")):
+        result_bundled = fetch_catalog(force_refresh=True)
+        assert isinstance(result_bundled, list)
+        assert len(result_bundled) >= 2
+        ids = [item["id"] for item in result_bundled]
+        assert "tcg_pos" in ids
+        assert "hardware_hub" in ids
+
+    # 3. When both cache and default_catalog are empty/missing, gracefully returns [] without exception
+    with patch("requests.get", side_effect=requests.Timeout("Connection timed out")), \
+         patch("core.addons.catalog._get_bundled_catalog", return_value=[]):
         result_empty = fetch_catalog(force_refresh=True)
         assert result_empty == []
 
@@ -323,4 +333,39 @@ def test_setup_wizard_step5_optional_addons(client, monkeypatch):
     assert "Optional Integrations &amp; Addons" in html or "Optional Integrations & Addons" in html
     assert "wizardAddonsContainer" in html
     assert "loadWizardAddons" in html
-    assert "Downloading and installing" in html
+    assert "btnRefreshCatalog" in html
+    assert "Refresh Catalog" in html
+    assert "Installing" in html
+
+
+def test_extract_addon_zip_github_archive_flattening(tmp_path):
+    """Asserts that extract_addon_zip flattens GitHub branch release wrapper folders (e.g. Open-POS-TCG-main/)."""
+    from core.addons.installer import extract_addon_zip
+
+    zip_file = tmp_path / "github_archive.zip"
+    target_dir = tmp_path / "installed_addon"
+
+    manifest_data = {
+        "id": "tcg_pos",
+        "name": "TCG POS & Singles Engine",
+        "version": "1.0.0"
+    }
+
+    # Simulate GitHub zip structure with top-level folder 'Open-POS-TCG-main'
+    with zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("Open-POS-TCG-main/manifest.json", json.dumps(manifest_data))
+        zf.writestr("Open-POS-TCG-main/plugin.py", "# plugin code")
+        zf.writestr("Open-POS-TCG-main/migrations/schema_sqlite.sql", "-- migration")
+
+    extract_addon_zip(str(zip_file), str(target_dir))
+
+    # Verify manifest.json is directly at the root of target_dir, not inside Open-POS-TCG-main
+    assert os.path.isfile(os.path.join(target_dir, "manifest.json"))
+    assert os.path.isfile(os.path.join(target_dir, "plugin.py"))
+    assert os.path.isfile(os.path.join(target_dir, "migrations", "schema_sqlite.sql"))
+    assert not os.path.exists(os.path.join(target_dir, "Open-POS-TCG-main"))
+
+    with open(os.path.join(target_dir, "manifest.json"), "r", encoding="utf-8") as f:
+        loaded = json.load(f)
+        assert loaded["id"] == "tcg_pos"
+

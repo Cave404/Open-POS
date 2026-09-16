@@ -553,3 +553,9 @@ class AddonManager:
 
 # Global singleton instance
 addon_manager = AddonManager()
+
+
+def load_single_addon(addon_dir: str, dir_type: str = "custom") -> AddonRecord:
+    """Convenience helper to load and register a single addon directory into the global manager."""
+    return addon_manager.load_addon(addon_dir, dir_type=dir_type)
+

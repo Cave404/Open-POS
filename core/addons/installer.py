@@ -16,7 +16,7 @@ import requests
 from core.config import Config
 from core.db import get_db_connection
 from core.addons.catalog import get_catalog_item, fetch_catalog, is_compatible
-from core.addons.loader import addon_manager, STATE_ERROR
+from core.addons.loader import addon_manager, load_single_addon, STATE_ERROR
 
 logger = logging.getLogger(__name__)
 
@@ -60,16 +60,101 @@ def _execute_addon_migrations(addon_dir: str) -> None:
     logger.info(f"Database migration completed successfully for {sql_filename}.")
 
 
+def extract_addon_zip(zip_path: str, target_dir: str) -> Dict[str, Any]:
+    """
+    Extracts an addon zip archive with GitHub wrapper folder flattening:
+    1. Extracts into a temporary staging folder in data/cache/temp_extract/.
+    2. Inspects the extracted contents:
+       - If root contains a single directory (e.g., Open-POS-TCG-main/) and it contains manifest.json:
+         Moves the contents of that inner directory directly into target_dir.
+       - If manifest.json is already at the root of temp_extract:
+         Moves all files directly into target_dir.
+    3. Cleans up temp_extract.
+    """
+    cache_dir = getattr(Config, 'CACHE_DIR', os.path.join(Config.DATA_DIR, 'cache'))
+    temp_extract = os.path.join(cache_dir, f"temp_extract_{os.getpid()}")
+    if os.path.isdir(temp_extract):
+        shutil.rmtree(temp_extract, ignore_errors=True)
+    os.makedirs(temp_extract, exist_ok=True)
+
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            resolved_staging = os.path.realpath(temp_extract)
+            for member in zf.infolist():
+                member_path = member.filename.replace('\\', '/')
+                dest_file = os.path.join(temp_extract, *member_path.split('/'))
+                dest_real = os.path.realpath(dest_file)
+                # Zip-slip path traversal guard
+                if not (dest_real == resolved_staging or dest_real.startswith(resolved_staging + os.sep)):
+                    continue
+                if member.is_dir():
+                    os.makedirs(dest_file, exist_ok=True)
+                else:
+                    os.makedirs(os.path.dirname(dest_file), exist_ok=True)
+                    with zf.open(member) as src, open(dest_file, 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+
+        # Inspect temp_extract structure
+        entries = [e for e in os.listdir(temp_extract) if not e.startswith('.')]
+        source_dir = temp_extract
+
+        if len(entries) == 1:
+            single_entry = os.path.join(temp_extract, entries[0])
+            if os.path.isdir(single_entry) and os.path.isfile(os.path.join(single_entry, 'manifest.json')):
+                source_dir = single_entry
+        elif not os.path.isfile(os.path.join(temp_extract, 'manifest.json')):
+            for entry in entries:
+                sub = os.path.join(temp_extract, entry)
+                if os.path.isdir(sub) and os.path.isfile(os.path.join(sub, 'manifest.json')):
+                    source_dir = sub
+                    break
+
+        manifest_file = os.path.join(source_dir, 'manifest.json')
+        if not os.path.isfile(manifest_file):
+            return {
+                "status": "error",
+                "message": "Invalid addon package: manifest.json not found in ZIP archive."
+            }
+
+        try:
+            with open(manifest_file, 'r', encoding='utf-8') as mf:
+                manifest_data = json.load(mf)
+        except Exception as je:
+            return {
+                "status": "error",
+                "message": f"Invalid manifest.json inside ZIP archive: {je}"
+            }
+
+        # Clear target_dir and move files
+        if os.path.isdir(target_dir):
+            shutil.rmtree(target_dir, ignore_errors=True)
+        os.makedirs(target_dir, exist_ok=True)
+
+        for item in os.listdir(source_dir):
+            src_item = os.path.join(source_dir, item)
+            dst_item = os.path.join(target_dir, item)
+            shutil.move(src_item, dst_item)
+
+        return {
+            "status": "success",
+            "manifest": manifest_data,
+            "target_dir": target_dir
+        }
+
+    finally:
+        if os.path.isdir(temp_extract):
+            shutil.rmtree(temp_extract, ignore_errors=True)
+
+
 def install_remote_addon(addon_id: str) -> Dict[str, Any]:
     """
     Installs a remote addon by ID from the catalog:
     1. Fetches catalog entry and validates min_core_version.
     2. Downloads the .zip package to a temporary cache file.
-    3. Validates manifest.json inside archive.
-    4. Unpacks cleanly to data/custom_addons/<addon_id>/.
-    5. Executes schema migrations if requires_db is True.
-    6. Mounts and initializes the addon in addon_manager without restart.
-    7. Cleans up temp download file.
+    3. Unpacks and flattens archive to data/custom_addons/<addon_id>/ via extract_addon_zip().
+    4. Executes schema migrations if requires_db is True.
+    5. Dynamically registers addon via core.addons.loader.load_single_addon().
+    6. Cleans up temp download file.
     """
     # 1. Fetch catalog entry
     item = get_catalog_item(addon_id)
@@ -129,64 +214,17 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
             "message": f"Network error downloading addon: {str(e)}"
         }
 
-    # 4. Inspect zip contents & extract
+    # 4. Extract and flatten to data/custom_addons/<addon_id>/
     custom_dir = getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))
     os.makedirs(custom_dir, exist_ok=True)
     target_dir = os.path.join(custom_dir, addon_id)
 
     try:
-        with zipfile.ZipFile(temp_zip_path, 'r') as zf:
-            namelist = zf.namelist()
-            manifest_entry = None
-            prefix = ""
-            for name in namelist:
-                parts = name.replace('\\', '/').split('/')
-                if parts[-1] == 'manifest.json':
-                    manifest_entry = name
-                    prefix = "/".join(parts[:-1])
-                    if prefix:
-                        prefix += "/"
-                    break
+        extract_res = extract_addon_zip(temp_zip_path, target_dir)
+        if extract_res.get("status") != "success":
+            return extract_res
 
-            if not manifest_entry:
-                return {
-                    "status": "error",
-                    "message": "Invalid addon package: manifest.json not found in ZIP archive."
-                }
-
-            try:
-                with zf.open(manifest_entry) as mf:
-                    manifest_data = json.load(mf)
-            except Exception as je:
-                return {
-                    "status": "error",
-                    "message": f"Invalid manifest.json inside ZIP archive: {je}"
-                }
-
-            # Unpack cleanly with zip-slip path traversal guard
-            if os.path.isdir(target_dir):
-                shutil.rmtree(target_dir, ignore_errors=True)
-            os.makedirs(target_dir, exist_ok=True)
-
-            resolved_target = os.path.realpath(target_dir)
-            for member in zf.infolist():
-                member_path = member.filename.replace('\\', '/')
-                if prefix and member_path.startswith(prefix):
-                    rel_path = member_path[len(prefix):]
-                else:
-                    rel_path = member_path
-
-                if not rel_path or rel_path.endswith('/'):
-                    continue
-
-                dest_file = os.path.join(target_dir, *rel_path.split('/'))
-                dest_real = os.path.realpath(dest_file)
-                if not (dest_real == resolved_target or dest_real.startswith(resolved_target + os.sep)):
-                    continue
-
-                os.makedirs(os.path.dirname(dest_file), exist_ok=True)
-                with zf.open(member) as src, open(dest_file, 'wb') as dst:
-                    shutil.copyfileobj(src, dst)
+        manifest_data = extract_res.get("manifest", {})
 
         # 5. Database migrations if declared in manifest or catalog
         requires_db = bool(manifest_data.get("requires_db", item.get("requires_db", False)))
@@ -200,8 +238,8 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
                     "message": f"Database migration failed: {str(me)}"
                 }
 
-        # 6. Mount and initialize immediately
-        record = addon_manager.load_addon(target_dir, dir_type="custom")
+        # 6. Dynamically register via core.addons.loader.load_single_addon()
+        record = load_single_addon(target_dir, dir_type="custom")
         if record.status == STATE_ERROR:
             return {
                 "status": "error",
@@ -222,9 +260,10 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
             "message": f"Failed to install addon '{addon_id}': {str(exc)}"
         }
     finally:
-        # 7. Clean up temp zip
+        # 7. Clean up downloaded temp zip
         if os.path.isfile(temp_zip_path):
             try:
                 os.remove(temp_zip_path)
             except Exception:
                 pass
+

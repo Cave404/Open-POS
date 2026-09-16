@@ -4,6 +4,7 @@ OpenPOS Addon Subsystem & Plugin Architecture
 
 from core.addons.loader import (
     addon_manager,
+    load_single_addon,
     AddonManager,
     AddonRecord,
     HookBus,
@@ -11,6 +12,7 @@ from core.addons.loader import (
     STATE_DISABLED,
     STATE_ERROR
 )
+
 from core.addons.catalog import (
     fetch_catalog,
     get_catalog_item,
@@ -18,7 +20,8 @@ from core.addons.catalog import (
     DEFAULT_CATALOG_URL
 )
 from core.addons.installer import (
-    install_remote_addon
+    install_remote_addon,
+    extract_addon_zip
 )
 
 def emit_hook(event_name: str, *args, **kwargs):
@@ -27,6 +30,7 @@ def emit_hook(event_name: str, *args, **kwargs):
 
 __all__ = [
     "addon_manager",
+    "load_single_addon",
     "AddonManager",
     "AddonRecord",
     "HookBus",
@@ -38,5 +42,8 @@ __all__ = [
     "get_catalog_item",
     "is_compatible",
     "DEFAULT_CATALOG_URL",
-    "install_remote_addon"
+    "install_remote_addon",
+    "extract_addon_zip"
 ]
+
+

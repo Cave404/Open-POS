@@ -20,6 +20,11 @@
             --wizard-muted: #94a3b8;
         }
 
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -926,10 +931,16 @@
         <!-- Stage 5: Optional Integrations & Addons -->
         <!-- ================================================================= -->
         <div class="wizard-stage-card stage-5" id="stage5">
-            <h2 class="stage-title">🧩 Optional Integrations &amp; Addons</h2>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+                <h2 class="stage-title" style="margin-bottom: 0;">🧩 Optional Integrations &amp; Addons</h2>
+                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnRefreshCatalog" style="padding: 6px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
+                    <span id="refreshCatalogIcon">↻</span> Refresh Catalog
+                </button>
+            </div>
             <p class="stage-desc">
                 Select optional modular extensions to automatically download, migrate, and provision for your store.
             </p>
+
 
             <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12.5px; color: #93c5fd; display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 18px;">💡</span>
@@ -1105,13 +1116,32 @@ function showStep(step) {
 }
 
 let wizardCatalogLoaded = false;
-async function loadWizardAddons() {
-    if (wizardCatalogLoaded) return;
+async function loadWizardAddons(forceRefresh = false) {
+    if (wizardCatalogLoaded && !forceRefresh) return;
     const container = document.getElementById('wizardAddonsContainer');
     if (!container) return;
 
+    const btnRefresh = document.getElementById('btnRefreshCatalog');
+    const refreshIcon = document.getElementById('refreshCatalogIcon');
+    if (btnRefresh) {
+        btnRefresh.disabled = true;
+    }
+    if (refreshIcon) {
+        refreshIcon.style.display = 'inline-block';
+        refreshIcon.style.animation = 'spin 1s linear infinite';
+    }
+
+    if (forceRefresh) {
+        container.innerHTML = `
+            <div style="text-align: center; color: var(--wizard-muted); padding: 24px; font-size: 13px;">
+                <span>⏳ Fetching latest catalog extensions...</span>
+            </div>
+        `;
+    }
+
     try {
-        const res = await fetch('/api/addons/catalog');
+        const url = forceRefresh ? '/api/addons/catalog?refresh=1' : '/api/addons/catalog';
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const list = await res.json();
         wizardCatalogLoaded = true;
@@ -1162,6 +1192,13 @@ async function loadWizardAddons() {
                 Offline mode: Online addon catalog unavailable. You can install extensions later from System Manager.
             </div>
         `;
+    } finally {
+        if (btnRefresh) {
+            btnRefresh.disabled = false;
+        }
+        if (refreshIcon) {
+            refreshIcon.style.animation = 'none';
+        }
     }
 }
 
@@ -1454,7 +1491,7 @@ document.getElementById('btnFinishSetup').addEventListener('click', async () => 
             const item = checkedAddons[i];
             const aId = item.value;
             const aName = item.dataset.name || aId;
-            finishBtn.innerHTML = `<span>⏳</span> Downloading and installing ${aName} addon...`;
+            finishBtn.innerHTML = `<span>⏳</span> Installing ${aName}...`;
             try {
                 await fetch('/api/addons/install_remote', {
                     method: 'POST',
@@ -1535,6 +1572,12 @@ document.getElementById('btnNext4').addEventListener('click', () => {
     showStep(5);
     loadWizardAddons();
 });
+const btnRefreshCatalog = document.getElementById('btnRefreshCatalog');
+if (btnRefreshCatalog) {
+    btnRefreshCatalog.addEventListener('click', () => {
+        loadWizardAddons(true);
+    });
+}
 document.getElementById('btnBack5').addEventListener('click', () => showStep(4));
 document.getElementById('btnNext5').addEventListener('click', () => {
     showStep(6);

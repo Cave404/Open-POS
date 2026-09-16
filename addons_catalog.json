@@ -1,0 +1,28 @@
+[
+  {
+    "id": "tcg_pos",
+    "name": "TCG POS & Singles Engine",
+    "version": "1.0.0",
+    "author": "OpenPOS Community",
+    "description": "Universal trading card game intake, Scryfall MTG price syncing, polymorphic singles inventory, and buylist calculator.",
+    "category": "Desktop_Apps",
+    "icon": "cards.png",
+    "download_url": "https://github.com/Cave404/Open-POS-TCG/archive/refs/heads/main.zip",
+    "repo_url": "https://github.com/Cave404/Open-POS-TCG",
+    "requires_db": true,
+    "min_core_version": "1.0.8"
+  },
+  {
+    "id": "hardware_hub",
+    "name": "Hardware Hub & Peripheral Dispatcher",
+    "version": "1.0.0",
+    "author": "OpenPOS Community",
+    "description": "Local peripheral drivers for ESC/POS thermal receipt printers, RJ11/RJ12 cash drawer kicks, and USB/HID NFC tag scanners.",
+    "category": "Hardware",
+    "icon": "devices.png",
+    "download_url": "https://github.com/Cave404/Open-POS-Hardware-Hub/archive/refs/heads/main.zip",
+    "repo_url": "https://github.com/Cave404/Open-POS-Hardware-Hub",
+    "requires_db": false,
+    "min_core_version": "1.0.8"
+  }
+]
