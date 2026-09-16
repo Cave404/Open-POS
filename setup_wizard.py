@@ -171,10 +171,11 @@ def main():
     window = webview.create_window(
         title="OpenPOS - Initial Setup & Security Initialization",
         url=f"http://127.0.0.1:{Config.PORT}/setup",
-        width=980,
+        width=1080,
         height=800,
-        min_size=(900, 720),
+        min_size=(960, 650),
         resizable=True,
+        easy_drag=False,
         js_api=bridge
     )
     bridge.window = window

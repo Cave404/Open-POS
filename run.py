@@ -430,10 +430,11 @@ if __name__ == '__main__':
         active_window = webview.create_window(
             title="OpenPOS - Initial Setup & Security Initialization",
             url=f"http://127.0.0.1:{resolved_port}/setup",
-            width=980,
+            width=1080,
             height=800,
-            min_size=(900, 720),
+            min_size=(960, 650),
             resizable=True,
+            easy_drag=False,
             confirm_close=False,
             js_api=JSBridge()   # Expose native save dialog to wizard JS context
         )

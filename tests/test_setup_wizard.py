@@ -145,3 +145,53 @@ def test_recovery_key_sheet_formatter():
     assert "OPOS-REC-1111-2222-3333-4444-5555-6666" in doc
     assert "dummy_fernet_key_abc123" in doc
     assert "WARNING & SECURITY ADVISORY" in doc
+
+
+def test_setup_wizard_fitment_and_sticky_footer(client, monkeypatch):
+    """Asserts that setup_wizard.html implements sticky action footer, flex card, and scrollable content."""
+    monkeypatch.setattr("manager.routes.is_setup_complete", lambda: False)
+    monkeypatch.setattr("manager.routes.check_existing_installation", lambda: {"exists": False, "has_password": False, "has_keys": False})
+
+    res = client.get("/manager/setup")
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+
+    # CSS flex column structure and viewport fitment
+    assert "wizard-card" in html
+    assert "wizard-step-content" in html
+    assert "max-height: calc(100vh - 120px);" in html
+    assert "overflow-y: auto;" in html
+
+    # Sticky action footer
+    assert "wizard-footer" in html
+    assert "wizard-actions" in html
+    assert "position: sticky;" in html
+    assert "bottom: 0;" in html
+    assert "flex-shrink: 0;" in html
+
+    # Subtle scrollbars
+    assert ".wizard-step-content::-webkit-scrollbar" in html
+    assert "var(--border-color, #30363d)" in html
+    assert "border-radius: 3px;" in html
+
+
+def test_run_and_setup_window_dimensions():
+    """Asserts that run.py and setup_wizard.py configure enlarged dimensions and easy_drag=False for setup."""
+    with open("run.py", "r", encoding="utf-8") as f:
+        run_content = f.read()
+
+    with open("setup_wizard.py", "r", encoding="utf-8") as f:
+        wizard_content = f.read()
+
+    # run.py setup window
+    assert "width=1080" in run_content
+    assert "height=800" in run_content
+    assert "min_size=(960, 650)" in run_content
+    assert "easy_drag=False" in run_content
+
+    # setup_wizard.py window
+    assert "width=1080" in wizard_content
+    assert "height=800" in wizard_content
+    assert "min_size=(960, 650)" in wizard_content
+    assert "easy_drag=False" in wizard_content
+

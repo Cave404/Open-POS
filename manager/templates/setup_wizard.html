@@ -40,8 +40,10 @@
             color: var(--wizard-text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             min-height: 100vh;
+            height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
             overflow-x: hidden;
         }
 
@@ -270,27 +272,53 @@
 
         /* Wizard Content Area */
         .wizard-main {
-            flex: 1;
+            flex: 1 1 auto;
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            padding: 32px 20px;
+            padding: 16px 20px 12px 20px;
+            overflow: hidden;
+            min-height: 0;
+            box-sizing: border-box;
         }
 
+        .wizard-card,
         .wizard-stage-card {
-            background: var(--wizard-card);
-            border: 1px solid var(--wizard-border);
+            background: var(--wizard-card, #1a1d24);
+            border: 1px solid var(--wizard-border, #2d3343);
             border-radius: 12px;
             width: 100%;
-            max-width: 760px;
-            padding: 28px 32px;
+            max-width: 820px;
+            padding: 24px 28px 16px 28px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
             display: none;
+            flex-direction: column;
+            max-height: calc(100vh - 120px);
+            overflow: hidden;
             animation: fadeIn 0.25s ease-out;
+            box-sizing: border-box;
         }
 
+        .wizard-card.active,
         .wizard-stage-card.active {
-            display: block;
+            display: flex;
+        }
+
+        .wizard-step-content {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 8px; /* space for scrollbar track */
+            min-height: 0;
+        }
+
+        /* Subtle custom scrollbars */
+        .wizard-step-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        .wizard-step-content::-webkit-scrollbar-thumb {
+            background: var(--border-color, #30363d);
+            border-radius: 3px;
         }
 
         @keyframes fadeIn {
@@ -571,14 +599,21 @@
             color: #ef4444;
         }
 
-        /* Button Trays */
+        /* Button Trays & Sticky Action Footer */
+        .wizard-footer,
+        .wizard-actions,
         .wizard-btn-row {
+            flex-shrink: 0;
+            position: sticky;
+            bottom: 0;
+            background: var(--bg-card, var(--wizard-card, #161b22));
+            padding: 16px 0 4px 0;
+            border-top: 1px solid var(--border-color, var(--wizard-border, #30363d));
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            margin-top: 28px;
-            padding-top: 18px;
-            border-top: 1px solid var(--wizard-border);
+            align-items: center;
+            z-index: 10;
+            margin-top: 14px;
         }
 
         .btn-wizard {
@@ -749,37 +784,39 @@
         <!-- ================================================================= -->
         <!-- Stage 1: Welcome & Prerequisite Check -->
         <!-- ================================================================= -->
-        <div class="wizard-stage-card active stage-1" id="stage1">
-            <h2 class="stage-title">🔍 Welcome to OpenPOS</h2>
-            <p class="stage-desc">
-                Before initializing your point of sale register, we verify your system environment, database drivers, and isolated storage permissions.
-            </p>
-
-            <div class="prereq-list" id="prereqList">
-                <div style="text-align: center; color: var(--wizard-muted); padding: 24px;">
-                    Scanning runtime environment...
-                </div>
-            </div>
-
-            <!-- Auto-Pip Pipeline and Upstream Links (Active when missing components detected) -->
-            <div id="prereqActionArea" style="display: none; margin-top: 16px; padding: 16px 20px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #f87171; margin-bottom: 6px; font-size: 13.5px;">
-                    <span>⚠️</span> Required Environment Components Missing
-                </div>
-                <p style="font-size: 12.5px; color: var(--wizard-muted); margin-bottom: 12px; line-height: 1.5;">
-                    One or more required Python drivers or libraries could not be loaded. You can install missing packages automatically via the auto-pip pipeline or download upstream installers.
+        <div class="wizard-stage-card wizard-card active stage-1" id="stage1">
+            <div class="wizard-step-content">
+                <h2 class="stage-title">🔍 Welcome to OpenPOS</h2>
+                <p class="stage-desc">
+                    Before initializing your point of sale register, we verify your system environment, database drivers, and isolated storage permissions.
                 </p>
-                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                    <button type="button" class="btn-wizard btn-wizard-primary" id="btnInstallDeps" style="padding: 9px 18px; font-size: 13px;">
-                        <span>📦</span> Install Missing Components
-                    </button>
-                    <a href="https://www.python.org/downloads/" target="_blank" style="color: #60a5fa; font-size: 12px; text-decoration: underline;">Python 3.12+ Upstream &rarr;</a>
-                    <a href="https://www.postgresql.org/download/" target="_blank" style="color: #60a5fa; font-size: 12px; text-decoration: underline;">PostgreSQL Upstream &rarr;</a>
+
+                <div class="prereq-list" id="prereqList">
+                    <div style="text-align: center; color: var(--wizard-muted); padding: 24px;">
+                        Scanning runtime environment...
+                    </div>
                 </div>
-                <div id="pipInstallStatus" style="display: none; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--wizard-warning);"></div>
+
+                <!-- Auto-Pip Pipeline and Upstream Links (Active when missing components detected) -->
+                <div id="prereqActionArea" style="display: none; margin-top: 16px; padding: 16px 20px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #f87171; margin-bottom: 6px; font-size: 13.5px;">
+                        <span>⚠️</span> Required Environment Components Missing
+                    </div>
+                    <p style="font-size: 12.5px; color: var(--wizard-muted); margin-bottom: 12px; line-height: 1.5;">
+                        One or more required Python drivers or libraries could not be loaded. You can install missing packages automatically via the auto-pip pipeline or download upstream installers.
+                    </p>
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <button type="button" class="btn-wizard btn-wizard-primary" id="btnInstallDeps" style="padding: 9px 18px; font-size: 13px;">
+                            <span>📦</span> Install Missing Components
+                        </button>
+                        <a href="https://www.python.org/downloads/" target="_blank" style="color: #60a5fa; font-size: 12px; text-decoration: underline;">Python 3.12+ Upstream &rarr;</a>
+                        <a href="https://www.postgresql.org/download/" target="_blank" style="color: #60a5fa; font-size: 12px; text-decoration: underline;">PostgreSQL Upstream &rarr;</a>
+                    </div>
+                    <div id="pipInstallStatus" style="display: none; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--wizard-warning);"></div>
+                </div>
             </div>
 
-            <div class="wizard-btn-row">
+            <div class="wizard-btn-row wizard-footer wizard-actions">
                 <button type="button" class="btn-wizard btn-wizard-secondary" id="btnRescanPrereq">
                     <span>🔄</span> Re-scan Environment
                 </button>
@@ -792,34 +829,36 @@
         <!-- ================================================================= -->
         <!-- Stage 2: Store Identity -->
         <!-- ================================================================= -->
-        <div class="wizard-stage-card stage-2" id="stage2">
-            <h2 class="stage-title">🏪 Store Identity</h2>
-            <p class="stage-desc">
-                Configure your retail store name, registered legal entity, and optional receipt logo.
-            </p>
+        <div class="wizard-stage-card wizard-card stage-2" id="stage2">
+            <div class="wizard-step-content">
+                <h2 class="stage-title">🏪 Store Identity</h2>
+                <p class="stage-desc">
+                    Configure your retail store name, registered legal entity, and optional receipt logo.
+                </p>
 
-            <div class="form-group">
-                <label class="form-label" for="inputStoreName">Store Name <span style="color: var(--wizard-danger);">*</span></label>
-                <input type="text" id="inputStoreName" class="form-input" placeholder="e.g. Main Street Games" value="Main Street Games" required>
+                <div class="form-group">
+                    <label class="form-label" for="inputStoreName">Store Name <span style="color: var(--wizard-danger);">*</span></label>
+                    <input type="text" id="inputStoreName" class="form-input" placeholder="e.g. Main Street Games" value="Main Street Games" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="inputLegalName">Legal Entity Name <span class="optional">(Optional)</span></label>
+                    <input type="text" id="inputLegalName" class="form-input" placeholder="e.g. Main Street Games LLC">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="inputLocation">City, State / Region <span class="optional">(Optional)</span></label>
+                    <input type="text" id="inputLocation" class="form-input" placeholder="e.g. Austin, TX">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="inputLogoFile">Store Logo Image <span class="optional">(Optional PNG, JPG, SVG - max 2MB)</span></label>
+                    <input type="file" id="inputLogoFile" class="form-input" accept="image/png, image/jpeg, image/svg+xml, image/webp">
+                    <p id="logoUploadStatus" style="font-size: 11px; color: var(--wizard-muted); margin-top: 4px;"></p>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="inputLegalName">Legal Entity Name <span class="optional">(Optional)</span></label>
-                <input type="text" id="inputLegalName" class="form-input" placeholder="e.g. Main Street Games LLC">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="inputLocation">City, State / Region <span class="optional">(Optional)</span></label>
-                <input type="text" id="inputLocation" class="form-input" placeholder="e.g. Austin, TX">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="inputLogoFile">Store Logo Image <span class="optional">(Optional PNG, JPG, SVG - max 2MB)</span></label>
-                <input type="file" id="inputLogoFile" class="form-input" accept="image/png, image/jpeg, image/svg+xml, image/webp">
-                <p id="logoUploadStatus" style="font-size: 11px; color: var(--wizard-muted); margin-top: 4px;"></p>
-            </div>
-
-            <div class="wizard-btn-row">
+            <div class="wizard-btn-row wizard-footer wizard-actions">
                 <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack2">← Back</button>
                 <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext2">Continue to Security →</button>
             </div>
@@ -828,35 +867,37 @@
         <!-- ================================================================= -->
         <!-- Stage 3: Security & Manager Credentials -->
         <!-- ================================================================= -->
-        <div class="wizard-stage-card stage-3" id="stage3">
-            <h2 class="stage-title">🛡️ Manager Credentials</h2>
-            <p class="stage-desc">
-                Set an administrative PIN or password to govern manager settings, refunds, and rate adjustments.
-            </p>
+        <div class="wizard-stage-card wizard-card stage-3" id="stage3">
+            <div class="wizard-step-content">
+                <h2 class="stage-title">🛡️ Manager Credentials</h2>
+                <p class="stage-desc">
+                    Set an administrative PIN or password to govern manager settings, refunds, and rate adjustments.
+                </p>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label" for="inputAdminPassword">Admin Password / PIN</label>
-                    <input type="password" id="inputAdminPassword" class="form-input" placeholder="Enter secure PIN or password">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="inputAdminPassword">Admin Password / PIN</label>
+                        <input type="password" id="inputAdminPassword" class="form-input" placeholder="Enter secure PIN or password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="inputConfirmPassword">Confirm Password / PIN</label>
+                        <input type="password" id="inputConfirmPassword" class="form-input" placeholder="Re-enter password">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="inputConfirmPassword">Confirm Password / PIN</label>
-                    <input type="password" id="inputConfirmPassword" class="form-input" placeholder="Re-enter password">
+
+                <div class="form-group" style="margin-top: 10px;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="checkRequirePassword">
+                        <span>Require Manager Password to Access Settings <span style="color: var(--wizard-muted); font-size: 11px;">(Default: Off)</span></span>
+                    </label>
                 </div>
+
+                <p style="font-size: 12px; color: var(--wizard-muted); margin-top: 12px;">
+                    💡 You can leave this blank to run without a manager password during testing, or set one now.
+                </p>
             </div>
 
-            <div class="form-group" style="margin-top: 10px;">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="checkRequirePassword">
-                    <span>Require Manager Password to Access Settings <span style="color: var(--wizard-muted); font-size: 11px;">(Default: Off)</span></span>
-                </label>
-            </div>
-
-            <p style="font-size: 12px; color: var(--wizard-muted); margin-top: 12px;">
-                💡 You can leave this blank to run without a manager password during testing, or set one now.
-            </p>
-
-            <div class="wizard-btn-row">
+            <div class="wizard-btn-row wizard-footer wizard-actions">
                 <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack3">← Back</button>
                 <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext3">Continue to Database →</button>
             </div>
@@ -865,63 +906,65 @@
         <!-- ================================================================= -->
         <!-- Stage 4: Database Engine Selection -->
         <!-- ================================================================= -->
-        <div class="wizard-stage-card stage-4" id="stage4">
-            <h2 class="stage-title">💾 Database Engine</h2>
-            <p class="stage-desc">
-                Choose the storage engine for your product catalog, transactions, and trade records.
-            </p>
+        <div class="wizard-stage-card wizard-card stage-4" id="stage4">
+            <div class="wizard-step-content">
+                <h2 class="stage-title">💾 Database Engine</h2>
+                <p class="stage-desc">
+                    Choose the storage engine for your product catalog, transactions, and trade records.
+                </p>
 
-            <div class="db-cards-grid">
-                <div class="db-card selected" id="cardSqlite">
-                    <div class="db-card-header">
-                        <span class="db-card-title">SQLite (Standalone)</span>
-                        <span class="db-card-badge">RECOMMENDED</span>
+                <div class="db-cards-grid">
+                    <div class="db-card selected" id="cardSqlite">
+                        <div class="db-card-header">
+                            <span class="db-card-title">SQLite (Standalone)</span>
+                            <span class="db-card-badge">RECOMMENDED</span>
+                        </div>
+                        <p class="db-card-desc">
+                            Zero-configuration local storage stored safely in <code>data/db/pos_store.db</code>. Ideal for single-register stores and local workstations.
+                        </p>
                     </div>
-                    <p class="db-card-desc">
-                        Zero-configuration local storage stored safely in <code>data/db/pos_store.db</code>. Ideal for single-register stores and local workstations.
-                    </p>
+
+                    <div class="db-card" id="cardPostgres">
+                        <div class="db-card-header">
+                            <span class="db-card-title">PostgreSQL (Network)</span>
+                            <span class="db-card-badge">ENTERPRISE</span>
+                        </div>
+                        <p class="db-card-desc">
+                            Connects to a centralized PostgreSQL database server for multi-lane register topologies and synchronized live inventory.
+                        </p>
+                    </div>
                 </div>
 
-                <div class="db-card" id="cardPostgres">
-                    <div class="db-card-header">
-                        <span class="db-card-title">PostgreSQL (Network)</span>
-                        <span class="db-card-badge">ENTERPRISE</span>
+                <!-- Conditional PostgreSQL Inputs -->
+                <div id="postgresFields" style="display: none; background: #141720; border: 1px solid var(--wizard-border); border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="inputPgHost">Host</label>
+                            <input type="text" id="inputPgHost" class="form-input" value="127.0.0.1">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="inputPgPort">Port</label>
+                            <input type="text" id="inputPgPort" class="form-input" value="5432">
+                        </div>
                     </div>
-                    <p class="db-card-desc">
-                        Connects to a centralized PostgreSQL database server for multi-lane register topologies and synchronized live inventory.
-                    </p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="inputPgDb">Database Name</label>
+                            <input type="text" id="inputPgDb" class="form-input" value="pos_store">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="inputPgUser">User</label>
+                            <input type="text" id="inputPgUser" class="form-input" value="postgres">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="inputPgPassword">Password</label>
+                        <input type="password" id="inputPgPassword" class="form-input" placeholder="Database user password">
+                    </div>
                 </div>
             </div>
 
-            <!-- Conditional PostgreSQL Inputs -->
-            <div id="postgresFields" style="display: none; background: #141720; border: 1px solid var(--wizard-border); border-radius: 8px; padding: 18px; margin-bottom: 20px;">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="inputPgHost">Host</label>
-                        <input type="text" id="inputPgHost" class="form-input" value="127.0.0.1">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="inputPgPort">Port</label>
-                        <input type="text" id="inputPgPort" class="form-input" value="5432">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="inputPgDb">Database Name</label>
-                        <input type="text" id="inputPgDb" class="form-input" value="pos_store">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="inputPgUser">User</label>
-                        <input type="text" id="inputPgUser" class="form-input" value="postgres">
-                    </div>
-                </div>
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="inputPgPassword">Password</label>
-                    <input type="password" id="inputPgPassword" class="form-input" placeholder="Database user password">
-                </div>
-            </div>
-
-            <div class="wizard-btn-row">
+            <div class="wizard-btn-row wizard-footer wizard-actions">
                 <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack4">← Back</button>
                 <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext4">Choose Addons →</button>
             </div>
@@ -930,30 +973,32 @@
         <!-- ================================================================= -->
         <!-- Stage 5: Optional Integrations & Addons -->
         <!-- ================================================================= -->
-        <div class="wizard-stage-card stage-5" id="stage5">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
-                <h2 class="stage-title" style="margin-bottom: 0;">🧩 Optional Integrations &amp; Addons</h2>
-                <button type="button" class="btn-wizard btn-wizard-secondary" id="btnRefreshCatalog" style="padding: 6px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
-                    <span id="refreshCatalogIcon">↻</span> Refresh Catalog
-                </button>
-            </div>
-            <p class="stage-desc">
-                Select optional modular extensions to automatically download, migrate, and provision for your store.
-            </p>
+        <div class="wizard-stage-card wizard-card stage-5" id="stage5">
+            <div class="wizard-step-content">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+                    <h2 class="stage-title" style="margin-bottom: 0;">🧩 Optional Integrations &amp; Addons</h2>
+                    <button type="button" class="btn-wizard btn-wizard-secondary" id="btnRefreshCatalog" style="padding: 6px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
+                        <span id="refreshCatalogIcon">↻</span> Refresh Catalog
+                    </button>
+                </div>
+                <p class="stage-desc">
+                    Select optional modular extensions to automatically download, migrate, and provision for your store.
+                </p>
 
 
-            <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12.5px; color: #93c5fd; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 18px;">💡</span>
-                <span>You can also install or remove addons at any time from the System Manager.</span>
-            </div>
+                <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12.5px; color: #93c5fd; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">💡</span>
+                    <span>You can also install or remove addons at any time from the System Manager.</span>
+                </div>
 
-            <div id="wizardAddonsContainer" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
-                <div style="text-align: center; color: var(--wizard-muted); padding: 24px; font-size: 13px;">
-                    <span>⏳ Loading available catalog extensions...</span>
+                <div id="wizardAddonsContainer" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
+                    <div style="text-align: center; color: var(--wizard-muted); padding: 24px; font-size: 13px;">
+                        <span>⏳ Loading available catalog extensions...</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="wizard-btn-row">
+            <div class="wizard-btn-row wizard-footer wizard-actions">
                 <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack5">← Back</button>
                 <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext5">Initialize Encryption →</button>
             </div>
@@ -962,34 +1007,36 @@
         <!-- ================================================================= -->
         <!-- Stage 6: Cryptography & Initialization -->
         <!-- ================================================================= -->
-        <div class="wizard-stage-card stage-6" id="stage6">
-            <h2 class="stage-title">🔐 Cryptographic Initialization</h2>
-            <p class="stage-desc">
-                Generating symmetric Fernet encryption keys, Flask session keys, and running persistence roundtrip verification.
-            </p>
+        <div class="wizard-stage-card wizard-card stage-6" id="stage6">
+            <div class="wizard-step-content">
+                <h2 class="stage-title">🔐 Cryptographic Initialization</h2>
+                <p class="stage-desc">
+                    Generating symmetric Fernet encryption keys, Flask session keys, and running persistence roundtrip verification.
+                </p>
 
-            <div class="crypto-card">
-                <div class="crypto-row">
-                    <span>Symmetric Fernet Key (32-byte):</span>
-                    <span class="crypto-mono" id="dispFernetKey">Generating...</span>
+                <div class="crypto-card">
+                    <div class="crypto-row">
+                        <span>Symmetric Fernet Key (32-byte):</span>
+                        <span class="crypto-mono" id="dispFernetKey">Generating...</span>
+                    </div>
+                    <div class="crypto-row">
+                        <span>Flask Secret Token (32-byte):</span>
+                        <span class="crypto-mono" id="dispSecretKey">Generating...</span>
+                    </div>
+                    <div class="crypto-row">
+                        <span>Storage Engine:</span>
+                        <span class="crypto-mono" id="dispEngine">SQLite (data/db/pos_store.db)</span>
+                    </div>
+                    <div class="crypto-row">
+                        <span>Roundtrip Integrity Status:</span>
+                        <span id="dispRoundtripStatus" style="font-weight: 700; color: var(--wizard-warning);">Testing...</span>
+                    </div>
                 </div>
-                <div class="crypto-row">
-                    <span>Flask Secret Token (32-byte):</span>
-                    <span class="crypto-mono" id="dispSecretKey">Generating...</span>
-                </div>
-                <div class="crypto-row">
-                    <span>Storage Engine:</span>
-                    <span class="crypto-mono" id="dispEngine">SQLite (data/db/pos_store.db)</span>
-                </div>
-                <div class="crypto-row">
-                    <span>Roundtrip Integrity Status:</span>
-                    <span id="dispRoundtripStatus" style="font-weight: 700; color: var(--wizard-warning);">Testing...</span>
-                </div>
+
+                <div id="cryptoErrorMsg" style="display: none; color: var(--wizard-danger); font-size: 13px; margin-bottom: 16px;"></div>
             </div>
 
-            <div id="cryptoErrorMsg" style="display: none; color: var(--wizard-danger); font-size: 13px; margin-bottom: 16px;"></div>
-
-            <div class="wizard-btn-row">
+            <div class="wizard-btn-row wizard-footer wizard-actions">
                 <button type="button" class="btn-wizard btn-wizard-secondary" id="btnBack6">← Back</button>
                 <button type="button" class="btn-wizard btn-wizard-primary" id="btnNext6" disabled>
                     View Recovery Key Sheet →
@@ -1000,82 +1047,84 @@
         <!-- ================================================================= -->
         <!-- Stage 7: Printable Recovery Key Sheet & Permanent Handoff -->
         <!-- ================================================================= -->
-        <div class="wizard-stage-card stage-7" id="stage7">
-            <h2 class="stage-title">📜 Emergency Recovery Sheet</h2>
-            <p class="stage-desc">
-                Save or print your Master Recovery Key. This token is required to recover encrypted store databases if your password is forgotten.
-            </p>
+        <div class="wizard-stage-card wizard-card stage-7" id="stage7">
+            <div class="wizard-step-content">
+                <h2 class="stage-title">📜 Emergency Recovery Sheet</h2>
+                <p class="stage-desc">
+                    Save or print your Master Recovery Key. This token is required to recover encrypted store databases if your password is forgotten.
+                </p>
 
-            <div class="recovery-key-card">
-                <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700;">
-                    Master Emergency Recovery Token
-                </div>
-                <div class="recovery-token-display" id="dispRecoveryToken">
-                    OPOS-REC-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
-                </div>
-                <div style="display: flex; justify-content: center; gap: 12px; margin-top: 12px;">
-                    <button type="button" class="btn-wizard btn-wizard-secondary" id="btnDownloadRecoveryFile">
-                        <span>💾</span> Save Recovery File (.txt)
-                    </button>
-                    <button type="button" class="btn-wizard btn-wizard-secondary" id="btnPrintRecoverySheet">
-                        <span>🖨️</span> Print Recovery Sheet
-                    </button>
-                </div>
-            </div>
-
-            <div class="warning-notice">
-                <strong>CRITICAL SECURITY WARNING:</strong>
-                This recovery key will <strong>NEVER</strong> be shown again after setup is completed. OpenPOS developers do not possess a backdoor and cannot restore your database if this key is lost. Please store it on an offline drive or paper printout in a safe.
-            </div>
-
-            <!-- Dedicated Printable Document Layout (Active during print via #printableRecoverySheet) -->
-            <div id="printableRecoverySheet" style="display: none;">
-                <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 16px;">
-                    <h2 style="font-size: 20px; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">OPEN-POS EMERGENCY SYSTEM RECOVERY KEY</h2>
-                    <div style="font-size: 11px; color: #444444; margin-top: 4px; font-weight: 600; letter-spacing: 0.5px;">CONFIDENTIAL MASTER CREDENTIALS &bull; STORE IN SECURE OFFLINE VAULT</div>
-                </div>
-                <div style="border: 1px solid #999999; padding: 12px 16px; margin-bottom: 16px; background: #f8fafc; font-size: 13px; line-height: 1.6;">
-                    <div><strong>Store Name:</strong> <span id="printStoreName">Store</span></div>
-                    <div><strong>Generated:</strong> <span id="printDate">&#8212;</span></div>
-                    <div><strong>System Version:</strong> v1.0.9</div>
-                </div>
-                <div style="margin-bottom: 14px;">
-                    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Master Emergency Recovery Token:</div>
-                    <div id="printTokenVal" style="font-family: Consolas, monospace; font-size: 16px; font-weight: 700; padding: 10px 14px; border: 2px solid #000000; background: #f1f5f9; text-align: center; letter-spacing: 1.5px;">OPOS-REC-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX</div>
-                </div>
-                <div style="margin-bottom: 16px;">
-                    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Symmetric Fernet Encryption Key:</div>
-                    <div id="printFernetVal" style="font-family: Consolas, monospace; font-size: 11px; padding: 8px 12px; border: 1px solid #999999; word-break: break-all; background: #f8fafc;">&#8212;</div>
-                </div>
-                <div style="border-top: 1px solid #000000; padding-top: 12px; font-size: 12px; line-height: 1.6;">
-                    <strong style="text-transform: uppercase; letter-spacing: 0.5px;">Recovery Instructions &amp; Safe Storage Protocol:</strong>
-                    <ol style="margin-top: 6px; padding-left: 20px; font-size: 11.5px;">
-                        <li><strong>Physical Vault Storage:</strong> File this document immediately in a locked fireproof vault or manager safe. Do not leave exposed on the counter.</li>
-                        <li><strong>Administrative Password Reset:</strong> If the administrator PIN or manager password is forgotten, this recovery token must be entered to reset credentials.</li>
-                        <li><strong>Cryptographic Data Protection:</strong> All local sales, customer data, and store inventory records are encrypted with this Fernet key.</li>
-                        <li><strong>Zero Knowledge Protocol:</strong> OpenPOS developers and support staff do not possess duplicate keys and cannot restore store records if this sheet is lost.</li>
-                    </ol>
-                </div>
-                <div style="margin-top: 20px; border-top: 1px solid #000000; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #555555;">
-                    <span>Open-POS &bull; Cryptographic Hardware &amp; Vault Recovery Sheet</span>
-                    <span>Page 1 of 1</span>
-                </div>
-            </div>
-
-            <!-- Automated Windows Desktop Shortcut Confirmation Notice -->
-            <div class="shortcut-notice-card" style="margin-top: 18px; padding: 14px 18px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; display: flex; align-items: flex-start; gap: 12px;">
-                <span style="font-size: 22px; line-height: 1;">🖥️</span>
-                <div>
-                    <div style="font-size: 13px; font-weight: 700; color: #93c5fd; margin-bottom: 2px;">
-                        A desktop shortcut 'OpenPOS' has been created on your Windows Desktop.
+                <div class="recovery-key-card">
+                    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700;">
+                        Master Emergency Recovery Token
                     </div>
-                    <div style="font-size: 12px; color: var(--wizard-muted); line-height: 1.5;">
-                        You can double-click OpenPOS on your desktop or run Open_POS.vbs at any time to launch the system silently.
+                    <div class="recovery-token-display" id="dispRecoveryToken">
+                        OPOS-REC-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 12px; margin-top: 12px;">
+                        <button type="button" class="btn-wizard btn-wizard-secondary" id="btnDownloadRecoveryFile">
+                            <span>💾</span> Save Recovery File (.txt)
+                        </button>
+                        <button type="button" class="btn-wizard btn-wizard-secondary" id="btnPrintRecoverySheet">
+                            <span>🖨️</span> Print Recovery Sheet
+                        </button>
                     </div>
                 </div>
+
+                <div class="warning-notice">
+                    <strong>CRITICAL SECURITY WARNING:</strong>
+                    This recovery key will <strong>NEVER</strong> be shown again after setup is completed. OpenPOS developers do not possess a backdoor and cannot restore your database if this key is lost. Please store it on an offline drive or paper printout in a safe.
+                </div>
+
+                <!-- Dedicated Printable Document Layout (Active during print via #printableRecoverySheet) -->
+                <div id="printableRecoverySheet" style="display: none;">
+                    <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 16px;">
+                        <h2 style="font-size: 20px; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">OPEN-POS EMERGENCY SYSTEM RECOVERY KEY</h2>
+                        <div style="font-size: 11px; color: #444444; margin-top: 4px; font-weight: 600; letter-spacing: 0.5px;">CONFIDENTIAL MASTER CREDENTIALS &bull; STORE IN SECURE OFFLINE VAULT</div>
+                    </div>
+                    <div style="border: 1px solid #999999; padding: 12px 16px; margin-bottom: 16px; background: #f8fafc; font-size: 13px; line-height: 1.6;">
+                        <div><strong>Store Name:</strong> <span id="printStoreName">Store</span></div>
+                        <div><strong>Generated:</strong> <span id="printDate">&#8212;</span></div>
+                        <div><strong>System Version:</strong> v1.0.9</div>
+                    </div>
+                    <div style="margin-bottom: 14px;">
+                        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Master Emergency Recovery Token:</div>
+                        <div id="printTokenVal" style="font-family: Consolas, monospace; font-size: 16px; font-weight: 700; padding: 10px 14px; border: 2px solid #000000; background: #f1f5f9; text-align: center; letter-spacing: 1.5px;">OPOS-REC-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX</div>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Symmetric Fernet Encryption Key:</div>
+                        <div id="printFernetVal" style="font-family: Consolas, monospace; font-size: 11px; padding: 8px 12px; border: 1px solid #999999; word-break: break-all; background: #f8fafc;">&#8212;</div>
+                    </div>
+                    <div style="border-top: 1px solid #000000; padding-top: 12px; font-size: 12px; line-height: 1.6;">
+                        <strong style="text-transform: uppercase; letter-spacing: 0.5px;">Recovery Instructions &amp; Safe Storage Protocol:</strong>
+                        <ol style="margin-top: 6px; padding-left: 20px; font-size: 11.5px;">
+                            <li><strong>Physical Vault Storage:</strong> File this document immediately in a locked fireproof vault or manager safe. Do not leave exposed on the counter.</li>
+                            <li><strong>Administrative Password Reset:</strong> If the administrator PIN or manager password is forgotten, this recovery token must be entered to reset credentials.</li>
+                            <li><strong>Cryptographic Data Protection:</strong> All local sales, customer data, and store inventory records are encrypted with this Fernet key.</li>
+                            <li><strong>Zero Knowledge Protocol:</strong> OpenPOS developers and support staff do not possess duplicate keys and cannot restore store records if this sheet is lost.</li>
+                        </ol>
+                    </div>
+                    <div style="margin-top: 20px; border-top: 1px solid #000000; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #555555;">
+                        <span>Open-POS &bull; Cryptographic Hardware &amp; Vault Recovery Sheet</span>
+                        <span>Page 1 of 1</span>
+                    </div>
+                </div>
+
+                <!-- Automated Windows Desktop Shortcut Confirmation Notice -->
+                <div class="shortcut-notice-card" style="margin-top: 18px; padding: 14px 18px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; display: flex; align-items: flex-start; gap: 12px;">
+                    <span style="font-size: 22px; line-height: 1;">🖥️</span>
+                    <div>
+                        <div style="font-size: 13px; font-weight: 700; color: #93c5fd; margin-bottom: 2px;">
+                            A desktop shortcut 'OpenPOS' has been created on your Windows Desktop.
+                        </div>
+                        <div style="font-size: 12px; color: var(--wizard-muted); line-height: 1.5;">
+                            You can double-click OpenPOS on your desktop or run Open_POS.vbs at any time to launch the system silently.
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="wizard-btn-row">
+            <div class="wizard-btn-row wizard-footer wizard-actions">
                 <span style="font-size: 12px; color: var(--wizard-muted);">Step 7 of 7 Complete</span>
                 <button type="button" class="btn-wizard btn-wizard-success" id="btnFinishSetup">
                     <span>🚀</span> Finish Setup &amp; Launch OpenPOS
@@ -1105,6 +1154,10 @@ function showStep(step) {
         const ind = document.getElementById(`stepIndicator${i}`);
         if (card) {
             card.classList.toggle('active', i === step);
+            if (i === step) {
+                const stepContent = card.querySelector('.wizard-step-content');
+                if (stepContent) stepContent.scrollTop = 0;
+            }
         }
         if (ind) {
             ind.classList.remove('active', 'completed');
