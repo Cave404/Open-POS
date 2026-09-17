@@ -1918,7 +1918,7 @@
 
             const countSpan = document.createElement('span');
             countSpan.className = 'reload-countdown';
-            let countdown = 3;
+            let countdown = 1;
             countSpan.textContent = countdown;
 
             const sSpan = document.createElement('span');
@@ -1928,11 +1928,10 @@
             banner.append(msgSpan, labelSpan, countSpan, sSpan);
             document.body.prepend(banner);
 
-            const interval = setInterval(() => {
-                countdown--;
-                countSpan.textContent = countdown;
-                if (countdown <= 0) {
-                    clearInterval(interval);
+            setTimeout(() => {
+                if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.reload_window === 'function') {
+                    window.pywebview.api.reload_window();
+                } else {
                     window.location.reload();
                 }
             }, 1000);

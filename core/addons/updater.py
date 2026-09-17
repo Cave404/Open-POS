@@ -330,6 +330,7 @@ def update_addon(addon_id: str, app=None) -> Dict[str, Any]:
         addon_logger.info(f"Addon '{addon_id}' updated successfully to v{record.version}.")
         return {
             "status": "success",
+            "success": True,
             "message": (
                 "Addon configured. Reloading engine..."
                 if record.reload_required
@@ -458,6 +459,7 @@ def rollback_addon(addon_id: str, snapshot_name: Optional[str] = None, app=None)
     addon_logger.info(f"Addon '{addon_id}' successfully reverted to snapshot '{target_snapshot['snapshot_id']}' (v{record.version}).")
     return {
         "status": "success",
+        "success": True,
         "message": (
             "Addon configured. Reloading engine..."
             if record.reload_required

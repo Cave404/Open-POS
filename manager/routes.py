@@ -443,6 +443,8 @@ def api_uninstall_addon(addon_id):
     """Uninstalls a custom addon from data/custom_addons/ and removes from registry."""
     from core.addons import addon_manager
     result = addon_manager.uninstall_addon(addon_id)
+    if result.get("success"):
+        result["reload_required"] = True
     status_code = 200 if result.get('success') else 400
     return jsonify(result), status_code
 
@@ -518,16 +520,21 @@ def api_get_addons_catalog():
 
 @api_bp.route('/addons/install_remote', methods=['POST'])
 @manager_bp.route('/api/addons/install_remote', methods=['POST'])
+@api_bp.route('/addons/install', methods=['POST'])
+@manager_bp.route('/api/addons/install', methods=['POST'])
 def api_install_remote_addon():
     """Downloads and installs a remote addon by ID from the catalog."""
     data = request.get_json(silent=True) or {}
     addon_id = data.get('addon_id') or request.form.get('addon_id')
     if not addon_id:
-        return jsonify({"status": "error", "message": "Missing 'addon_id' in request."}), 400
+        return jsonify({"status": "error", "success": False, "message": "Missing 'addon_id' in request."}), 400
 
     from core.addons.installer import install_remote_addon
     result = install_remote_addon(addon_id)
-    status_code = 200 if result.get("status") == "success" else 400
+    result["success"] = (result.get("status") == "success" or result.get("success") is True)
+    if result["success"]:
+        result["reload_required"] = result.get("reload_required", True)
+    status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
 
@@ -540,10 +547,14 @@ def api_update_addon(addon_id):
     try:
         app_obj = current_app._get_current_object() if hasattr(current_app, '_get_current_object') else current_app
         res = update_addon(addon_id, app=app_obj)
+        res["success"] = (res.get("status") == "success" or res.get("success") is True)
+        if res["success"]:
+            res["reload_required"] = res.get("reload_required", True)
         return jsonify(res), 200
     except Exception as e:
         return jsonify({
             "status": "error",
+            "success": False,
             "message": str(e),
             "addon_id": addon_id
         }), 400

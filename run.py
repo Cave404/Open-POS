@@ -196,6 +196,18 @@ class JSBridge:
         """Returns the current Open-POS version string (used by JS diagnostics)."""
         return Config.VERSION
 
+    def reload_window(self) -> dict:
+        """Reloads the active pywebview window to refresh addon blueprints and routes."""
+        try:
+            win = getattr(self, '_window', None) or (webview.windows[0] if webview.windows else None)
+            if win:
+                current_url = win.get_current_url() or f"http://127.0.0.1:{Config.PORT}/manager/addons"
+                win.load_url(current_url)
+                return {"status": "success"}
+            return {"status": "error", "message": "No active pywebview window available."}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
 
 # -----------------------------------------------------------------------------
 # 1. Background Web Server Worker & Dynamic Port Fallback

@@ -266,6 +266,7 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
 
         return {
             "status": "success",
+            "success": True,
             "message": (
                 "Addon configured. Reloading engine..."
                 if record.reload_required

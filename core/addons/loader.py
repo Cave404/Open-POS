@@ -132,6 +132,7 @@ class AddonManager:
     def init_app(self, app: Flask) -> None:
         """Binds the Flask application instance and executes initial discovery and registration."""
         self.app = app
+        self._initialized = False
         self.discover_and_load_all()
         self._initialized = True
 
@@ -438,9 +439,36 @@ class AddonManager:
         sys.modules[package_name] = module
         sys.modules[f"openpos_addon_{record.id}"] = module
 
-        # Execute the entrypoint (runs plugin.py top-level code)
-        spec.loader.exec_module(module)  # type: ignore[union-attr]
-        record.module = module
+        # Collect top-level item names inside the addon directory (e.g. 'routes', 'services')
+        addon_local_names = set()
+        try:
+            for item in os.listdir(addon_dir_str):
+                base, _ = os.path.splitext(item)
+                if base and base != '__init__':
+                    addon_local_names.add(base)
+        except Exception:
+            pass
+
+        # Temporarily isolate sys.modules and sys.path for any names this addon might define
+        saved_modules = {name: sys.modules.get(name) for name in addon_local_names if name in sys.modules}
+        for name in addon_local_names:
+            sys.modules.pop(name, None)
+
+        orig_sys_path = list(sys.path)
+        sys.path.insert(0, addon_dir_str)
+        try:
+            # Execute the entrypoint (runs plugin.py top-level code)
+            spec.loader.exec_module(module)  # type: ignore[union-attr]
+            record.module = module
+        finally:
+            # Guarantee individual addon path is removed from sys.path immediately after execution
+            sys.path[:] = orig_sys_path
+            # Restore saved sys.modules or purge unnamespaced leaked top-level modules
+            for name in addon_local_names:
+                if name in saved_modules:
+                    sys.modules[name] = saved_modules[name]
+                else:
+                    sys.modules.pop(name, None)
 
         # ── 6. Call optional addon initialisation hooks
         if target_app is not None:
@@ -455,10 +483,20 @@ class AddonManager:
             bp = module.blueprint
         elif hasattr(module, 'bp') and isinstance(module.bp, Blueprint):
             bp = module.bp
+        elif hasattr(module, 'addon_bp') and isinstance(module.addon_bp, Blueprint):
+            bp = module.addon_bp
+        elif hasattr(module, 'plugin_bp') and isinstance(module.plugin_bp, Blueprint):
+            bp = module.plugin_bp
         elif hasattr(module, 'get_blueprint') and callable(module.get_blueprint):
             candidate = module.get_blueprint()
             if isinstance(candidate, Blueprint):
                 bp = candidate
+        if bp is None:
+            for attr_name in dir(module):
+                val = getattr(module, attr_name, None)
+                if isinstance(val, Blueprint):
+                    bp = val
+                    break
 
         if bp is None:
             return
@@ -470,17 +508,16 @@ class AddonManager:
 
         # ── 8. Blueprint registration / deferral
         #
-        # Pre-startup  (_initialized=False): register normally — the Flask app
-        #   has not yet handled any requests so blueprint mutations are safe.
-        #
-        # Post-startup (_initialized=True): Flask raises AssertionError if we
-        #   call before_request() or register_blueprint() on a live app.  Skip
-        #   registration and set reload_required so the caller can tell the
-        #   frontend to trigger a WSGI engine restart.
-        if self._initialized:
+        # If the Flask engine is live (already serving requests) or the blueprint
+        # has already been registered on this app, attempting to register or add
+        # before_request hooks raises Flask's AssertionError.  Skip registration
+        # and set reload_required so the caller can return {reload_required: true}
+        # and trigger a WSGI reload.
+        is_live = getattr(target_app, '_got_first_request', False) or (bp.name in target_app.blueprints)
+        if is_live:
             record.reload_required = True
             logger.info(
-                f"Addon '{record.id}' loaded post-startup — "
+                f"Addon '{record.id}' loaded while engine is live — "
                 f"blueprint registration deferred to next engine reload."
             )
             return
