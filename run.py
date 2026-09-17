@@ -37,7 +37,11 @@ from pystray import MenuItem as item
 from core.config import Config, REQUIRED_DATA_DIRS
 from core.boot import run_boot_sequence
 from core.setup import is_setup_complete
+from core.logger import install_global_excepthooks
 from app import create_app
+
+# Install global exception hooks immediately upon boot
+install_global_excepthooks()
 
 
 # -----------------------------------------------------------------------------

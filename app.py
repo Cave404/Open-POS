@@ -55,11 +55,20 @@ def create_app():
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-    # Global Error Handlers - Eliminate raw dead-end error pages
-    from flask import request
+    # Global Error Handlers - Centralized Logging & Resilient Feedback
+    from flask import request, jsonify
+    from core.logger import logger, install_global_excepthooks
+
+    install_global_excepthooks()
 
     @app.errorhandler(404)
     def handle_404(err):
+        if request.path.startswith('/api/') or request.path.startswith('/manager/api/') or request.is_json:
+            return jsonify({
+                "error": "Not Found",
+                "detail": "The requested API endpoint does not exist.",
+                "path": getattr(request, 'path', '')
+            }), 404
         return render_template('error.html',
             error_code=404,
             error_title="Page or Endpoint Not Found",
@@ -69,6 +78,29 @@ def create_app():
 
     @app.errorhandler(500)
     def handle_500(err):
+        logger.error(f"Internal Server Error on {getattr(request, 'path', '')}: {err}", exc_info=True)
+        if request.path.startswith('/api/') or request.path.startswith('/manager/api/') or request.is_json:
+            return jsonify({
+                "error": "Internal Server Error",
+                "detail": str(err),
+                "path": getattr(request, 'path', '')
+            }), 500
+        return render_template('error.html',
+            error_code=500,
+            error_title="Internal Server Failure",
+            error_message="An unexpected error occurred while processing your request.",
+            request_path=getattr(request, 'path', '')
+        ), 500
+
+    @app.errorhandler(Exception)
+    def handle_unhandled_exception(e):
+        logger.error(f"Unhandled HTTP Exception on {getattr(request, 'path', '')}: {e}", exc_info=True)
+        if request.path.startswith('/api/') or request.path.startswith('/manager/api/') or request.is_json:
+            return jsonify({
+                "error": "Internal Server Error",
+                "detail": str(e),
+                "path": getattr(request, 'path', '')
+            }), 500
         return render_template('error.html',
             error_code=500,
             error_title="Internal Server Failure",

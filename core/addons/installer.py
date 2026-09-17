@@ -6,10 +6,12 @@ and dynamically mounting blueprints.
 """
 
 import os
+import sys
 import json
 import shutil
 import logging
 import zipfile
+from pathlib import Path
 from typing import Dict, Any
 import requests
 
@@ -225,6 +227,14 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
             return extract_res
 
         manifest_data = extract_res.get("manifest", {})
+
+        # Ensure addon directory and custom_addons root are injected into sys.path
+        target_dir_str = str(Path(target_dir).resolve())
+        if target_dir_str not in sys.path:
+            sys.path.insert(0, target_dir_str)
+        custom_root_str = str(Path(custom_dir).resolve())
+        if custom_root_str not in sys.path:
+            sys.path.insert(1, custom_root_str)
 
         # 5. Database migrations if declared in manifest or catalog
         requires_db = bool(manifest_data.get("requires_db", item.get("requires_db", False)))

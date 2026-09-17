@@ -5,6 +5,7 @@ import logging
 import importlib
 import importlib.util
 import traceback
+from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
 from flask import Flask, Blueprint, jsonify
 
@@ -81,6 +82,11 @@ class AddonRecord:
         self.module = None
         self.blueprint: Optional[Blueprint] = None
         self.hooks: Dict[str, Callable] = {}
+
+    def __getattr__(self, name: str) -> Any:
+        if self.module is not None and hasattr(self.module, name):
+            return getattr(self.module, name)
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -162,10 +168,13 @@ class AddonManager:
 
         return self.addons
 
-    def load_addon(self, addon_dir: str, dir_type: str = "builtin") -> AddonRecord:
+    def load_addon(self, addon_dir: str, dir_type: str = "builtin", app: Optional[Flask] = None) -> AddonRecord:
         """
         Loads, validates, migrates, and registers a single addon with full error containment.
         """
+        if app is not None and self.app is None:
+            self.app = app
+
         manifest_path = os.path.join(addon_dir, 'manifest.json')
         addon_id = os.path.basename(addon_dir)
 
@@ -201,7 +210,7 @@ class AddonManager:
             if record.requires_db:
                 self._run_migrations(record)
 
-            self._mount_blueprint(record)
+            self._mount_blueprint(record, app=app)
             self._register_hooks(record)
 
             if record.enabled:
@@ -285,26 +294,71 @@ class AddonManager:
         except Exception as e:
             raise RuntimeError(f"Migration script '{sql_filename}' failed for addon '{record.id}': {e}")
 
-    def _mount_blueprint(self, record: AddonRecord) -> None:
+    def _mount_blueprint(self, record: AddonRecord, app: Optional[Flask] = None) -> None:
         """
         Dynamically imports the entrypoint file and mounts its Flask Blueprint under /addons/<addon_id>/.
+        Supports direct imports (import routes) and relative imports (from .routes import ...).
         Adds an automatic enabled-status guard to return 503 if the addon is toggled off.
         """
+        target_app = app or self.app
+
+        addon_dir_path = Path(record.dir_path).resolve()
+        addon_dir_str = str(addon_dir_path)
+
+        # 1. Prepend addon directory to sys.path at index 0 for direct imports (e.g., `import routes`)
+        if addon_dir_str in sys.path:
+            sys.path.remove(addon_dir_str)
+        sys.path.insert(0, addon_dir_str)
+
+        # 2. Ensure data/custom_addons root is on sys.path for package imports
+        custom_addons_root = str(Path(getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))).resolve())
+        if custom_addons_root not in sys.path:
+            sys.path.insert(1, custom_addons_root)
+
+        # 3. Ensure builtin addons root is on sys.path
+        builtin_addons_root = str(Path(Config.BASE_DIR, 'addons').resolve())
+        if builtin_addons_root not in sys.path:
+            sys.path.insert(2, builtin_addons_root)
+
         entrypoint_file = os.path.join(record.dir_path, record.entrypoint)
         if not os.path.isfile(entrypoint_file):
             raise FileNotFoundError(f"Addon entrypoint file '{record.entrypoint}' not found at {entrypoint_file}")
 
+        # 4. Clean cached module instances if reloading
+        for mod_name in list(sys.modules.keys()):
+            if (
+                mod_name == record.id
+                or mod_name.startswith(f"{record.id}.")
+                or mod_name == f"openpos_addon_{record.id}"
+                or mod_name.startswith(f"openpos_addon_{record.id}.")
+            ):
+                del sys.modules[mod_name]
+
         module_name = f"openpos_addon_{record.id}"
-        spec = importlib.util.spec_from_file_location(module_name, entrypoint_file)
+        spec = importlib.util.spec_from_file_location(
+            record.id,
+            entrypoint_file,
+            submodule_search_locations=[addon_dir_str]
+        )
         if spec is None or spec.loader is None:
             raise ImportError(f"Cannot create module spec for '{entrypoint_file}'")
 
         module = importlib.util.module_from_spec(spec)
+        module.__package__ = record.id
+        module.__path__ = [addon_dir_str]
+        sys.modules[record.id] = module
         sys.modules[module_name] = module
 
         # Execute entrypoint module in isolated namespace
         spec.loader.exec_module(module)
         record.module = module
+
+        # If addon exposes register_addon(app) or setup(app), initialize it
+        if target_app is not None:
+            if hasattr(module, "register_addon") and callable(module.register_addon):
+                module.register_addon(target_app)
+            elif hasattr(module, "setup") and callable(module.setup):
+                module.setup(target_app)
 
         # Locate Flask Blueprint
         bp = None
@@ -335,21 +389,21 @@ class AddonManager:
             bp.before_request(make_guard(addon_id))
 
             # Register on Flask app if bound
-            if self.app is not None:
+            if target_app is not None:
                 # Check if blueprint is already registered
-                if bp.name not in self.app.blueprints:
+                if bp.name not in target_app.blueprints:
                     prefix = f"/addons/{record.id}"
-                    was_handled = getattr(self.app, '_got_first_request', False)
+                    was_handled = getattr(target_app, '_got_first_request', False)
                     if was_handled:
-                        self.app._got_first_request = False
+                        target_app._got_first_request = False
                     try:
-                        self.app.register_blueprint(bp, url_prefix=prefix)
+                        target_app.register_blueprint(bp, url_prefix=prefix)
                         logger.info(f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{prefix}'.")
                     except Exception as bpe:
                         logger.warning(f"Could not register dynamic blueprint '{bp.name}' directly: {bpe}")
                     finally:
                         if was_handled:
-                            self.app._got_first_request = True
+                            target_app._got_first_request = True
 
     def _register_hooks(self, record: AddonRecord) -> None:
         """Extracts and registers lifecycle hook listeners defined in the addon entrypoint."""
@@ -555,7 +609,43 @@ class AddonManager:
 addon_manager = AddonManager()
 
 
-def load_single_addon(addon_dir: str, dir_type: str = "custom") -> AddonRecord:
-    """Convenience helper to load and register a single addon directory into the global manager."""
-    return addon_manager.load_addon(addon_dir, dir_type=dir_type)
+def load_single_addon(
+    addon_identifier: str,
+    dir_type: Any = "custom",
+    app: Optional[Flask] = None,
+    **kwargs
+) -> AddonRecord:
+    """
+    Convenience helper to load and register a single addon into the global manager.
+    Supports either an addon ID (e.g. 'tcg_pos') or a directory path, and binds
+    an optional Flask app instance. Accepts dir_type as keyword argument.
+    """
+    if hasattr(dir_type, "register_blueprint") or isinstance(dir_type, Flask):
+        app = dir_type
+        dir_type = kwargs.get("dir_type", "custom")
+    elif not isinstance(dir_type, str):
+        dir_type = "custom"
+
+    # Resolve addon directory path
+    addon_dir = None
+    if os.path.isdir(addon_identifier):
+        addon_dir = os.path.abspath(addon_identifier)
+    else:
+        custom_dir = getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))
+        candidate_custom = os.path.join(custom_dir, addon_identifier)
+        candidate_builtin = os.path.join(Config.BASE_DIR, 'addons', addon_identifier)
+        if os.path.isdir(candidate_custom):
+            addon_dir = candidate_custom
+            dir_type = "custom"
+        elif os.path.isdir(candidate_builtin):
+            addon_dir = candidate_builtin
+            dir_type = "builtin"
+        else:
+            addon_dir = candidate_custom
+
+    manifest_file = os.path.join(addon_dir, "manifest.json")
+    if not os.path.isdir(addon_dir) or not os.path.isfile(manifest_file):
+        raise FileNotFoundError(f"Addon directory or manifest missing for '{addon_identifier}' at '{addon_dir}'")
+
+    return addon_manager.load_addon(addon_dir, dir_type=dir_type, app=app)
 

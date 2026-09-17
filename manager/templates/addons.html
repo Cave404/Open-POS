@@ -784,6 +784,135 @@
         .btn-dismiss:hover {
             background: var(--accent-hover);
         }
+
+        /* Update & Rollback Controls */
+        .btn-update-addon {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: #ffffff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+            transition: all 0.15s ease;
+        }
+
+        .btn-update-addon:hover:not(:disabled) {
+            filter: brightness(1.15);
+            transform: translateY(-1px);
+        }
+
+        .btn-update-addon:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-rollback-menu {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-rollback-menu:hover {
+            color: var(--text-main);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .btn-addon-logs {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 7px 13px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-addon-logs:hover {
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        .snapshot-item-card {
+            background: #090d16;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            transition: border-color 0.15s ease;
+        }
+
+        .snapshot-item-card:hover {
+            border-color: #3b82f6;
+        }
+
+        .snapshot-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .snapshot-version-tag {
+            font-size: 13px;
+            font-weight: 700;
+            color: #60a5fa;
+            font-family: Consolas, monospace;
+        }
+
+        .snapshot-timestamp {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .snapshot-folder-id {
+            font-size: 10px;
+            color: #64748b;
+            font-family: Consolas, monospace;
+        }
+
+        .btn-do-rollback {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+            color: #ffffff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
+            transition: all 0.15s ease;
+        }
+
+        .btn-do-rollback:hover {
+            filter: brightness(1.15);
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body class="manager-body">
@@ -802,6 +931,9 @@
             </div>
         </div>
         <div class="header-right">
+            <button class="btn-addon-logs" id="btnViewAddonLogs" onclick="openAddonLogsModal()" title="View Addon Logs">
+                <span>📜</span> View Addon Logs
+            </button>
             <button class="btn-import-zip" id="btnImportAddon" onclick="document.getElementById('addonZipInput').click()" title="Import Addon (.zip)">
                 <span>📦</span> Import Addon (.zip)
             </button>
@@ -961,6 +1093,53 @@
         </div>
     </div>
 
+    <!-- Addon Version History & Rollback Modal -->
+    <div class="modal-overlay" id="rollbackModal">
+        <div class="modal-card" style="max-width: 680px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color: #60a5fa;">
+                    <span>⏪</span>
+                    <span id="rollbackModalAddonTitle">Version History &amp; Rollback</span>
+                </div>
+                <button class="btn-modal-close" onclick="closeRollbackModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="gap: 12px;" id="rollbackSnapshotsList">
+                <!-- Dynamically populated via openRollbackModal() -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-dismiss" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main);" onclick="closeRollbackModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Addon Universal Logs Modal -->
+    <div class="modal-overlay" id="addonLogsModal">
+        <div class="modal-card" style="max-width: 820px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color: #34d399;">
+                    <span>📜</span>
+                    <span>Addon Subsystem Log Stream (data/logs/openpos_addons.log)</span>
+                </div>
+                <button class="btn-modal-close" onclick="closeAddonLogsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="terminal-code-wrap" style="max-height: 480px;">
+                    <div class="terminal-header">
+                        <span>openpos_addons.log (Latest entries)</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-copy" style="padding: 3px 8px; font-size: 11px;" onclick="loadAddonLogs()">🔄 Refresh</button>
+                            <button class="btn-copy" id="btnCopyAddonLogs" style="padding: 3px 8px; font-size: 11px;" onclick="copyAddonLogs()">📋 Copy Logs</button>
+                        </div>
+                    </div>
+                    <pre class="traceback-pre" id="addonLogsPre" style="max-height: 400px; color: #93c5fd; font-size: 11px;"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-dismiss" onclick="closeAddonLogsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let allAddons = [];
         let currentFilter = 'ALL';
@@ -992,6 +1171,12 @@
 
         async function loadAddons() {
             try {
+                if (allCatalogAddons.length === 0) {
+                    fetch('/manager/api/addons/catalog').then(r => r.json()).then(data => {
+                        allCatalogAddons = data;
+                        renderAddonsGrid();
+                    }).catch(() => {});
+                }
                 const res = await fetch('/manager/api/addons');
                 if (!res.ok) throw new Error('Failed to load addons');
                 allAddons = await res.json();
@@ -1093,6 +1278,23 @@
                 ? `<button class="btn-remove" onclick="confirmRemoveAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Remove custom addon">🗑️ Remove</button>`
                 : '';
 
+            // Check if newer catalog version is available
+            const catalogItem = allCatalogAddons.find(c => c.id === addon.id);
+            let updateBtn = '';
+            if (catalogItem && (catalogItem.has_update || (catalogItem.version && catalogItem.version !== addon.version))) {
+                updateBtn = `
+                    <button class="btn-update-addon" id="btnUpdate-${addon.id}" onclick="triggerAddonUpdate('${addon.id}', '${catalogItem.version}')" title="In-place update to v${catalogItem.version}">
+                        <span>🚀</span> Update (v${catalogItem.version})
+                    </button>
+                `;
+            }
+
+            const rollbackBtn = (addon.dir_type === 'custom')
+                ? `<button class="btn-rollback-menu" onclick="openRollbackModal('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Version History & Rollback">
+                    <span>⏪</span> Rollback
+                </button>`
+                : '';
+
             const iconDisplay = addon.icon && addon.icon.endsWith('.png')
                 ? '🧩'
                 : (addon.icon || '🧩');
@@ -1128,6 +1330,8 @@
                     </label>
 
                     <div class="action-btns">
+                        ${updateBtn}
+                        ${rollbackBtn}
                         ${errorBtn}
                         ${settingsBtn}
                         ${removeBtn}
@@ -1176,6 +1380,162 @@
             const text = document.getElementById('modalTraceback').textContent;
             navigator.clipboard.writeText(text).then(() => {
                 const btn = document.getElementById('btnCopyTrace');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            }).catch(err => {
+                console.error('Clipboard copy failed:', err);
+            });
+        }
+
+        // Addon In-Place Hot Update Trigger
+        async function triggerAddonUpdate(addonId, targetVersion) {
+            const btn = document.getElementById(`btnUpdate-${addonId}`);
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span>⏳</span> Updating...`;
+            }
+
+            try {
+                const res = await fetch(`/api/addons/${addonId}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    alert(`✅ Addon updated successfully to v${data.version || targetVersion}!`);
+                    await loadAddons();
+                    if (allCatalogAddons.length > 0) {
+                        await loadCatalog(true);
+                    }
+                } else {
+                    alert(`❌ Update failed: ${data.message || 'Unknown error occurred.'}`);
+                    await loadAddons();
+                }
+            } catch (err) {
+                console.error('Error during addon update:', err);
+                alert(`❌ Network error during update: ${err.message}`);
+                await loadAddons();
+            } finally {
+                if (btn) {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        // Addon Rollback Modal & Execution
+        let currentRollbackAddonId = null;
+
+        async function openRollbackModal(addonId, addonName) {
+            currentRollbackAddonId = addonId;
+            document.getElementById('rollbackModalAddonTitle').textContent = `Version History & Rollback: ${addonName} (${addonId})`;
+            const listEl = document.getElementById('rollbackSnapshotsList');
+            listEl.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted);">Loading snapshots...</div>';
+            document.getElementById('rollbackModal').classList.add('open');
+
+            try {
+                const res = await fetch(`/api/addons/${addonId}/snapshots`);
+                const snapshots = await res.json();
+                if (!res.ok) throw new Error(snapshots.message || 'Failed to retrieve snapshot list');
+
+                if (!snapshots || snapshots.length === 0) {
+                    listEl.innerHTML = `
+                        <div style="padding: 36px 20px; text-align: center; color: var(--text-muted);">
+                            <div style="font-size: 32px; margin-bottom: 8px;">📂</div>
+                            <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">No previous version snapshots found</div>
+                            <div style="font-size: 12px;">Snapshots are created automatically before each hot update.</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                listEl.innerHTML = '';
+                snapshots.forEach(s => {
+                    const card = document.createElement('div');
+                    card.className = 'snapshot-item-card';
+                    card.innerHTML = `
+                        <div class="snapshot-info">
+                            <div class="snapshot-version-tag">Version ${s.version || 'Build'}</div>
+                            <div class="snapshot-timestamp">📅 ${s.timestamp || s.created_at || s.snapshot_id}</div>
+                            <div class="snapshot-folder-id">${s.snapshot_id}</div>
+                        </div>
+                        <button class="btn-do-rollback" onclick="executeRollback('${addonId}', '${s.snapshot_id}')">
+                            <span>⏪</span> Revert to this Build
+                        </button>
+                    `;
+                    listEl.appendChild(card);
+                });
+            } catch (err) {
+                listEl.innerHTML = `<div style="color: #f87171; padding: 20px;">Error loading snapshots: ${err.message}</div>`;
+            }
+        }
+
+        function closeRollbackModal() {
+            document.getElementById('rollbackModal').classList.remove('open');
+            currentRollbackAddonId = null;
+        }
+
+        async function executeRollback(addonId, snapshotId) {
+            if (!confirm(`Are you sure you want to revert addon '${addonId}' to snapshot '${snapshotId}'?`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/addons/${addonId}/rollback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ snapshot: snapshotId })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    alert(`✅ ${data.message || 'Addon successfully rolled back!'}`);
+                    closeRollbackModal();
+                    await loadAddons();
+                } else {
+                    alert(`⚠️ Rollback result: ${data.message || 'Unknown response'}`);
+                    await loadAddons();
+                }
+            } catch (err) {
+                console.error('Error executing rollback:', err);
+                alert(`❌ Failed to execute rollback: ${err.message}`);
+            }
+        }
+
+        // Addon Logs Viewer
+        async function openAddonLogsModal() {
+            document.getElementById('addonLogsModal').classList.add('open');
+            await loadAddonLogs();
+        }
+
+        function closeAddonLogsModal() {
+            document.getElementById('addonLogsModal').classList.remove('open');
+        }
+
+        async function loadAddonLogs() {
+            const pre = document.getElementById('addonLogsPre');
+            pre.textContent = 'Streaming data/logs/openpos_addons.log...';
+            try {
+                const res = await fetch('/api/addons/logs?limit=250');
+                const data = await res.json();
+                if (res.ok && data.logs) {
+                    if (data.logs.length === 0) {
+                        pre.textContent = '[openpos_addons.log is currently empty]';
+                    } else {
+                        pre.textContent = data.logs.map(l => `[${l.timestamp}] [${l.level}] [${l.subsystem || 'ADDONS'}]: ${l.message}`).join('\n');
+                    }
+                } else {
+                    pre.textContent = 'Could not retrieve addon logs.';
+                }
+            } catch (err) {
+                pre.textContent = `Error loading addon logs: ${err.message}`;
+            }
+        }
+
+        function copyAddonLogs() {
+            const text = document.getElementById('addonLogsPre').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('btnCopyAddonLogs');
                 const orig = btn.innerHTML;
                 btn.innerHTML = '✅ Copied!';
                 setTimeout(() => { btn.innerHTML = orig; }, 2000);

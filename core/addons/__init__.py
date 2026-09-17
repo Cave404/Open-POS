@@ -23,6 +23,13 @@ from core.addons.installer import (
     install_remote_addon,
     extract_addon_zip
 )
+from core.addons.updater import (
+    update_addon,
+    rollback_addon,
+    list_addon_snapshots,
+    export_addon_state,
+    restore_addon_state
+)
 
 def emit_hook(event_name: str, *args, **kwargs):
     """Convenience helper to emit an event across all loaded and active addons."""
@@ -43,7 +50,12 @@ __all__ = [
     "is_compatible",
     "DEFAULT_CATALOG_URL",
     "install_remote_addon",
-    "extract_addon_zip"
+    "extract_addon_zip",
+    "update_addon",
+    "rollback_addon",
+    "list_addon_snapshots",
+    "export_addon_state",
+    "restore_addon_state"
 ]
 
 

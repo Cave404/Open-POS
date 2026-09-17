@@ -531,6 +531,70 @@ def api_install_remote_addon():
     return jsonify(result), status_code
 
 
+@api_bp.route('/addons/<addon_id>/update', methods=['POST'])
+@manager_bp.route('/api/addons/<addon_id>/update', methods=['POST'])
+def api_update_addon(addon_id):
+    """Triggers in-place hot update with state persistence and auto-rollback."""
+    from flask import current_app
+    from core.addons.updater import update_addon
+    try:
+        app_obj = current_app._get_current_object() if hasattr(current_app, '_get_current_object') else current_app
+        res = update_addon(addon_id, app=app_obj)
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "addon_id": addon_id
+        }), 400
+
+
+@api_bp.route('/addons/<addon_id>/snapshots', methods=['GET'])
+@manager_bp.route('/api/addons/<addon_id>/snapshots', methods=['GET'])
+def api_list_addon_snapshots(addon_id):
+    """Lists available local backup versions and timestamps for an addon."""
+    from core.addons.updater import list_addon_snapshots
+    try:
+        snapshots = list_addon_snapshots(addon_id)
+        return jsonify(snapshots), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@api_bp.route('/addons/<addon_id>/rollback', methods=['POST'])
+@manager_bp.route('/api/addons/<addon_id>/rollback', methods=['POST'])
+def api_rollback_addon(addon_id):
+    """Reverts an addon to a specified local snapshot or latest available snapshot."""
+    from flask import current_app
+    from core.addons.updater import rollback_addon
+    data = request.get_json(silent=True) or {}
+    snapshot_name = data.get("snapshot") or data.get("snapshot_id") or request.form.get("snapshot")
+    try:
+        app_obj = current_app._get_current_object() if hasattr(current_app, '_get_current_object') else current_app
+        res = rollback_addon(
+            addon_id,
+            snapshot_name=snapshot_name,
+            app=app_obj
+        )
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "addon_id": addon_id
+        }), 400
+
+
+@api_bp.route('/addons/logs', methods=['GET'])
+@manager_bp.route('/api/addons/logs', methods=['GET'])
+def api_get_addon_logs():
+    """Returns recent log records from data/logs/openpos_addons.log."""
+    from core.logger import read_addon_logs
+    limit = int(request.args.get('limit', 150))
+    logs = read_addon_logs(limit=limit)
+    return jsonify({"status": "ok", "logs": logs, "total": len(logs)}), 200
+
+
 def _is_route_registered(url_path: str) -> bool:
     try:
         from flask import current_app
