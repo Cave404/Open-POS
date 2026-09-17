@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/css/manager.css">
     <script src="/static/js/notifications.js"></script>
     <script src="/static/js/lockout_guard.js" data-section="addons"></script>
+    <script src="/static/js/addons.js"></script>
     <style>
         .addons-container {
             max-width: 1060px;
@@ -912,43 +913,6 @@
             filter: brightness(1.15);
             transform: translateY(-1px);
         }
-
-        /* Engine-reload notification banner */
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-100%); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        #engineReloadBanner {
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            z-index: 9999;
-            background: linear-gradient(90deg, #0f172a 0%, #1e3a5f 100%);
-            border-bottom: 2px solid rgba(99, 179, 237, 0.55);
-            color: #e2e8f0;
-            padding: 14px 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            font-size: 14px;
-            font-weight: 600;
-            box-shadow: 0 6px 32px rgba(0,0,0,0.5);
-            animation: slideDown 0.35s ease;
-        }
-
-        #engineReloadBanner .reload-countdown {
-            background: rgba(99,179,237,0.15);
-            border: 1px solid rgba(99,179,237,0.4);
-            border-radius: 6px;
-            padding: 2px 10px;
-            font-size: 20px;
-            font-weight: 800;
-            color: #63b3ed;
-            font-variant-numeric: tabular-nums;
-            min-width: 36px;
-            text-align: center;
-        }
     </style>
 </head>
 <body class="manager-body">
@@ -1190,6 +1154,9 @@
 
         let activeMainTab = 'installed';
         let allCatalogAddons = [];
+        window.allCatalogAddons = allCatalogAddons;
+        window.catalogAddons = allCatalogAddons;
+        window.catalogData = allCatalogAddons;
         let currentCatalogSearch = '';
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1217,6 +1184,9 @@
                 if (allCatalogAddons.length === 0) {
                     fetch('/manager/api/addons/catalog').then(r => r.json()).then(data => {
                         allCatalogAddons = data;
+                        window.allCatalogAddons = data;
+                        window.catalogAddons = data;
+                        window.catalogData = data;
                         renderAddonsGrid();
                     }).catch(() => {});
                 }
@@ -1548,12 +1518,8 @@
                 const data = await res.json();
                 if (res.ok && data.status === 'success') {
                     closeRollbackModal();
-                    if (data.reload_required) {
-                        showReloadBanner(data.message || 'Addon reverted. Reloading engine...');
-                    } else {
-                        alert(`✅ ${data.message || 'Addon successfully rolled back!'}`);
-                        await loadAddons();
-                    }
+                    showAddonToast(addonId, "Rollback Complete", data.message || "Addon successfully reverted.", "success");
+                    await loadAddons();
                 } else {
                     alert(`⚠️ Rollback result: ${data.message || 'Unknown response'}`);
                     await loadAddons();
@@ -1632,12 +1598,9 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    if (data.reload_required) {
-                        showReloadBanner(data.message || 'Addon installed. Reloading engine...');
-                    } else {
-                        alert(data.message || 'Addon installed successfully!');
-                        await loadAddons();
-                    }
+                    showAddonToast(data.id || 'addon', "Import Complete", data.message || "Addon installed successfully!", "success");
+                    await loadAddons();
+                    if (typeof loadCatalog === 'function') loadCatalog();
                 } else {
                     alert(`Import failed: ${data.error || data.message || 'Unknown error'}`);
                 }
@@ -1676,12 +1639,9 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    if (data.reload_required) {
-                        showReloadBanner(data.message || 'Addon removed. Reloading engine...');
-                    } else {
-                        alert(data.message || 'Addon uninstalled successfully.');
-                        await loadAddons();
-                    }
+                    showAddonToast(addonId, "Addon Removed", data.message || "Addon uninstalled successfully.", "success");
+                    await loadAddons();
+                    if (typeof loadCatalog === 'function') loadCatalog();
                 } else {
                     alert(`Failed to remove addon: ${data.error || 'Unknown error'}`);
                 }
@@ -1708,7 +1668,11 @@
                 viewInstalled.style.display = 'none';
                 viewCatalog.style.display = 'block';
 
-                loadCatalog();
+                if (allCatalogAddons && allCatalogAddons.length > 0) {
+                    renderCatalogGrid();
+                } else {
+                    loadCatalog();
+                }
             } else {
                 btnCatalog.classList.remove('active');
                 btnCatalog.setAttribute('aria-selected', 'false');
@@ -1739,6 +1703,9 @@
                 const res = await fetch(`/manager/api/addons/catalog?refresh=${forceRefresh ? '1' : '0'}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 allCatalogAddons = await res.json();
+                window.allCatalogAddons = allCatalogAddons;
+                window.catalogAddons = allCatalogAddons;
+                window.catalogData = allCatalogAddons;
                 renderCatalogGrid();
             } catch (err) {
                 console.error('Error fetching catalog:', err);
@@ -1813,12 +1780,12 @@
             let actionBtnHtml = '';
             if (addon.is_installed) {
                 if (addon.has_update) {
-                    actionBtnHtml = `<button class="btn btn-sm btn-primary btn-install-addon" onclick="installRemoteAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">🔄 Update to v${addon.version}</button>`;
+                    actionBtnHtml = `<button class="btn btn-sm btn-primary btn-install-addon" data-id="${addon.id}" onclick="installAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">🔄 Update to v${addon.version}</button>`;
                 } else {
-                    actionBtnHtml = `<span class="btn-installed-badge">✓ Installed (v${addon.installed_version || addon.version})</span>`;
+                    actionBtnHtml = `<span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6 btn-installed-badge">✓ Installed (v${addon.installed_version || addon.version})</span>`;
                 }
             } else if (isCompatible) {
-                actionBtnHtml = `<button class="btn btn-sm btn-primary btn-install-addon" onclick="installRemoteAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">⬇️ Install Addon</button>`;
+                actionBtnHtml = `<button class="btn btn-sm btn-primary btn-install-addon" data-id="${addon.id}" onclick="installAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">⬇️ Install Addon</button>`;
             } else {
                 actionBtnHtml = `<button class="btn btn-sm btn-secondary disabled" disabled style="opacity: 0.5; cursor: not-allowed;">Incompatible</button>`;
             }
@@ -1857,85 +1824,9 @@
             return card;
         }
 
-        async function installRemoteAddon(addonId, addonName, btnEl) {
-            const originalHtml = btnEl ? btnEl.innerHTML : '';
-            if (btnEl) {
-                btnEl.innerHTML = '<span>⏳</span> Installing...';
-                btnEl.disabled = true;
-            }
-
-            try {
-                const res = await fetch('/api/addons/install_remote', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ addon_id: addonId })
-                });
-                const data = await res.json();
-                if (res.ok && data.status === 'success') {
-                    if (data.reload_required) {
-                        showReloadBanner(data.message || `${addonName} configured. Reloading engine...`);
-                    } else {
-                        alert(`✅ ${data.message || addonName + ' installed successfully!'}`);
-                        await loadAddons();
-                        await loadCatalog();
-                    }
-                } else {
-                    alert(`❌ Installation failed: ${data.message || 'Unknown error occurred.'}`);
-                    if (btnEl) {
-                        btnEl.innerHTML = originalHtml;
-                        btnEl.disabled = false;
-                    }
-                }
-            } catch (err) {
-                console.error('Error installing remote addon:', err);
-                alert(`❌ Network error installing addon: ${err.message}`);
-                if (btnEl) {
-                    btnEl.innerHTML = originalHtml;
-                    btnEl.disabled = false;
-                }
-            }
-        }
-
-        /**
-         * Shows a non-blocking slide-down banner with a countdown and
-         * automatically reloads the page to restart the WSGI engine context.
-         * Called whenever the backend returns `reload_required: true`.
-         */
-        function showReloadBanner(message) {
-            // Remove any existing banner
-            const existing = document.getElementById('engineReloadBanner');
-            if (existing) existing.remove();
-
-            const banner = document.createElement('div');
-            banner.id = 'engineReloadBanner';
-
-            const msgSpan = document.createElement('span');
-            msgSpan.textContent = '⚙️  ' + (message || 'Engine reloading...');
-
-            const labelSpan = document.createElement('span');
-            labelSpan.style.cssText = 'color: var(--text-muted); font-weight: 400;';
-            labelSpan.textContent = 'Restarting in';
-
-            const countSpan = document.createElement('span');
-            countSpan.className = 'reload-countdown';
-            let countdown = 1;
-            countSpan.textContent = countdown;
-
-            const sSpan = document.createElement('span');
-            sSpan.style.cssText = 'color: var(--text-muted); font-weight: 400;';
-            sSpan.textContent = 's...';
-
-            banner.append(msgSpan, labelSpan, countSpan, sSpan);
-            document.body.prepend(banner);
-
-            setTimeout(() => {
-                if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.reload_window === 'function') {
-                    window.pywebview.api.reload_window();
-                } else {
-                    window.location.reload();
-                }
-            }, 1000);
-        }
     </script>
+
+    <!-- Floating Toast Notification Container -->
+    <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;"></div>
 </body>
 </html>

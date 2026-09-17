@@ -264,15 +264,23 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
                 "message": f"Addon installed but failed to initialize: {record.error}"
             }
 
+        addon_name = manifest_data.get("name", addon_id)
+        try:
+            from core.notifications import add_alert
+            add_alert("INFO", f"Addon Installed: {addon_name} v{record.version}", subsystem="ADDONS")
+        except Exception:
+            pass
+
         return {
             "status": "success",
             "success": True,
             "message": (
                 "Addon configured. Reloading engine..."
                 if record.reload_required
-                else f"{addon_id} installed and activated successfully"
+                else f"{addon_name} installed and activated successfully"
             ),
             "addon_id": addon_id,
+            "name": addon_name,
             "version": record.version,
             "reload_required": record.reload_required
         }

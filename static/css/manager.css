@@ -1657,4 +1657,144 @@ input:checked + .toggle-slider:before {
     pointer-events: none;
 }
 
+/* ==========================================================================
+   Floating Toast Notifications & Addon Lifecycle Host
+   ========================================================================== */
+
+.toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.addon-toast {
+    background: #1c2128;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    min-width: 320px;
+    max-width: 400px;
+    color: #f0f6fc;
+    overflow: hidden;
+    margin-top: 10px;
+    animation: slideInRight 0.25s ease-out;
+    pointer-events: auto;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.addon-toast-progress {
+    height: 3px;
+    background: #238636;
+    width: 100%;
+    transition: width 3.5s linear;
+}
+
+.addon-toast .d-flex {
+    display: flex !important;
+}
+
+.addon-toast .align-items-center {
+    align-items: center !important;
+}
+
+.addon-toast .justify-content-between {
+    justify-content: space-between !important;
+}
+
+.addon-toast .p-3 {
+    padding: 14px 16px !important;
+}
+
+.addon-toast .me-1 {
+    margin-right: 4px !important;
+}
+
+.addon-toast .me-2 {
+    margin-right: 8px !important;
+}
+
+.addon-toast .ms-2 {
+    margin-left: 8px !important;
+}
+
+.addon-toast .fw-bold {
+    font-weight: 600 !important;
+}
+
+.addon-toast .fs-6 {
+    font-size: 14px !important;
+    color: #f0f6fc !important;
+}
+
+.addon-toast .text-muted {
+    color: #8b949e !important;
+}
+
+.addon-toast .small {
+    font-size: 12px !important;
+    margin-top: 2px !important;
+}
+
+.addon-toast .text-success {
+    color: #3fb950 !important;
+}
+
+.addon-toast .text-danger {
+    color: #f85149 !important;
+}
+
+.addon-toast .text-primary {
+    color: #58a6ff !important;
+}
+
+.addon-toast .spinner-border {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    vertical-align: -0.125em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border 0.75s linear infinite;
+}
+
+.addon-toast .spinner-border-sm {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+}
+
+@keyframes spinner-border {
+    to { transform: rotate(360deg); }
+}
+
+.addon-toast .btn-close {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+}
+
+.addon-toast .btn-close:hover {
+    color: #f0f6fc;
+}
+
+.addon-toast .btn-close::before {
+    content: "✕";
+}
+
 
