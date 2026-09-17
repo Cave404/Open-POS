@@ -13,6 +13,7 @@ UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
 LOGS_DIR = os.path.join(DATA_DIR, 'logs')
 CUSTOM_ADDONS_DIR = os.path.join(DATA_DIR, 'custom_addons')
 CONFIG_DIR = os.path.join(DATA_DIR, 'config')
+BACKUP_DIR = os.path.join(DATA_DIR, 'backups')
 
 # Priority: Load environment variables from data/config/.env first, falling back to root .env
 env_path = os.path.join(CONFIG_DIR, '.env')
@@ -27,7 +28,8 @@ REQUIRED_DATA_DIRS = [
     "data/logs",
     "data/cache",
     "data/custom_addons",
-    "data/uploads"
+    "data/uploads",
+    "data/backups"
 ]
 
 # Automatically ensure private data directories exist on startup
@@ -70,6 +72,7 @@ class Config:
     LOGS_DIR = LOGS_DIR
     CUSTOM_ADDONS_DIR = CUSTOM_ADDONS_DIR
     CONFIG_DIR = CONFIG_DIR
+    BACKUP_DIR = BACKUP_DIR
     REQUIRED_DATA_DIRS = REQUIRED_DATA_DIRS
 
     # Database Settings

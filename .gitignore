@@ -217,7 +217,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Core Runtime Data Isolation
+# Core Data Directory Isolation
 data/
 !data/
 data/*
@@ -225,8 +225,11 @@ data/*
 !data/custom_addons/
 data/custom_addons/*
 !data/custom_addons/.gitkeep
+!data/backups/
+data/backups/*
+!data/backups/.gitkeep
 
-# Sensitive Secrets & Databases
+# Explicit Secrets & Databases
 *.hash
 *.key
 *.db
@@ -234,13 +237,16 @@ data/custom_addons/*
 *.sqlite3
 *.log
 .env
+store_settings.json
+.setup_complete
 data/config/*
 data/db/*
 data/cache/*
 data/logs/*
 data/uploads/*
+data/backups/*
 
-# Python runtime artifacts
+# Python virtualenv & caches
 venv/
 __pycache__/
 *.pyc

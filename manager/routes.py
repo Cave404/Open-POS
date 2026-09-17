@@ -339,6 +339,8 @@ def manager_setup():
             mimetype="text/html"
         )
     existing = check_existing_installation()
+    if not existing["exists"]:
+        session['setup_reauth_verified'] = True
     reauth_required = existing["exists"] and (session.get('setup_reauth_verified') is not True)
     return render_template('setup_wizard.html', reauth_required=reauth_required)
 
@@ -818,6 +820,12 @@ def handle_logo_upload():
     with open(target_path, 'wb') as f:
         f.write(file_data)
 
+    try:
+        from core.services.branding_service import generate_store_ico
+        generate_store_ico(target_path)
+    except Exception as ie:
+        logger.warning(f"Failed to generate store_icon.ico: {ie}")
+
     logo_url = f"/data/uploads/{target_name}"
     set_setting('store_logo_url', logo_url)
 
@@ -835,6 +843,12 @@ def handle_logo_delete():
                 os.remove(path)
             except OSError:
                 pass
+    ico_path = os.path.join(upload_folder, "store_icon.ico")
+    if os.path.isfile(ico_path):
+        try:
+            os.remove(ico_path)
+        except OSError:
+            pass
     # Clean legacy folder if present
     legacy_folder = os.path.join(Config.BASE_DIR, 'static', 'uploads')
     if os.path.isdir(legacy_folder):
@@ -1299,6 +1313,7 @@ def api_setup_submit():
     result = save_setup_configuration(data)
     if result.get("status") == "error":
         return jsonify(result), 400
+    session['setup_reauth_verified'] = True
     return jsonify(result), 200
 
 

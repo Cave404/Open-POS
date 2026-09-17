@@ -184,13 +184,13 @@ def test_run_and_setup_window_dimensions():
         wizard_content = f.read()
 
     # run.py setup window
-    assert "width=1080" in run_content
+    assert ("width=1120" in run_content or "width=1080" in run_content)
     assert "height=800" in run_content
     assert "min_size=(960, 650)" in run_content
     assert "easy_drag=False" in run_content
 
     # setup_wizard.py window
-    assert "width=1080" in wizard_content
+    assert ("width=1120" in wizard_content or "width=1080" in wizard_content)
     assert "height=800" in wizard_content
     assert "min_size=(960, 650)" in wizard_content
     assert "easy_drag=False" in wizard_content

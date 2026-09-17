@@ -32,19 +32,29 @@ if not exist "venv\Scripts\python.exe" (
 )
 
 REM 3. Pre-flight dependency check
-"venv\Scripts\python.exe" -c "import webview, waitress, flask, psycopg, cryptography" >nul 2>&1
+"venv\Scripts\python.exe" -c "import webview, waitress, flask, psycopg, cryptography, PIL" >nul 2>&1
 if errorlevel 1 (
     echo [*] Installing or updating required dependencies...
     echo [*] (Pip cache bypass active to prevent Windows file locks)
     echo.
     "venv\Scripts\python.exe" -m pip install -r requirements.txt --no-cache-dir
-    
-    REM Post-install validation
-    "venv\Scripts\python.exe" -c "import webview, waitress, flask" >nul 2>&1
     if errorlevel 1 (
         echo.
         echo ===================================================
-        echo [ERROR] Dependency installation failed.
+        echo [ERROR] Pip installation failed.
+        echo ===================================================
+        echo Please verify your internet connection and permissions.
+        echo.
+        pause
+        exit /b 1
+    )
+    
+    REM Post-install validation
+    "venv\Scripts\python.exe" -c "import webview, waitress, flask, psycopg, cryptography, PIL" >nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo ===================================================
+        echo [ERROR] Dependency verification failed after install.
         echo ===================================================
         echo 1. Ensure any other running Python apps or older POS systems are closed.
         echo 2. Check internet connection for package downloads.

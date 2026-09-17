@@ -1167,11 +1167,27 @@ function showStep(step) {
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
+    // Step 5 re-entry guard: ensure Initialize Encryption button resets to active
+    if (step === 5) {
+        const btnNext5 = document.getElementById('btnNext5');
+        if (btnNext5) {
+            btnNext5.disabled = false;
+            btnNext5.removeAttribute('disabled');
+            btnNext5.style.opacity = '1';
+            btnNext5.style.pointerEvents = 'auto';
+        }
+    }
+
     // Step 6 re-entry guard: if crypto keys were already generated on a prior pass,
     // auto-populate displays and enable the Next button without re-hitting the backend.
     if (step === 6 && generatedCrypto.fernet_key) {
         const nextBtn = document.getElementById('btnNext6');
-        if (nextBtn) nextBtn.disabled = false;
+        if (nextBtn) {
+            nextBtn.disabled = false;
+            nextBtn.removeAttribute('disabled');
+            nextBtn.style.opacity = '1';
+            nextBtn.style.pointerEvents = 'auto';
+        }
         const roundtripEl = document.getElementById('dispRoundtripStatus');
         if (roundtripEl && roundtripEl.textContent !== '\u2713 Verified & Decryptable') {
             roundtripEl.textContent = '\u2713 Verified & Decryptable';
@@ -1431,6 +1447,15 @@ async function executeSetupPersistence() {
         document.getElementById('dispRoundtripStatus').style.color = 'var(--wizard-success)';
 
         document.getElementById('dispRecoveryToken').textContent = data.recovery_token;
+
+        // Immediately unlock Step 6 "View Recovery Key Sheet ->" button
+        const nextBtn6 = document.getElementById('btnNext6');
+        if (nextBtn6) {
+            nextBtn6.disabled = false;
+            nextBtn6.removeAttribute('disabled');
+            nextBtn6.style.opacity = '1';
+            nextBtn6.style.pointerEvents = 'auto';
+        }
         // Navigation advance is handled by the calling click handler (checks generatedCrypto.fernet_key)
 
     } catch (err) {
