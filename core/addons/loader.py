@@ -2,6 +2,7 @@ import os
 import sys
 import re
 import json
+import types
 import logging
 import importlib
 import importlib.util
@@ -83,6 +84,9 @@ class AddonRecord:
         self.module = None
         self.blueprint: Optional[Blueprint] = None
         self.hooks: Dict[str, Callable] = {}
+        # True when a blueprint registration was deferred because the Flask
+        # engine is already live; the caller should signal a WSGI reload.
+        self.reload_required: bool = False
 
     def __getattr__(self, name: str) -> Any:
         if self.module is not None and hasattr(self.module, name):
@@ -110,6 +114,7 @@ class AddonRecord:
             "error": self.error,
             "traceback": self.traceback,
             "has_settings": bool(self.settings_route),
+            "reload_required": self.reload_required,
         }
 
 
@@ -320,49 +325,103 @@ class AddonManager:
         except Exception as e:
             raise RuntimeError(f"Migration script '{sql_filename}' failed for addon '{record.id}': {e}")
 
+    def _ensure_namespace_packages(self, addon_dir_str: str, addon_id: str, dir_type: str) -> None:
+        """
+        Pre-registers synthetic parent package stubs in sys.modules so Python's
+        import resolver can locate sub-modules inside the addon directory via
+        relative imports (e.g. ``from .routes import ...``).  No __init__.py
+        files are required because these stubs bypass the filesystem finder.
+        """
+        if dir_type == "custom":
+            custom_dir = str(Path(getattr(
+                Config, 'CUSTOM_ADDONS_DIR',
+                os.path.join(Config.DATA_DIR, 'custom_addons')
+            )).resolve())
+
+            # Synthetic top-level 'data' package
+            if 'data' not in sys.modules:
+                pkg = types.ModuleType('data')
+                pkg.__path__ = [str(Path(Config.DATA_DIR).resolve())]  # type: ignore[attr-defined]
+                pkg.__package__ = 'data'
+                sys.modules['data'] = pkg
+
+            # Synthetic 'data.custom_addons' package
+            ca_key = 'data.custom_addons'
+            if ca_key not in sys.modules:
+                pkg = types.ModuleType(ca_key)
+                pkg.__path__ = [custom_dir]  # type: ignore[attr-defined]
+                pkg.__package__ = ca_key
+                sys.modules[ca_key] = pkg
+
+        else:
+            builtin_dir = str(Path(Config.BASE_DIR, 'addons').resolve())
+            if 'addons' not in sys.modules:
+                pkg = types.ModuleType('addons')
+                pkg.__path__ = [builtin_dir]  # type: ignore[attr-defined]
+                pkg.__package__ = 'addons'
+                sys.modules['addons'] = pkg
+
     def _mount_blueprint(self, record: AddonRecord, app: Optional[Flask] = None) -> None:
         """
-        Dynamically imports the entrypoint file and mounts its Flask Blueprint under /addons/<addon_id>/.
-        Supports direct imports (import routes) and relative imports (from .routes import ...).
-        Adds an automatic enabled-status guard to return 503 if the addon is toggled off.
+        Loads the addon entrypoint module under a fully-qualified namespace:
+          - Custom addons  →  ``data.custom_addons.<addon_id>``
+          - Built-in addons →  ``addons.<addon_id>``
+
+        This eliminates sys.path collisions that arise when multiple addons
+        share internal module names (e.g. ``routes.py``).  Relative imports
+        (``from .routes import ...``) resolve correctly because the module's
+        ``__package__`` and ``__path__`` are set to the addon directory.
+
+        Blueprint registration is only performed during the initial startup
+        sweep (``self._initialized`` is False).  After the Flask engine is
+        live, attempting to add ``before_request`` hooks or call
+        ``register_blueprint`` raises Flask's AssertionError.  Instead we set
+        ``record.reload_required = True`` so the API layer can return
+        ``{reload_required: true}`` and the frontend triggers a WSGI restart.
         """
         target_app = app or self.app
 
         addon_dir_path = Path(record.dir_path).resolve()
         addon_dir_str = str(addon_dir_path)
 
-        # 1. Prepend addon directory to sys.path at index 0 for direct imports (e.g., `import routes`)
-        if addon_dir_str in sys.path:
-            sys.path.remove(addon_dir_str)
-        sys.path.insert(0, addon_dir_str)
+        # ── 1. Guarantee the project root is on sys.path so core imports
+        #        (e.g. ``from core.config import Config``) work inside addons.
+        #        We do NOT add the individual addon directory to sys.path.
+        repo_root = str(Path(Config.BASE_DIR).resolve())
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
 
-        # 2. Ensure data/custom_addons root is on sys.path for package imports
-        custom_addons_root = str(Path(getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))).resolve())
-        if custom_addons_root not in sys.path:
-            sys.path.insert(1, custom_addons_root)
+        # ── 2. Pre-register synthetic parent package stubs
+        self._ensure_namespace_packages(addon_dir_str, record.id, record.dir_type)
 
-        # 3. Ensure builtin addons root is on sys.path
-        builtin_addons_root = str(Path(Config.BASE_DIR, 'addons').resolve())
-        if builtin_addons_root not in sys.path:
-            sys.path.insert(2, builtin_addons_root)
+        # ── 3. Determine the fully-qualified module name for this addon
+        if record.dir_type == "custom":
+            package_name = f"data.custom_addons.{record.id}"
+        else:
+            package_name = f"addons.{record.id}"
 
         entrypoint_file = os.path.join(record.dir_path, record.entrypoint)
         if not os.path.isfile(entrypoint_file):
-            raise FileNotFoundError(f"Addon entrypoint file '{record.entrypoint}' not found at {entrypoint_file}")
+            raise FileNotFoundError(
+                f"Addon entrypoint file '{record.entrypoint}' not found at {entrypoint_file}"
+            )
 
-        # 4. Clean cached module instances if reloading
-        for mod_name in list(sys.modules.keys()):
-            if (
-                mod_name == record.id
-                or mod_name.startswith(f"{record.id}.")
-                or mod_name == f"openpos_addon_{record.id}"
-                or mod_name.startswith(f"openpos_addon_{record.id}.")
-            ):
-                del sys.modules[mod_name]
+        # ── 4. Invalidate all stale cached modules for this addon namespace
+        stale = [
+            k for k in list(sys.modules.keys())
+            if k == package_name
+            or k.startswith(package_name + ".")
+            or k == f"openpos_addon_{record.id}"
+            or k.startswith(f"openpos_addon_{record.id}.")
+            or k == record.id
+            or k.startswith(f"{record.id}.")
+        ]
+        for k in stale:
+            sys.modules.pop(k, None)
 
-        module_name = f"openpos_addon_{record.id}"
+        # ── 5. Build the module spec and execute the entrypoint file
         spec = importlib.util.spec_from_file_location(
-            record.id,
+            package_name,
             entrypoint_file,
             submodule_search_locations=[addon_dir_str]
         )
@@ -370,23 +429,27 @@ class AddonManager:
             raise ImportError(f"Cannot create module spec for '{entrypoint_file}'")
 
         module = importlib.util.module_from_spec(spec)
-        module.__package__ = record.id
-        module.__path__ = [addon_dir_str]
-        sys.modules[record.id] = module
-        sys.modules[module_name] = module
+        # Set __package__ and __path__ so relative imports (from .routes import ...)
+        # resolve sub-modules inside the addon directory.
+        module.__package__ = package_name
+        module.__path__ = [addon_dir_str]  # type: ignore[assignment]
 
-        # Execute entrypoint module in isolated namespace
-        spec.loader.exec_module(module)
+        # Register under the canonical namespaced name and a legacy alias
+        sys.modules[package_name] = module
+        sys.modules[f"openpos_addon_{record.id}"] = module
+
+        # Execute the entrypoint (runs plugin.py top-level code)
+        spec.loader.exec_module(module)  # type: ignore[union-attr]
         record.module = module
 
-        # If addon exposes register_addon(app) or setup(app), initialize it
+        # ── 6. Call optional addon initialisation hooks
         if target_app is not None:
             if hasattr(module, "register_addon") and callable(module.register_addon):
                 module.register_addon(target_app)
             elif hasattr(module, "setup") and callable(module.setup):
                 module.setup(target_app)
 
-        # Locate Flask Blueprint
+        # ── 7. Locate the Flask Blueprint exposed by this addon
         bp = None
         if hasattr(module, 'blueprint') and isinstance(module.blueprint, Blueprint):
             bp = module.blueprint
@@ -397,12 +460,36 @@ class AddonManager:
             if isinstance(candidate, Blueprint):
                 bp = candidate
 
-        if bp is not None:
-            record.blueprint = bp
+        if bp is None:
+            return
 
-            # Guard: check if addon is active before handling request
-            addon_id = record.id
-            def make_guard(a_id):
+        record.blueprint = bp
+
+        if target_app is None:
+            return
+
+        # ── 8. Blueprint registration / deferral
+        #
+        # Pre-startup  (_initialized=False): register normally — the Flask app
+        #   has not yet handled any requests so blueprint mutations are safe.
+        #
+        # Post-startup (_initialized=True): Flask raises AssertionError if we
+        #   call before_request() or register_blueprint() on a live app.  Skip
+        #   registration and set reload_required so the caller can tell the
+        #   frontend to trigger a WSGI engine restart.
+        if self._initialized:
+            record.reload_required = True
+            logger.info(
+                f"Addon '{record.id}' loaded post-startup — "
+                f"blueprint registration deferred to next engine reload."
+            )
+            return
+
+        if bp.name not in target_app.blueprints:
+            prefix = f"/addons/{record.id}"
+            addon_id_capture = record.id
+
+            def make_guard(a_id: str):
                 def _guard():
                     rec = self.addons.get(a_id)
                     if rec and rec.status != STATE_ACTIVE:
@@ -412,24 +499,16 @@ class AddonManager:
                         }), 503
                 return _guard
 
-            bp.before_request(make_guard(addon_id))
-
-            # Register on Flask app if bound
-            if target_app is not None:
-                # Check if blueprint is already registered
-                if bp.name not in target_app.blueprints:
-                    prefix = f"/addons/{record.id}"
-                    was_handled = getattr(target_app, '_got_first_request', False)
-                    if was_handled:
-                        target_app._got_first_request = False
-                    try:
-                        target_app.register_blueprint(bp, url_prefix=prefix)
-                        logger.info(f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{prefix}'.")
-                    except Exception as bpe:
-                        logger.warning(f"Could not register dynamic blueprint '{bp.name}' directly: {bpe}")
-                    finally:
-                        if was_handled:
-                            target_app._got_first_request = True
+            try:
+                bp.before_request(make_guard(addon_id_capture))
+                target_app.register_blueprint(bp, url_prefix=prefix)
+                logger.info(
+                    f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{prefix}'."
+                )
+            except Exception as bpe:
+                logger.warning(
+                    f"Could not register blueprint '{bp.name}' for addon '{record.id}': {bpe}"
+                )
 
     def _register_hooks(self, record: AddonRecord) -> None:
         """Extracts and registers lifecycle hook listeners defined in the addon entrypoint."""
@@ -500,7 +579,8 @@ class AddonManager:
             "id": addon_id,
             "status": updated.status,
             "enabled": updated.enabled,
-            "error": updated.error
+            "error": updated.error,
+            "reload_required": updated.reload_required
         }
 
     def get_all_addons(self) -> List[Dict[str, Any]]:
@@ -587,7 +667,12 @@ class AddonManager:
                     "name": record.name,
                     "status": record.status,
                     "error": record.error,
-                    "message": f"Addon '{record.name}' installed successfully."
+                    "reload_required": record.reload_required,
+                    "message": (
+                        "Addon configured. Reloading engine..."
+                        if record.reload_required
+                        else f"Addon '{record.name}' installed successfully."
+                    )
                 }
 
         except Exception as e:
@@ -650,13 +735,17 @@ class AddonManager:
             except Exception as re:
                 logger.warning(f"Could not update addon_registry.json during uninstall: {re}")
 
-        # Clean cached module instances from sys.modules
+        # Clean cached module instances from sys.modules (all naming conventions)
         for mod_name in list(sys.modules.keys()):
             if (
                 mod_name == addon_id
                 or mod_name.startswith(f"{addon_id}.")
                 or mod_name == f"openpos_addon_{addon_id}"
                 or mod_name.startswith(f"openpos_addon_{addon_id}.")
+                or mod_name == f"data.custom_addons.{addon_id}"
+                or mod_name.startswith(f"data.custom_addons.{addon_id}.")
+                or mod_name == f"addons.{addon_id}"
+                or mod_name.startswith(f"addons.{addon_id}.")
             ):
                 del sys.modules[mod_name]
 
@@ -664,9 +753,12 @@ class AddonManager:
         self.addons.pop(addon_id, None)
 
         addon_name = rec.name if rec else addon_id
+        # Blueprint URLs remain in Flask's URL map until the engine restarts;
+        # signal the frontend to trigger a WSGI reload.
         return {
             "success": True,
             "id": addon_id,
+            "reload_required": True,
             "message": f"Addon '{addon_name}' has been uninstalled successfully from disk."
         }
 

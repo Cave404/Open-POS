@@ -330,9 +330,14 @@ def update_addon(addon_id: str, app=None) -> Dict[str, Any]:
         addon_logger.info(f"Addon '{addon_id}' updated successfully to v{record.version}.")
         return {
             "status": "success",
-            "message": f"Addon '{record.name}' updated successfully to v{record.version}.",
+            "message": (
+                "Addon configured. Reloading engine..."
+                if record.reload_required
+                else f"Addon '{record.name}' updated successfully to v{record.version}."
+            ),
             "addon_id": addon_id,
-            "version": record.version
+            "version": record.version,
+            "reload_required": record.reload_required
         }
 
     except Exception as exc:
@@ -453,8 +458,13 @@ def rollback_addon(addon_id: str, snapshot_name: Optional[str] = None, app=None)
     addon_logger.info(f"Addon '{addon_id}' successfully reverted to snapshot '{target_snapshot['snapshot_id']}' (v{record.version}).")
     return {
         "status": "success",
-        "message": f"Addon '{record.name}' successfully reverted to v{record.version}.",
+        "message": (
+            "Addon configured. Reloading engine..."
+            if record.reload_required
+            else f"Addon '{record.name}' successfully reverted to v{record.version}."
+        ),
         "addon_id": addon_id,
         "version": record.version,
-        "snapshot": target_snapshot["snapshot_id"]
+        "snapshot": target_snapshot["snapshot_id"],
+        "reload_required": record.reload_required
     }

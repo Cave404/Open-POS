@@ -244,14 +244,6 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
             except Exception as pe:
                 logger.warning(f"pip install for addon '{addon_id}' failed: {pe}")
 
-        # Ensure addon directory and custom_addons root are injected into sys.path
-        target_dir_str = str(Path(target_dir).resolve())
-        if target_dir_str not in sys.path:
-            sys.path.insert(0, target_dir_str)
-        custom_root_str = str(Path(custom_dir).resolve())
-        if custom_root_str not in sys.path:
-            sys.path.insert(1, custom_root_str)
-
         # 5. Database migrations if declared in manifest or catalog
         requires_db = bool(manifest_data.get("requires_db", item.get("requires_db", False)))
         if requires_db:
@@ -274,9 +266,14 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
 
         return {
             "status": "success",
-            "message": f"{addon_id} installed and activated successfully",
+            "message": (
+                "Addon configured. Reloading engine..."
+                if record.reload_required
+                else f"{addon_id} installed and activated successfully"
+            ),
             "addon_id": addon_id,
-            "version": record.version
+            "version": record.version,
+            "reload_required": record.reload_required
         }
 
     except Exception as exc:
