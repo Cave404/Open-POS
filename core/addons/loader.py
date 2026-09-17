@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import logging
 import importlib
@@ -242,10 +243,35 @@ class AddonManager:
 
     def _verify_dependencies(self, record: AddonRecord) -> None:
         """Verifies that all third-party Python modules specified in dependencies can be imported."""
-        for dep in record.dependencies:
-            dep_clean = dep.strip()
+        dependencies = record.manifest.get("dependencies", record.dependencies)
+        if isinstance(dependencies, dict):
+            dependencies = list(dependencies.keys())
+        elif not isinstance(dependencies, (list, tuple, set)):
+            dependencies = []
+
+        for dep in dependencies:
+            dep_str = str(dep).strip()
+            if not dep_str:
+                continue
+
+            # Strip version specifiers like 'package>=1.0.0' or 'package==1.5' -> 'package'
+            dep_clean = re.split(r"[<>=!~ ]", dep_str)[0].strip()
             if not dep_clean:
                 continue
+
+            # Handle Python runtime version constraints (e.g. python, python>=3.10)
+            if dep_clean.lower() == "python":
+                if ">=" in dep_str:
+                    req_ver = dep_str.split(">=")[1].strip()
+                    try:
+                        req_parts = [int(p) for p in req_ver.split(".") if p.isdigit()]
+                        cur_parts = [sys.version_info.major, sys.version_info.minor, sys.version_info.micro][:len(req_parts)]
+                        if cur_parts < req_parts:
+                            raise RuntimeError(f"Addon '{record.id}' requires Python >={req_ver}, but current Python is {sys.version.split()[0]}")
+                    except ValueError:
+                        pass
+                continue
+
             try:
                 importlib.import_module(dep_clean)
             except Exception as err:
@@ -575,33 +601,73 @@ class AddonManager:
         """
         import shutil
 
-        rec = self.addons.get(addon_id)
-        if not rec:
-            return {"success": False, "error": f"Addon '{addon_id}' not found."}
+        custom_dir = getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))
+        target_dir = os.path.join(custom_dir, addon_id)
 
-        if rec.dir_type != "custom":
+        rec = self.addons.get(addon_id)
+        if rec and rec.dir_type != "custom":
             return {
                 "success": False,
                 "error": f"Cannot remove built-in core addon '{rec.name}'. You can disable it using the toggle instead."
             }
 
+        if not rec and not os.path.isdir(target_dir):
+            return {"success": False, "error": f"Addon '{addon_id}' not found."}
+
         # Unregister hooks
         self.hook_bus.unregister_for_addon(addon_id)
 
-        # Remove files
-        if os.path.isdir(rec.dir_path):
+        # Unbind blueprint from Flask app if registered
+        if rec and rec.blueprint and self.app:
             try:
-                shutil.rmtree(rec.dir_path, ignore_errors=True)
-            except Exception as e:
-                return {"success": False, "error": f"Failed to delete directory: {e}"}
+                self.app.blueprints.pop(rec.blueprint.name, None)
+            except Exception:
+                pass
+
+        # Remove files completely from disk
+        target_paths = set()
+        if rec and rec.dir_path:
+            target_paths.add(rec.dir_path)
+        target_paths.add(target_dir)
+
+        for p in target_paths:
+            if os.path.isdir(p):
+                try:
+                    shutil.rmtree(p, ignore_errors=True)
+                except Exception as e:
+                    logger.error(f"Failed to delete addon directory {p}: {e}")
+
+        # Purge from addon_registry.json if present
+        registry_file = os.path.join(Config.DATA_DIR, 'config', 'addon_registry.json')
+        if os.path.isfile(registry_file):
+            try:
+                with open(registry_file, 'r', encoding='utf-8') as rf:
+                    reg_data = json.load(rf)
+                if addon_id in reg_data:
+                    reg_data.pop(addon_id, None)
+                    with open(registry_file, 'w', encoding='utf-8') as wf:
+                        json.dump(reg_data, wf, indent=2)
+            except Exception as re:
+                logger.warning(f"Could not update addon_registry.json during uninstall: {re}")
+
+        # Clean cached module instances from sys.modules
+        for mod_name in list(sys.modules.keys()):
+            if (
+                mod_name == addon_id
+                or mod_name.startswith(f"{addon_id}.")
+                or mod_name == f"openpos_addon_{addon_id}"
+                or mod_name.startswith(f"openpos_addon_{addon_id}.")
+            ):
+                del sys.modules[mod_name]
 
         # Purge from registry
         self.addons.pop(addon_id, None)
 
+        addon_name = rec.name if rec else addon_id
         return {
             "success": True,
             "id": addon_id,
-            "message": f"Addon '{rec.name}' has been uninstalled successfully."
+            "message": f"Addon '{addon_name}' has been uninstalled successfully from disk."
         }
 
 

@@ -11,6 +11,7 @@ import json
 import shutil
 import logging
 import zipfile
+import subprocess
 from pathlib import Path
 from typing import Dict, Any
 import requests
@@ -227,6 +228,21 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
             return extract_res
 
         manifest_data = extract_res.get("manifest", {})
+
+        # Auto-install dependencies if requirements.txt exists
+        addon_reqs = os.path.join(target_dir, "requirements.txt")
+        if os.path.isfile(addon_reqs):
+            logger.info(f"Installing dependencies for addon '{addon_id}' from {addon_reqs}...")
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "-r", addon_reqs, "--no-cache-dir"],
+                    check=True,
+                    capture_output=True,
+                    timeout=120
+                )
+                logger.info(f"Dependencies installed successfully for addon '{addon_id}'.")
+            except Exception as pe:
+                logger.warning(f"pip install for addon '{addon_id}' failed: {pe}")
 
         # Ensure addon directory and custom_addons root are injected into sys.path
         target_dir_str = str(Path(target_dir).resolve())

@@ -128,8 +128,8 @@ BUILTIN_APPLETS = [
     },
     {
         "id": "addons",
-        "title": "Applets_&_Addons",
-        "category": "Desktop_Apps",
+        "title": "Addons",
+        "category": "Addons",
         "icon": "puzzle.png",
         "target": "/manager/addons"
     },
@@ -174,9 +174,9 @@ APPLETS_META = {
         "description": "System credits, contributors ledger, and third-party dependency licensing audit."
     },
     "addons": {
-        "title": "Applets & Addons",
+        "title": "Addons",
         "icon": "🧩",
-        "category": "Desktop Apps",
+        "category": "Addons",
         "description": "Inspect, enable/disable, configure, and troubleshoot installed system extensions and custom applets."
     }
 }
@@ -370,7 +370,7 @@ def manager_placeholder(applet_id):
         meta = {
             "title": addon.get("name", applet_id.replace('_', ' ').title()),
             "icon": addon.get("icon") if addon.get("icon") and not str(addon["icon"]).endswith('.png') else "🧩",
-            "category": addon.get("category", "Desktop Apps"),
+            "category": addon.get("category", "Addons"),
             "description": addon.get("description", "This installed extension is active and currently being initialized.")
         }
     else:
@@ -621,7 +621,7 @@ def list_applets():
             applets.append({
                 "id": addon["id"],
                 "title": addon["name"],
-                "category": addon.get("category", "Desktop_Apps"),
+                "category": addon.get("category", "Addons"),
                 "icon": addon.get("icon", "generic_app.png"),
                 "target": target_url,
                 "is_addon": True,

@@ -297,6 +297,22 @@ def update_addon(addon_id: str, app=None) -> Dict[str, Any]:
         if extract_res.get("status") != "success":
             raise RuntimeError(f"Package extraction error: {extract_res.get('message')}")
 
+        # Auto-install dependencies if requirements.txt exists
+        addon_reqs = addon_dir / "requirements.txt"
+        if addon_reqs.is_file():
+            addon_logger.info(f"Installing dependencies for updated addon '{addon_id}'...")
+            try:
+                import subprocess
+                subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "-r", str(addon_reqs), "--no-cache-dir"],
+                    check=True,
+                    capture_output=True,
+                    timeout=120
+                )
+                addon_logger.info(f"Dependencies installed successfully for updated addon '{addon_id}'.")
+            except Exception as pe:
+                addon_logger.warning(f"pip install for updated addon '{addon_id}' failed: {pe}")
+
         # Step 6: Database Migrations
         manifest_data = extract_res.get("manifest", {})
         requires_db = bool(manifest_data.get("requires_db", item.get("requires_db", False)))

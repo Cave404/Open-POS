@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Applets &amp; Addons Manager - Open-POS</title>
+    <title>Addon Manager - Open-POS</title>
     <link rel="stylesheet" href="/static/css/manager.css">
     <script src="/static/js/notifications.js"></script>
     <script src="/static/js/lockout_guard.js" data-section="addons"></script>
@@ -139,8 +139,8 @@
         /* Addons Grid */
         .addons-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 1.5rem;
         }
 
         .addon-card {
@@ -153,7 +153,6 @@
             gap: 16px;
             transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
             position: relative;
-            overflow: hidden;
         }
 
         .addon-card:hover {
@@ -925,12 +924,19 @@
             <div class="header-divider"></div>
             <div>
                 <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">
-                    Desktop Apps &rarr; Addon Control Center
+                    Addons &rarr; Addon Control Center
                 </div>
-                <h2 class="subview-title" style="margin: 0;">Applets &amp; Addons Manager</h2>
+                <h2 class="subview-title" style="margin: 0;">Addon Manager</h2>
             </div>
         </div>
         <div class="header-right">
+            <!-- Addon Manager Global Navigation Button -->
+            <a href="/manager/addons" class="btn-nav-addon-manager active" title="Addon Manager">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/>
+                </svg>
+                <span>Addon Manager</span>
+            </a>
             <button class="btn-addon-logs" id="btnViewAddonLogs" onclick="openAddonLogsModal()" title="View Addon Logs">
                 <span>📜</span> View Addon Logs
             </button>
@@ -1243,16 +1249,17 @@
 
         function createAddonCard(addon) {
             const card = document.createElement('div');
-            card.className = `addon-card status-${addon.status.toLowerCase()}`;
+            const statusKey = (addon.status || 'ACTIVE').toLowerCase();
+            card.className = `addon-card status-${statusKey}`;
             card.id = `addon-card-${addon.id}`;
 
-            const isChecked = addon.enabled && addon.status !== 'ERROR';
-            const isError = addon.status === 'ERROR';
+            const isChecked = addon.enabled && statusKey !== 'error' && statusKey !== 'failed';
+            const isError = statusKey === 'error' || statusKey === 'failed';
 
             let statusHtml = '';
-            if (addon.status === 'ACTIVE') {
+            if (statusKey === 'active') {
                 statusHtml = `<span class="status-badge active"><span class="status-dot"></span> Active</span>`;
-            } else if (addon.status === 'DISABLED') {
+            } else if (statusKey === 'disabled') {
                 statusHtml = `<span class="status-badge disabled"><span class="status-dot"></span> Disabled</span>`;
             } else {
                 statusHtml = `<span class="status-badge error"><span class="status-dot"></span> Failed</span>`;
@@ -1266,49 +1273,62 @@
                 ? `<span class="tag-pill">Database Required</span>`
                 : '';
 
-            const settingsBtn = addon.settings_route
-                ? `<a href="${addon.settings_route}" class="btn-configure ${addon.status !== 'ACTIVE' ? 'disabled' : ''}">⚙️ Configure</a>`
-                : `<span class="btn-configure disabled" title="No configure route specified">⚙️ Configure</span>`;
+            // Icon resolution: image or default SVG fallback
+            const puzzleSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/></svg>`;
+            
+            const rawIcon = addon.icon_url || addon.icon;
+            const isImg = rawIcon && (rawIcon.endsWith('.png') || rawIcon.endsWith('.svg') || rawIcon.endsWith('.jpg') || rawIcon.startsWith('http') || rawIcon.startsWith('/'));
 
-            const errorBtn = isError
-                ? `<button class="btn-trace" onclick="openErrorModal('${addon.id}')">🔍 View Error Trace</button>`
-                : '';
-
-            const removeBtn = addon.dir_type === 'custom'
-                ? `<button class="btn-remove" onclick="confirmRemoveAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Remove custom addon">🗑️ Remove</button>`
-                : '';
+            const iconHtml = isImg
+                ? `<img src="${rawIcon}" alt="" class="addon-icon-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                   <div class="addon-icon-fallback" style="display: none;">${puzzleSvg}</div>`
+                : `<div class="addon-icon-fallback" style="display: flex;">${(addon.icon && !isImg && addon.icon.length <= 4) ? addon.icon : puzzleSvg}</div>`;
 
             // Check if newer catalog version is available
             const catalogItem = allCatalogAddons.find(c => c.id === addon.id);
-            let updateBtn = '';
-            if (catalogItem && (catalogItem.has_update || (catalogItem.version && catalogItem.version !== addon.version))) {
-                updateBtn = `
-                    <button class="btn-update-addon" id="btnUpdate-${addon.id}" onclick="triggerAddonUpdate('${addon.id}', '${catalogItem.version}')" title="In-place update to v${catalogItem.version}">
-                        <span>🚀</span> Update (v${catalogItem.version})
-                    </button>
-                `;
-            }
+            const hasUpdate = catalogItem && (catalogItem.has_update || (catalogItem.version && catalogItem.version !== addon.version));
 
-            const rollbackBtn = (addon.dir_type === 'custom')
-                ? `<button class="btn-rollback-menu" onclick="openRollbackModal('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Version History & Rollback">
-                    <span>⏪</span> Rollback
-                </button>`
+            // View Error button
+            const errorBtn = isError
+                ? `<button class="btn btn-sm btn-outline-danger btn-view-trace" onclick="openErrorModal('${addon.id}')" title="Inspect failure stack trace">View Error</button>`
                 : '';
 
-            const iconDisplay = addon.icon && addon.icon.endsWith('.png')
-                ? '🧩'
-                : (addon.icon || '🧩');
+            // Update button
+            const updateBtn = hasUpdate
+                ? `<button class="btn btn-sm btn-primary btn-update-addon" onclick="triggerAddonUpdate('${addon.id}', '${catalogItem.version}')" title="In-place update to v${catalogItem.version}">Update</button>`
+                : '';
+
+            // Rollback button
+            const rollbackBtn = (addon.dir_type === 'custom')
+                ? `<button class="btn btn-sm btn-secondary btn-rollback-menu" onclick="openRollbackModal('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Version History & Rollback">⏪ Rollback</button>`
+                : '';
+
+            // Configure button
+            let configBtn = '';
+            if (addon.settings_route) {
+                configBtn = `<a href="${addon.settings_route}" class="btn btn-sm btn-secondary btn-configure-addon ${addon.status !== 'ACTIVE' ? 'disabled' : ''}">Configure</a>`;
+            } else {
+                configBtn = `<button class="btn btn-sm btn-secondary btn-configure-addon disabled" disabled title="No configure route specified">Configure</button>`;
+            }
+
+            // Uninstall button - Guaranteed on every card (both Active and Failed)
+            let uninstallBtn = '';
+            if (addon.dir_type !== 'builtin') {
+                uninstallBtn = `<button class="btn btn-sm btn-danger btn-uninstall-addon" onclick="confirmRemoveAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Permanently Delete Addon">🗑 Uninstall</button>`;
+            } else {
+                uninstallBtn = `<button class="btn btn-sm btn-danger btn-uninstall-addon" disabled style="opacity: 0.35; cursor: not-allowed;" title="Core built-in addons cannot be uninstalled">🗑 Uninstall</button>`;
+            }
 
             card.innerHTML = `
                 <div class="card-top">
-                    <div class="addon-brand">
-                        <div class="addon-icon-wrap">${iconDisplay}</div>
-                        <div class="addon-meta">
-                            <div class="addon-name">
-                                ${addon.name}
-                                <span class="addon-version">v${addon.version}</span>
-                            </div>
-                            <div class="addon-author">by ${addon.author || 'OpenPOS'}</div>
+                    <div class="addon-header-row">
+                        <div class="addon-icon-wrapper">
+                            ${iconHtml}
+                        </div>
+                        <div class="addon-title-group">
+                            <h3 class="addon-title">${addon.name || addon.id}</h3>
+                            <span class="addon-version-pill">v${addon.version || '1.0.0'}</span>
+                            <span class="addon-author">by ${addon.author || 'OpenPOS'}</span>
                         </div>
                     </div>
                     ${statusHtml}
@@ -1322,19 +1342,20 @@
                     <span class="tag-pill">ID: ${addon.id}</span>
                 </div>
 
-                <div class="card-actions">
-                    <label class="toggle-wrap">
-                        <input type="checkbox" class="switch-input" ${isChecked ? 'checked' : ''} onchange="toggleAddonState('${addon.id}', this.checked)">
-                        <div class="switch-slider"></div>
+                <div class="addon-card-actions">
+                    <div class="actions-left">
+                        <label class="switch-toggle toggle-wrap">
+                            <input type="checkbox" class="switch-input addon-toggle-input" data-id="${addon.id}" ${isChecked ? 'checked' : ''} onchange="toggleAddonState('${addon.id}', this.checked)">
+                            <div class="switch-slider toggle-slider"></div>
+                        </label>
                         <span class="toggle-label">${isChecked ? 'Enabled' : 'Disabled'}</span>
-                    </label>
-
-                    <div class="action-btns">
+                    </div>
+                    <div class="actions-right">
+                        ${errorBtn}
                         ${updateBtn}
                         ${rollbackBtn}
-                        ${errorBtn}
-                        ${settingsBtn}
-                        ${removeBtn}
+                        ${configBtn}
+                        ${uninstallBtn}
                     </div>
                 </div>
             `;
@@ -1718,9 +1739,14 @@
             card.className = 'addon-card';
             card.id = `catalog-card-${addon.id}`;
 
-            const iconDisplay = addon.icon_url
-                ? `<img src="${addon.icon_url}" alt="${addon.name}" style="width:32px; height:32px; object-fit:contain;" onerror="this.outerHTML='🧩'">`
-                : (addon.icon || '🧩');
+            const puzzleSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/></svg>`;
+            const rawIcon = addon.icon_url || addon.icon;
+            const isImg = rawIcon && (rawIcon.endsWith('.png') || rawIcon.endsWith('.svg') || rawIcon.endsWith('.jpg') || rawIcon.startsWith('http') || rawIcon.startsWith('/'));
+
+            const iconHtml = isImg
+                ? `<img src="${rawIcon}" alt="" class="addon-icon-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                   <div class="addon-icon-fallback" style="display: none;">${puzzleSvg}</div>`
+                : `<div class="addon-icon-fallback" style="display: flex;">${(addon.icon && !isImg && addon.icon.length <= 4) ? addon.icon : puzzleSvg}</div>`;
 
             const isCompatible = addon.is_compatible !== false;
             const compatBadge = isCompatible
@@ -1738,26 +1764,26 @@
             let actionBtnHtml = '';
             if (addon.is_installed) {
                 if (addon.has_update) {
-                    actionBtnHtml = `<button class="btn-install-addon" onclick="installRemoteAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">🔄 Update to v${addon.version}</button>`;
+                    actionBtnHtml = `<button class="btn btn-sm btn-primary btn-install-addon" onclick="installRemoteAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">🔄 Update to v${addon.version}</button>`;
                 } else {
                     actionBtnHtml = `<span class="btn-installed-badge">✓ Installed (v${addon.installed_version || addon.version})</span>`;
                 }
             } else if (isCompatible) {
-                actionBtnHtml = `<button class="btn-install-addon" onclick="installRemoteAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">⬇️ Install Addon</button>`;
+                actionBtnHtml = `<button class="btn btn-sm btn-primary btn-install-addon" onclick="installRemoteAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">⬇️ Install Addon</button>`;
             } else {
-                actionBtnHtml = `<button class="btn-secondary disabled" disabled style="opacity: 0.5; cursor: not-allowed;">Incompatible</button>`;
+                actionBtnHtml = `<button class="btn btn-sm btn-secondary disabled" disabled style="opacity: 0.5; cursor: not-allowed;">Incompatible</button>`;
             }
 
             card.innerHTML = `
                 <div class="card-top">
-                    <div class="addon-brand">
-                        <div class="addon-icon-wrap">${iconDisplay}</div>
-                        <div class="addon-meta">
-                            <div class="addon-name">
-                                ${addon.name}
-                                <span class="addon-version">v${addon.version}</span>
-                            </div>
-                            <div class="addon-author">by ${addon.author || 'Open-POS Community'}</div>
+                    <div class="addon-header-row">
+                        <div class="addon-icon-wrapper">
+                            ${iconHtml}
+                        </div>
+                        <div class="addon-title-group">
+                            <h3 class="addon-title">${addon.name}</h3>
+                            <span class="addon-version-pill">v${addon.version}</span>
+                            <span class="addon-author">by ${addon.author || 'Open-POS Community'}</span>
                         </div>
                     </div>
                 </div>
@@ -1765,15 +1791,15 @@
                 <div class="addon-desc">${addon.description || 'No description provided.'}</div>
 
                 <div class="addon-tags">
-                    <span class="tag-pill source-custom">Remote Catalog</span>
                     ${compatBadge}
                     ${dbBadge}
                     ${depsBadge}
                     <span class="tag-pill">ID: ${addon.id}</span>
                 </div>
 
-                <div class="card-actions" style="justify-content: flex-end;">
-                    <div class="action-btns">
+                <div class="addon-card-actions">
+                    <div></div>
+                    <div class="actions-right">
                         ${actionBtnHtml}
                     </div>
                 </div>

@@ -84,7 +84,7 @@ def test_manager_addons_ui_and_apis(client):
     res_ui = client.get("/manager/addons")
     assert res_ui.status_code == 200
     html = res_ui.get_data(as_text=True)
-    assert "Applets &amp; Addons Manager" in html or "Applets & Addons Manager" in html
+    assert any(t in html for t in ("Addon Manager", "Applets &amp; Addons Manager", "Applets & Addons Manager"))
     assert "Return to Dashboard" in html
     assert "statTotalAddons" in html
     assert "errorModal" in html
@@ -216,3 +216,55 @@ def test_addon_missing_dependency_isolation(client):
         if os.path.isdir(missing_dep_dir):
             shutil.rmtree(missing_dep_dir, ignore_errors=True)
         addon_manager.addons.pop("dep_fail_addon", None)
+
+
+def test_addon_python_and_versioned_dependencies(client):
+    """
+    Asserts that:
+    1. Dependencies with version specifiers (e.g. 'sqlalchemy>=2.0.0') are stripped and imported properly.
+    2. 'python>=3.10' or 'python' checks sys.version_info and does not fail looking for a 'python' module.
+    3. Dictionary dependencies format (e.g. {'python': '>=3.10', 'sqlalchemy': '>=2.0.0'}) is supported.
+    """
+    dep_addon_dir = os.path.join(Config.CUSTOM_ADDONS_DIR, "dep_version_addon")
+    os.makedirs(dep_addon_dir, exist_ok=True)
+    try:
+        manifest = {
+            "id": "dep_version_addon",
+            "name": "Dependency Version Plugin",
+            "version": "1.0.0",
+            "entrypoint": "plugin.py",
+            "dependencies": [
+                "python>=3.10",
+                "sqlalchemy>=2.0.0"
+            ]
+        }
+        with open(os.path.join(dep_addon_dir, "manifest.json"), "w", encoding="utf-8") as f:
+            json.dump(manifest, f)
+
+        with open(os.path.join(dep_addon_dir, "plugin.py"), "w", encoding="utf-8") as f:
+            f.write("from flask import Blueprint\nblueprint = Blueprint('dep_version', __name__)\n")
+
+        record = addon_manager.load_addon(dep_addon_dir, dir_type="custom")
+        assert record.status == STATE_ACTIVE, f"Addon failed with: {record.error}"
+
+        # Test dictionary dependencies format
+        manifest_dict = {
+            "id": "dep_version_addon",
+            "name": "Dependency Version Plugin",
+            "version": "1.0.1",
+            "entrypoint": "plugin.py",
+            "dependencies": {
+                "python": ">=3.10",
+                "sqlalchemy": ">=2.0.0"
+            }
+        }
+        with open(os.path.join(dep_addon_dir, "manifest.json"), "w", encoding="utf-8") as f:
+            json.dump(manifest_dict, f)
+
+        record2 = addon_manager.load_addon(dep_addon_dir, dir_type="custom")
+        assert record2.status == STATE_ACTIVE, f"Addon with dict dependencies failed: {record2.error}"
+
+    finally:
+        if os.path.isdir(dep_addon_dir):
+            shutil.rmtree(dep_addon_dir, ignore_errors=True)
+        addon_manager.addons.pop("dep_version_addon", None)
