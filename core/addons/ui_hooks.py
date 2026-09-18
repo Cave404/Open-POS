@@ -38,23 +38,84 @@ def get_active_ui_extensions() -> List[Dict[str, Any]]:
         return []
 
     active_exts = []
-    for record in manager.get_all_addons():
-        status = getattr(record, 'status', None)
+    items = manager.addons.values() if hasattr(manager, 'addons') and manager.addons else manager.get_all_addons()
+    for item in items:
+        if isinstance(item, dict):
+            status = item.get('status')
+            addon_id = item.get('id')
+            manifest = item.get('manifest') or {}
+            name = item.get('name', addon_id)
+            dir_path = item.get('dir_path', '')
+        else:
+            status = getattr(item, 'status', None)
+            addon_id = getattr(item, 'id', None)
+            manifest = getattr(item, 'manifest', {}) or {}
+            name = getattr(item, 'name', addon_id)
+            dir_path = getattr(item, 'dir_path', '')
+
         # Check active status (AddonRecord uses 'ACTIVE')
         if str(status).upper() != "ACTIVE":
             continue
 
-        manifest = getattr(record, 'manifest', {}) or {}
         ui_ext = manifest.get("ui_extensions")
         if ui_ext and isinstance(ui_ext, dict):
             active_exts.append({
-                "addon_id": record.id,
-                "name": getattr(record, 'name', record.id),
-                "dir_path": getattr(record, 'dir_path', ''),
+                "addon_id": addon_id,
+                "name": name,
+                "dir_path": dir_path,
+                "manifest": manifest,
                 "ui_extensions": ui_ext
             })
 
     return active_exts
+
+
+def get_registered_workspaces() -> List[Dict[str, Any]]:
+    """
+    Inspects active addon manifests to discover registered canvas workspaces.
+    Returns list of workspace objects:
+      - 'id': addon ID (e.g. 'tcg_pos')
+      - 'label': workspace tab label (e.g. '🃏 TCG Singles & Intake')
+      - 'icon_html': icon html or emoji string (e.g. '🃏')
+      - 'template_path': template relative path to include (e.g. 'tcg_pos/canvas.html')
+    """
+    workspaces = []
+    for ext in get_active_ui_extensions():
+        addon_id = ext["addon_id"]
+        manifest = ext.get("manifest", {})
+        ui_ext = ext.get("ui_extensions", {})
+
+        provides_canvas = (
+            ui_ext.get("provides_canvas") is True or
+            ui_ext.get("mode") == "canvas_replace" or
+            bool(ui_ext.get("canvas_template")) or
+            bool(ui_ext.get("canvas_label"))
+        )
+        if not provides_canvas:
+            continue
+
+        raw_label = ui_ext.get("canvas_label") or manifest.get("name") or ext.get("name", addon_id)
+        icon_html = ui_ext.get("icon_html")
+        if not icon_html:
+            first_char = raw_label.strip()[:1] if raw_label else ""
+            if first_char and ord(first_char) > 127:
+                icon_html = ""
+            else:
+                icon_html = "🧩"
+
+        tmpl = ui_ext.get("canvas_template", "canvas.html")
+        if tmpl.startswith(f"{addon_id}/") or tmpl.startswith(f"{addon_id}\\"):
+            template_path = tmpl.replace('\\', '/')
+        else:
+            template_path = f"{addon_id}/{tmpl}".replace('\\', '/')
+
+        workspaces.append({
+            "id": addon_id,
+            "label": raw_label,
+            "icon_html": icon_html,
+            "template_path": template_path
+        })
+    return workspaces
 
 
 def has_addon_canvas() -> bool:
@@ -64,7 +125,7 @@ def has_addon_canvas() -> bool:
     """
     for ext in get_active_ui_extensions():
         ui_ext = ext["ui_extensions"]
-        if ui_ext.get("mode") == "canvas_replace" or ui_ext.get("canvas_template") or ui_ext.get("canvas_label"):
+        if ui_ext.get("provides_canvas") or ui_ext.get("mode") == "canvas_replace" or ui_ext.get("canvas_template") or ui_ext.get("canvas_label"):
             return True
     return False
 
@@ -76,7 +137,7 @@ def get_addon_canvases() -> List[Dict[str, Any]]:
     canvases = []
     for ext in get_active_ui_extensions():
         ui_ext = ext["ui_extensions"]
-        if ui_ext.get("mode") == "canvas_replace" or ui_ext.get("canvas_template") or ui_ext.get("canvas_label"):
+        if ui_ext.get("provides_canvas") or ui_ext.get("mode") == "canvas_replace" or ui_ext.get("canvas_template") or ui_ext.get("canvas_label"):
             canvases.append({
                 "addon_id": ext["addon_id"],
                 "name": ext["name"],

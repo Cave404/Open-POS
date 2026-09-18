@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controls &amp; Settings - Open-POS System Manager</title>
+    <link rel="stylesheet" href="/static/css/manager.css">
+    <script src="/static/js/notifications.js"></script>
+</head>
+<body>
+
+    <!-- Header Navigation Dock -->
+    <header class="subview-header">
+        <div class="header-left">
+            <a href="/manager" class="btn-back" id="btnReturnDashboard">
+                <span class="btn-icon">←</span>
+                <span>Return to Dashboard</span>
+            </a>
+            <div class="header-divider"></div>
+            <h2 class="subview-title">Controls &amp; Settings</h2>
+        </div>
+        <div class="header-right">
+            <!-- Quick Return to POS Register -->
+            <a href="/pos" class="btn btn-sm btn-success btn-return-register" title="Switch to Front-of-House Register">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM1 3.5c0-.28.22-.5.5-.5h13c.28 0 .5.22.5.5v9c0 .28-.22.5-.5.5h-13a.5.5 0 0 1-.5-.5z"/>
+                    <path d="M2 4.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5m1 3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/>
+                </svg>
+                <span>⮌ Open Register</span>
+            </a>
+            <!-- Addon Manager Global Navigation Button -->
+            <a href="/manager/addons" class="btn-nav-addon-manager" title="Open Addon Manager">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/>
+                </svg>
+                <span>Addon Manager</span>
+            </a>
+            <span class="status-pill status-online">Engine: Online</span>
+            <a href="/manager/about" class="version-badge-link">v1.0.9</a>
+        </div>
+    </header>
+
+    <div class="view-container">
+        <div class="settings-header">
+            <h1>Store Settings &amp; Register Preferences</h1>
+            <p>Configure default register workspace, store identity, branding, and business rules.</p>
+        </div>
+
+        <form id="settingsForm" onsubmit="return false;">
+            <div class="form-grid">
+                <!-- Section 1: Register Workspaces -->
+                <div class="form-card">
+                    <div class="card-header">
+                        <span class="card-icon">🖥️</span>
+                        <h2>Register Workspaces</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="default_pos_view">Default Register Workspace</label>
+                            <select id="default_pos_view" name="default_pos_view" class="form-select" style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px;">
+                                <option value="default-retail" {% if settings and settings.default_pos_view == 'default-retail' %}selected{% endif %}>
+                                    Standard Retail (Catalog & Quick Keys)
+                                </option>
+                                {% for ws in available_workspaces %}
+                                <option value="{{ ws.id }}" {% if settings and settings.default_pos_view == ws.id %}selected{% endif %}>
+                                    {{ ws.label }} (Addon Workspace)
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text form-hint">Choose which workspace opens by default when launching /pos.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Store Identity & Branding -->
+                <div class="form-card">
+                    <div class="card-header">
+                        <span class="card-icon">🏬</span>
+                        <h2>Store Identity</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group mb-3">
+                            <label class="form-label" for="store_name">Store Name</label>
+                            <input type="text" id="store_name" name="store_name" class="form-control" value="{{ settings.store_name if settings else 'Open-POS System' }}" required style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px;">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="form-label" for="currency_symbol">Currency Symbol</label>
+                            <input type="text" id="currency_symbol" name="currency_symbol" class="form-control" value="{{ settings.currency_symbol if settings else '$' }}" maxlength="8" style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px;">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="form-label" for="tax_rate">Default Tax Rate (%)</label>
+                            <input type="number" id="tax_rate" name="tax_rate" class="form-control" value="{{ settings.tax_rate if settings else '8.25' }}" step="0.01" style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="manager-actions">
+                <button type="button" class="btn btn-secondary" onclick="window.location.reload();">Discard Changes</button>
+                <button type="submit" class="btn btn-primary" id="saveBtn">Save Changes</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-container" id="toastContainer">
+        <div class="toast" id="toast" role="alert" aria-live="polite">
+            <div class="toast-message">
+                <span id="toastIcon">✓</span>
+                <span id="toastText">Settings updated successfully.</span>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('saveBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    const payload = {
+        default_pos_view: document.getElementById('default_pos_view').value,
+        store_name: document.getElementById('store_name').value.trim(),
+        currency_symbol: document.getElementById('currency_symbol').value.trim(),
+        tax_rate: parseFloat(document.getElementById('tax_rate').value) || 0
+    };
+
+    try {
+        const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (res.ok && result.status === 'success') {
+            showToast('Settings saved successfully.');
+        } else {
+            showToast(result.message || 'Failed to save settings.', true);
+        }
+    } catch (err) {
+        showToast('Network error while saving settings.', true);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+    }
+});
+
+function showToast(message, isError = false) {
+    const toast = document.getElementById('toast');
+    const text = document.getElementById('toastText');
+    const icon = document.getElementById('toastIcon');
+    text.textContent = message;
+    icon.textContent = isError ? '⚠️' : '✓';
+    toast.classList.toggle('toast-error', isError);
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>

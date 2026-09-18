@@ -1480,6 +1480,73 @@ input:checked + .toggle-slider:before {
     flex-shrink: 0;
 }
 
+.btn-open-register,
+.btn-return-register,
+.btn-success {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, #059669, #10b981);
+    border: 1px solid #34d399;
+    border-radius: 6px;
+    color: #ffffff !important;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+}
+
+.btn-open-register:hover,
+.btn-return-register:hover,
+.btn-success:hover {
+    background: linear-gradient(135deg, #047857, #059669);
+    border-color: #6ee7b7;
+    color: #ffffff !important;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
+    transform: translateY(-1px);
+}
+
+.btn-open-register svg,
+.btn-return-register svg,
+.btn-success svg {
+    flex-shrink: 0;
+}
+
+.sidebar-register-action {
+    padding: 10px 14px 6px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 8px;
+}
+
+.sidebar-register-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 12px;
+    background: linear-gradient(135deg, #059669, #10b981);
+    border: 1px solid #34d399;
+    border-radius: 8px;
+    color: #ffffff !important;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    transition: all 0.2s ease;
+}
+
+.sidebar-register-btn:hover {
+    background: linear-gradient(135deg, #047857, #059669);
+    border-color: #6ee7b7;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.5);
+    transform: translateY(-1px);
+}
+
 /* Scoped Addon Header Row & Fallback Icons */
 .addon-header-row {
     display: flex;

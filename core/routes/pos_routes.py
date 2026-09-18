@@ -25,7 +25,7 @@ from core.db import get_db_connection, execute_sql
 from core.events import event_bus
 from core.services.cart_service import cart_service
 from core.services.customer_service import resolve_customer, get_customer, redeem_store_credit
-from core.addons.ui_hooks import has_addon_canvas, get_addon_canvases
+from core.addons.ui_hooks import has_addon_canvas, get_addon_canvases, get_registered_workspaces
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +110,9 @@ def pos_register_view():
     if default_pos_view and default_pos_view != "default-retail":
         active_canvas = f"addon-{default_pos_view}"
 
+    addon_workspaces = get_registered_workspaces()
     canvases = get_addon_canvases()
-    has_canvas_switcher = len(canvases) > 0
+    has_canvas_switcher = len(canvases) > 0 or len(addon_workspaces) > 0
 
     return render_template(
         'pos/register.html',
@@ -120,9 +121,11 @@ def pos_register_view():
         currency_symbol=currency_symbol,
         tax_rate=tax_rate,
         default_canvas=active_canvas,
+        default_view=default_pos_view,
         default_pos_view=default_pos_view,
         has_canvas_switcher=has_canvas_switcher,
-        canvases=canvases
+        canvases=canvases,
+        addon_workspaces=addon_workspaces
     )
 
 

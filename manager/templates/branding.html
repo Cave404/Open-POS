@@ -22,6 +22,14 @@
             <h2 class="subview-title">Store Branding &amp; Business Rules</h2>
         </div>
         <div class="header-right">
+            <!-- Quick Return to POS Register -->
+            <a href="/pos" class="btn btn-sm btn-success btn-return-register" title="Switch to Front-of-House Register">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM1 3.5c0-.28.22-.5.5-.5h13c.28 0 .5.22.5.5v9c0 .28-.22.5-.5.5h-13a.5.5 0 0 1-.5-.5z"/>
+                    <path d="M2 4.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5m1 3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/>
+                </svg>
+                <span>⮌ Open Register</span>
+            </a>
             <!-- Addon Manager Global Navigation Button -->
             <a href="/manager/addons" class="btn-nav-addon-manager" title="Open Addon Manager">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -135,13 +143,19 @@
                             <span class="form-hint">Default sales tax rate applied to register line items.</span>
                         </div>
 
-                        <div class="form-group">
-                            <label for="default_pos_view">Default Register View</label>
-                            <select id="default_pos_view" name="default_pos_view" style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px;">
-                                <option value="default-retail">🏷️ Standard Retail Register</option>
-                                <option value="tcg_pos">🃏 TCG Singles &amp; Intake (TCG POS)</option>
+                        <div class="form-group mb-3">
+                            <label class="form-label" for="default_pos_view">Default Register Workspace</label>
+                            <select id="default_pos_view" name="default_pos_view" class="form-select" style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px;">
+                                <option value="default-retail" {% if settings and settings.default_pos_view == 'default-retail' %}selected{% endif %}>
+                                    Standard Retail (Catalog & Quick Keys)
+                                </option>
+                                {% for ws in available_workspaces %}
+                                <option value="{{ ws.id }}" {% if settings and settings.default_pos_view == ws.id %}selected{% endif %}>
+                                    {{ ws.label }} (Addon Workspace)
+                                </option>
+                                {% endfor %}
                             </select>
-                            <span class="form-hint">Workspace canvas to load automatically when opening /pos.</span>
+                            <div class="form-text form-hint">Choose which workspace opens by default when launching /pos.</div>
                         </div>
                     </div>
                 </div>

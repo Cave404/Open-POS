@@ -434,3 +434,82 @@ def test_ui_hooks_system():
     # Render canvas mount
     canvas_html = render_addon_hook("pos:canvas_mount")
     assert isinstance(canvas_html, str)
+
+
+def _ensure_tcg_addon():
+    import os
+    import shutil
+    from core.config import Config
+    from core.addons import addon_manager
+    src = os.path.join(Config.BASE_DIR, 'data', 'custom_addons', 'tcg_pos')
+    dst = os.path.join(Config.CUSTOM_ADDONS_DIR, 'tcg_pos')
+    if os.path.isdir(src) and not os.path.isdir(dst):
+        shutil.copytree(src, dst)
+    if os.path.isdir(dst):
+        addon_manager.load_addon(dst, "custom")
+
+
+def test_registered_workspaces_discovery():
+    """Asserts get_registered_workspaces discovers active addons declaring canvas views."""
+    _ensure_tcg_addon()
+    from core.addons.ui_hooks import get_registered_workspaces
+    workspaces = get_registered_workspaces()
+    assert isinstance(workspaces, list)
+    assert len(workspaces) >= 1
+    ws = next((w for w in workspaces if w["id"] == "tcg_pos"), None)
+    assert ws is not None
+    assert "TCG" in ws["label"]
+    assert "tcg_pos/canvas.html" in ws["template_path"]
+
+
+def test_pos_workspace_tabs_and_panes(test_app):
+    """Asserts that /pos renders workspace tabs and dynamic addon panes correctly."""
+    _ensure_tcg_addon()
+    # 1. Retail view as default
+    set_setting("default_pos_view", "default-retail")
+    res1 = test_app.get('/pos')
+    assert res1.status_code == 200
+    html1 = res1.data.decode('utf-8')
+    assert "pos-workspace-nav" in html1
+    assert "Standard Retail" in html1
+    assert 'data-target="#canvas-default-retail"' in html1
+    assert 'id="canvas-default-retail"' in html1
+
+    # 2. Addon view as default
+    set_setting("default_pos_view", "tcg_pos")
+    res2 = test_app.get('/pos')
+    assert res2.status_code == 200
+    html2 = res2.data.decode('utf-8')
+    assert 'id="canvas-addon-tcg_pos"' in html2
+    assert 'tab-tcg_pos' in html2
+
+
+def test_manager_open_register_navigation(test_app):
+    """Asserts the Open Register button is present across all Manager sub-views."""
+    endpoints = ['/manager', '/manager/branding', '/manager/settings', '/manager/addons']
+    for ep in endpoints:
+        res = test_app.get(ep, follow_redirects=True)
+        assert res.status_code == 200, f"Failed accessing {ep}"
+        html = res.data.decode('utf-8')
+        assert 'href="/pos"' in html, f"Open Register link missing on {ep}"
+        assert 'Open Register' in html, f"'Open Register' text missing on {ep}"
+
+
+def test_settings_service_sync():
+    """Asserts that settings_service reads and writes store_settings.json and syncs default_pos_view."""
+    from core.services.settings_service import (
+        get_store_settings,
+        save_store_settings,
+        get_default_pos_view,
+        set_default_pos_view
+    )
+    # Set default pos view to tcg_pos
+    set_default_pos_view("tcg_pos")
+    assert get_default_pos_view() == "tcg_pos"
+    assert get_setting("default_pos_view") == "tcg_pos"
+
+    # Reset back to default-retail
+    set_default_pos_view("default-retail")
+    assert get_default_pos_view() == "default-retail"
+    assert get_setting("default_pos_view") == "default-retail"
+

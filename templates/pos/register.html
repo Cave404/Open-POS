@@ -92,55 +92,99 @@
         <!-- Left Panel: Dynamic Action Canvas (62% width) -->
         <section class="pos-action-canvas-container" id="pos-action-canvas">
             
-            <!-- Default View: Retail Workspace -->
-            <div class="canvas-view {% if default_canvas == 'default-retail' %}active{% endif %}" id="canvas-default-retail">
-                
-                <!-- Quick Search / Barcode Input Bar -->
-                <div class="canvas-search-dock">
-                    <div class="search-input-group">
-                        <span class="search-symbol">🔍</span>
-                        <input type="text" id="barcodeOmniInput" class="barcode-omni-input" placeholder="Scan barcode / NFC UID, or search SKU / item name (F2)..." autocomplete="off" autofocus>
-                        <span class="hotkey-badge">F2</span>
-                        <button type="button" class="btn-clear-search" id="btnClearSearch" style="display: none;">✕</button>
-                    </div>
-                </div>
+            <!-- Multi-Workspace Tab Switcher Strip -->
+            <div class="pos-workspace-nav d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
+                <ul class="nav nav-pills workspace-tabs gap-2" id="posWorkspaceTabs" role="tablist">
+                    <!-- Standard Retail Tab -->
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link workspace-tab-btn {% if default_view == 'default-retail' %}active{% endif %}" 
+                                id="tab-retail" 
+                                data-bs-toggle="pill" 
+                                data-target="#canvas-default-retail" 
+                                type="button">
+                            🏷 Standard Retail
+                        </button>
+                    </li>
 
-                <!-- Preset Category Filter Tabs -->
-                <div class="product-category-filters" id="categoryFilters">
-                    <button type="button" class="cat-pill active" data-category="ALL">All Items</button>
-                    <button type="button" class="cat-pill" data-category="TCG Sealed">🃏 Sealed TCG</button>
-                    <button type="button" class="cat-pill" data-category="Accessories">🛡️ Accessories</button>
-                    <button type="button" class="cat-pill" data-category="Events">🎟️ Events</button>
-                    <button type="button" class="cat-pill" data-category="Snacks">🥤 Snacks</button>
-                    <button type="button" class="cat-pill" data-category="CUSTOM">⚡ Custom Amount</button>
-                </div>
+                    <!-- Dynamic Addon Workspace Tabs -->
+                    {% for addon_tab in addon_workspaces %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link workspace-tab-btn {% if default_view == addon_tab.id %}active{% endif %}" 
+                                id="tab-{{ addon_tab.id }}" 
+                                data-bs-toggle="pill" 
+                                data-target="#canvas-addon-{{ addon_tab.id }}" 
+                                type="button">
+                            {{ addon_tab.icon_html | safe }} {{ addon_tab.label }}
+                        </button>
+                    </li>
+                    {% endfor %}
+                </ul>
 
-                <!-- Quick-Key Product Grid -->
-                <div class="quick-products-grid" id="quickProductsGrid">
-                    <!-- Loaded dynamically from /api/pos/products -->
-                </div>
-
-                <!-- Custom Manual Amount Entry Form (Drawer / Bar) -->
-                <div class="manual-entry-bar" id="manualEntryBar">
-                    <div class="manual-input-group">
-                        <label for="manualItemName">Custom Item:</label>
-                        <input type="text" id="manualItemName" placeholder="Misc Merchandise / Service" class="form-input-sm">
-                    </div>
-                    <div class="manual-input-group">
-                        <label for="manualItemPrice">Price ($):</label>
-                        <input type="number" id="manualItemPrice" step="0.01" min="0" placeholder="0.00" class="form-input-sm">
-                    </div>
-                    <div class="manual-input-group">
-                        <label for="manualItemTaxable">Taxable:</label>
-                        <input type="checkbox" id="manualItemTaxable" checked class="form-check-sm">
-                    </div>
-                    <button type="button" class="btn btn-sm btn-primary" id="btnAddManualItem">+ Add to Ticket</button>
+                <!-- Global Register Action Shortcuts -->
+                <div class="workspace-meta text-muted small">
+                    <span>Press <kbd>F2</kbd> Search | <kbd>F4</kbd> Customer | <kbd>F12</kbd> Tender</span>
                 </div>
             </div>
 
-            <!-- Addon Canvas Mount Container -->
-            <div class="canvas-view {% if default_canvas != 'default-retail' %}active{% endif %}" id="canvas-addon-mount">
-                {{ render_addon_hook('pos:canvas_mount') }}
+            <!-- Workspace Content Panes -->
+            <div class="pos-workspace-content flex-grow-1 position-relative">
+                <!-- 1. Standard Retail Pane -->
+                <div id="canvas-default-retail" class="workspace-pane {% if default_view == 'default-retail' %}active{% else %}d-none{% endif %}">
+                    
+                    <!-- Quick Search / Barcode Input Bar -->
+                    <div class="canvas-search-dock">
+                        <div class="search-input-group">
+                            <span class="search-symbol">🔍</span>
+                            <input type="text" id="barcodeOmniInput" class="barcode-omni-input" placeholder="Scan barcode / NFC UID, or search SKU / item name (F2)..." autocomplete="off" autofocus>
+                            <span class="hotkey-badge">F2</span>
+                            <button type="button" class="btn-clear-search" id="btnClearSearch" style="display: none;">✕</button>
+                        </div>
+                    </div>
+
+                    <!-- Preset Category Filter Tabs -->
+                    <div class="product-category-filters" id="categoryFilters">
+                        <button type="button" class="cat-pill active" data-category="ALL">All Items</button>
+                        <button type="button" class="cat-pill" data-category="TCG Sealed">🃏 Sealed TCG</button>
+                        <button type="button" class="cat-pill" data-category="Accessories">🛡️ Accessories</button>
+                        <button type="button" class="cat-pill" data-category="Events">🎟️ Events</button>
+                        <button type="button" class="cat-pill" data-category="Snacks">🥤 Snacks</button>
+                        <button type="button" class="cat-pill" data-category="CUSTOM">⚡ Custom Amount</button>
+                    </div>
+
+                    <!-- Quick-Key Product Grid -->
+                    <div class="quick-products-grid" id="quickProductsGrid">
+                        <!-- Loaded dynamically from /api/pos/products -->
+                    </div>
+
+                    <!-- Custom Manual Amount Entry Form (Drawer / Bar) -->
+                    <div class="manual-entry-bar" id="manualEntryBar">
+                        <div class="manual-input-group">
+                            <label for="manualItemName">Custom Item:</label>
+                            <input type="text" id="manualItemName" placeholder="Misc Merchandise / Service" class="form-input-sm">
+                        </div>
+                        <div class="manual-input-group">
+                            <label for="manualItemPrice">Price ($):</label>
+                            <input type="number" id="manualItemPrice" step="0.01" min="0" placeholder="0.00" class="form-input-sm">
+                        </div>
+                        <div class="manual-input-group">
+                            <label for="manualItemTaxable">Taxable:</label>
+                            <input type="checkbox" id="manualItemTaxable" checked class="form-check-sm">
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary" id="btnAddManualItem">+ Add to Ticket</button>
+                    </div>
+                </div>
+
+                <!-- 2. Dynamic Addon Workspace Panes -->
+                {% for addon_tab in addon_workspaces %}
+                <div id="canvas-addon-{{ addon_tab.id }}" class="workspace-pane {% if default_view == addon_tab.id %}active{% else %}d-none{% endif %}">
+                    {% include addon_tab.template_path ignore missing %}
+                </div>
+                {% endfor %}
+
+                <!-- Fallback Addon Canvas Mount Slot -->
+                <div class="canvas-view d-none" id="canvas-addon-mount">
+                    {{ render_addon_hook('pos:canvas_mount') }}
+                </div>
             </div>
 
         </section>

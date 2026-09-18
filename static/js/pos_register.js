@@ -135,55 +135,87 @@
     // 2. Pluggable Workspace Canvas Swapping
     // -------------------------------------------------------------------------
     function initCanvasSwitcher() {
-        const toggles = document.querySelectorAll('.btn-canvas-toggle');
-        const defaultCanvas = document.body.dataset.defaultCanvas || 'default-retail';
+        const tabButtons = document.querySelectorAll('.workspace-tab-btn, .btn-canvas-toggle');
+        const panes = document.querySelectorAll('.workspace-pane, .canvas-view');
 
-        toggles.forEach(btn => {
-            btn.addEventListener('click', function () {
-                const targetCanvas = this.getAttribute('data-canvas');
-                switchCanvas(targetCanvas);
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                let targetSelector = btn.getAttribute('data-target');
+                let canvasId = btn.getAttribute('data-canvas');
+                
+                if (!targetSelector && canvasId) {
+                    targetSelector = (canvasId === 'default-retail') 
+                        ? '#canvas-default-retail' 
+                        : `#canvas-addon-${canvasId.replace(/^addon-/, '')}`;
+                }
+                if (!canvasId && targetSelector) {
+                    canvasId = targetSelector.replace('#canvas-addon-', '').replace('#canvas-', '');
+                }
+
+                // Update button active classes
+                tabButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Toggle pane visibility
+                panes.forEach(pane => {
+                    pane.classList.remove('active');
+                    pane.classList.add('d-none');
+                });
+
+                const targetPane = targetSelector ? document.querySelector(targetSelector) : null;
+                if (targetPane) {
+                    targetPane.classList.remove('d-none');
+                    targetPane.classList.add('active');
+                    targetPane.style.display = '';
+
+                    // Notify addon canvas if it has an onActivate hook
+                    window.dispatchEvent(new CustomEvent('pos:workspace_changed', { 
+                        detail: { target: targetSelector, canvasId: canvasId } 
+                    }));
+                    window.dispatchEvent(new CustomEvent('openpos:canvas_switched', { 
+                        detail: { canvasId: canvasId } 
+                    }));
+                }
             });
         });
 
-        // Activate the configured default canvas on boot
-        switchCanvas(defaultCanvas);
+        // Initialize active workspace pane matching active button or defaultCanvas
+        const activeBtn = document.querySelector('.workspace-tab-btn.active, .btn-canvas-toggle.active');
+        if (activeBtn) {
+            let targetSelector = activeBtn.getAttribute('data-target');
+            if (!targetSelector) {
+                const canvasId = activeBtn.getAttribute('data-canvas');
+                if (canvasId) {
+                    targetSelector = (canvasId === 'default-retail') 
+                        ? '#canvas-default-retail' 
+                        : `#canvas-addon-${canvasId.replace(/^addon-/, '')}`;
+                }
+            }
+            if (targetSelector) {
+                const targetPane = document.querySelector(targetSelector);
+                if (targetPane) {
+                    panes.forEach(p => {
+                        if (p !== targetPane) {
+                            p.classList.remove('active');
+                            p.classList.add('d-none');
+                        }
+                    });
+                    targetPane.classList.remove('d-none');
+                    targetPane.classList.add('active');
+                }
+            }
+        }
     }
 
     function switchCanvas(canvasId) {
-        // 1. Update button states
-        const toggles = document.querySelectorAll('.btn-canvas-toggle');
-        toggles.forEach(btn => {
-            if (btn.getAttribute('data-canvas') === canvasId) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        });
-
-        const retailCanvas = document.getElementById('canvas-default-retail');
-        const addonMount = document.getElementById('canvas-addon-mount');
-
-        if (canvasId === 'default-retail') {
-            if (retailCanvas) retailCanvas.classList.add('active');
-            if (addonMount) addonMount.classList.remove('active');
-        } else {
-            if (retailCanvas) retailCanvas.classList.remove('active');
-            if (addonMount) {
-                addonMount.classList.add('active');
-                // Show specific pane matching addon ID
-                const panes = addonMount.querySelectorAll('.addon-canvas-pane');
-                panes.forEach(pane => {
-                    if (pane.id === `canvas-${canvasId}`) {
-                        pane.style.display = 'block';
-                    } else {
-                        pane.style.display = 'none';
-                    }
-                });
-            }
+        const cleanId = canvasId.replace(/^addon-/, '');
+        const targetBtn = document.querySelector(
+            `[data-target="#canvas-addon-${cleanId}"], [data-target="#canvas-${canvasId}"], [data-canvas="${canvasId}"], [data-canvas="${cleanId}"]`
+        );
+        if (targetBtn) {
+            targetBtn.click();
         }
-
-        // Dispatch notification event for active addon scripts
-        window.dispatchEvent(new CustomEvent('openpos:canvas_switched', { detail: { canvasId } }));
     }
 
     // -------------------------------------------------------------------------

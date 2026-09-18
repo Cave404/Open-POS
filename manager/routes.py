@@ -359,9 +359,20 @@ def manager_setup():
 
 
 @manager_bp.route('/branding')
+@manager_bp.route('/settings')
 def manager_branding():
     """Renders the Store Branding & Business Rules configuration panel."""
-    return render_template('branding.html', is_locked=is_section_locked('branding'))
+    from core.addons.ui_hooks import get_registered_workspaces
+    available_workspaces = get_registered_workspaces()
+    settings = get_all_settings()
+    is_locked = is_section_locked('branding')
+    template_name = 'settings.html' if request.path.endswith('/settings') else 'branding.html'
+    return render_template(
+        template_name,
+        is_locked=is_locked,
+        settings=settings,
+        available_workspaces=available_workspaces
+    )
 
 
 @manager_bp.route('/about')
@@ -899,6 +910,13 @@ def handle_update_settings():
         success = set_setting(k, v)
         if not success:
             return jsonify({"status": "error", "message": f"Failed to persist setting: {k}"}), 500
+
+    # Also synchronize to data/config/store_settings.json
+    try:
+        from core.services.settings_service import save_store_settings
+        save_store_settings(validated)
+    except Exception as sync_err:
+        logger.warning(f"Failed to sync settings to store_settings.json: {sync_err}")
 
     return jsonify({"status": "success"})
 
