@@ -4,6 +4,8 @@ from core.db import init_db
 from core.settings import seed_default_settings
 from manager.routes import manager_bp, api_bp
 from core.routes.customer_routes import core_customers_bp
+from core.routes.pos_routes import pos_bp, run_pos_migrations
+from core.addons.ui_hooks import render_addon_hook, has_addon_canvas
 
 def create_app():
     app = Flask(__name__, template_folder='templates')
@@ -13,14 +15,20 @@ def create_app():
     init_db()
     seed_default_settings()
 
-    # Run Customer Management migrations (idempotent)
+    # Run Database Migrations (idempotent)
     from core.services.customer_service import run_customer_migrations
     run_customer_migrations()
+    run_pos_migrations()
 
     # Register blueprints
     app.register_blueprint(manager_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(core_customers_bp)
+    app.register_blueprint(pos_bp)
+
+    # Expose Addon UI Hooks to Jinja2 templates
+    app.jinja_env.globals['render_addon_hook'] = render_addon_hook
+    app.jinja_env.globals['has_addon_canvas'] = has_addon_canvas
 
     # Initialize dynamic Addon & Plugin Engine
     from core.addons import addon_manager
@@ -35,7 +43,7 @@ def create_app():
 
     @app.route('/')
     def index():
-        return redirect(url_for('manager.manager_index'))
+        return redirect('/pos')
 
     @app.route('/setup')
     def setup_root():

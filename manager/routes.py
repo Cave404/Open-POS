@@ -843,6 +843,11 @@ def handle_update_settings():
         elif isinstance(pinned_val, str):
             validated['pinned_tools'] = pinned_val
 
+    # Validate Default POS View
+    if 'default_pos_view' in data:
+        view_val = str(data['default_pos_view']).strip()
+        validated['default_pos_view'] = view_val or 'default-retail'
+
     # Persist all validated settings to database
     for k, v in validated.items():
         success = set_setting(k, v)

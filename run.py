@@ -312,7 +312,7 @@ def open_register_browser(icon=None, menu_item=None):
     """
     Opens the default system web browser directed at the POS register endpoint.
     """
-    register_url = f"http://127.0.0.1:{Config.PORT}/register"
+    register_url = f"http://127.0.0.1:{Config.PORT}/pos"
     webbrowser.open(register_url)
 
 
@@ -395,16 +395,16 @@ def boot_orchestration_worker():
     # Execute modular boot sequence (Phases 1 through 5)
     run_boot_sequence(progress_callback=update_splash_ui, buffer_seconds=1.5)
 
-    # Instantiate the primary System Manager window
+    # Instantiate the primary Register window (boots into /pos)
     active_window = webview.create_window(
-        title=f"{Config.STORE_NAME} - System Manager",
-        url=f"http://127.0.0.1:{Config.PORT}/manager",
-        width=1040,
-        height=720,
-        min_size=(820, 560),
+        title=f"{Config.STORE_NAME} - POS Register",
+        url=f"http://127.0.0.1:{Config.PORT}/pos",
+        width=1240,
+        height=820,
+        min_size=(960, 640),
         resizable=True,
         confirm_close=False,
-        js_api=JSBridge()   # Expose native save/dialog bridge to manager JS context
+        js_api=JSBridge()   # Expose native save/dialog bridge to JS context
     )
 
     # Register close button minimization hook

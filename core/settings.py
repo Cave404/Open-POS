@@ -17,6 +17,7 @@ DEFAULT_SETTINGS = {
     "store_logo_url": "",
     "pinned_tools": '["branding", "database"]',
     "addon_catalog_url": "https://raw.githubusercontent.com/Cave404/Open-POS/main/addons_catalog.json",
+    "default_pos_view": "default-retail",
 }
 
 def seed_default_settings(force: bool = False) -> None:

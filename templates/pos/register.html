@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ store_name }} - POS Register</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/pos_register.css">
+</head>
+<body data-default-canvas="{{ default_canvas }}">
+
+    <!-- Header Navigation Dock -->
+    <header class="pos-header">
+        <div class="pos-header-left">
+            <div class="pos-brand">
+                {% if store_logo_url %}
+                <img src="{{ store_logo_url }}" alt="Logo" class="pos-brand-logo">
+                {% else %}
+                <div class="pos-brand-icon">🏷️</div>
+                {% endif %}
+                <span class="pos-brand-title">{{ store_name }}</span>
+            </div>
+
+            <!-- Pluggable Workspace Mode Switcher -->
+            <div class="workspace-switcher-wrapper" id="workspaceSwitcherWrapper" {% if not has_canvas_switcher %}style="display: none;"{% endif %}>
+                <div class="workspace-switcher btn-group" role="group">
+                    <button type="button" class="btn btn-sm btn-canvas-toggle {% if default_canvas == 'default-retail' %}active{% endif %}" data-canvas="default-retail">
+                        🏷 Retail
+                    </button>
+                    {{ render_addon_hook('pos:workspace_toggles') }}
+                </div>
+            </div>
+        </div>
+
+        <div class="pos-header-center">
+            <!-- Dynamic Customer Loyalty Pill -->
+            <div class="customer-pill" id="customerPill">
+                <button type="button" class="btn-customer-attach" id="btnOpenCustomerModal" title="Attach Customer (F4)">
+                    <span class="customer-pill-icon">👤</span>
+                    <span class="customer-pill-label" id="customerPillLabel">Attach Customer (F4)</span>
+                </button>
+                <div class="customer-active-badge" id="customerActiveBadge" style="display: none;">
+                    <span class="cust-icon">👤</span>
+                    <div class="cust-details">
+                        <span class="cust-name" id="custBadgeName">Customer Name</span>
+                        <span class="cust-credit-balance" id="custBadgeCredit">Credit: $0.00</span>
+                    </div>
+                    <button type="button" class="btn-detach-customer" id="btnDetachCustomer" title="Detach Customer">✕</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="pos-header-right">
+            <!-- Slot for addon header actions -->
+            <div class="addon-header-slot">
+                {{ render_addon_hook('pos:header_actions') }}
+            </div>
+
+            <!-- System Manager Shortcut -->
+            <a href="/manager" class="btn-system-manager" title="Open OpenPOS System Manager">
+                <span class="mgr-icon">⚙️</span>
+                <span>System Manager</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Main POS Dual-Panel Workstation Layout -->
+    <main class="pos-workstation">
+
+        <!-- Left Panel: Dynamic Action Canvas (62% width) -->
+        <section class="pos-action-canvas-container" id="pos-action-canvas">
+            
+            <!-- Default View: Retail Workspace -->
+            <div class="canvas-view {% if default_canvas == 'default-retail' %}active{% endif %}" id="canvas-default-retail">
+                
+                <!-- Quick Search / Barcode Input Bar -->
+                <div class="canvas-search-dock">
+                    <div class="search-input-group">
+                        <span class="search-symbol">🔍</span>
+                        <input type="text" id="barcodeOmniInput" class="barcode-omni-input" placeholder="Scan barcode / NFC UID, or search SKU / item name (F2)..." autocomplete="off" autofocus>
+                        <span class="hotkey-badge">F2</span>
+                        <button type="button" class="btn-clear-search" id="btnClearSearch" style="display: none;">✕</button>
+                    </div>
+                </div>
+
+                <!-- Preset Category Filter Tabs -->
+                <div class="product-category-filters" id="categoryFilters">
+                    <button type="button" class="cat-pill active" data-category="ALL">All Items</button>
+                    <button type="button" class="cat-pill" data-category="TCG Sealed">🃏 Sealed TCG</button>
+                    <button type="button" class="cat-pill" data-category="Accessories">🛡️ Accessories</button>
+                    <button type="button" class="cat-pill" data-category="Events">🎟️ Events</button>
+                    <button type="button" class="cat-pill" data-category="Snacks">🥤 Snacks</button>
+                    <button type="button" class="cat-pill" data-category="CUSTOM">⚡ Custom Amount</button>
+                </div>
+
+                <!-- Quick-Key Product Grid -->
+                <div class="quick-products-grid" id="quickProductsGrid">
+                    <!-- Loaded dynamically from /api/pos/products -->
+                </div>
+
+                <!-- Custom Manual Amount Entry Form (Drawer / Bar) -->
+                <div class="manual-entry-bar" id="manualEntryBar">
+                    <div class="manual-input-group">
+                        <label for="manualItemName">Custom Item:</label>
+                        <input type="text" id="manualItemName" placeholder="Misc Merchandise / Service" class="form-input-sm">
+                    </div>
+                    <div class="manual-input-group">
+                        <label for="manualItemPrice">Price ($):</label>
+                        <input type="number" id="manualItemPrice" step="0.01" min="0" placeholder="0.00" class="form-input-sm">
+                    </div>
+                    <div class="manual-input-group">
+                        <label for="manualItemTaxable">Taxable:</label>
+                        <input type="checkbox" id="manualItemTaxable" checked class="form-check-sm">
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" id="btnAddManualItem">+ Add to Ticket</button>
+                </div>
+            </div>
+
+            <!-- Addon Canvas Mount Container -->
+            <div class="canvas-view {% if default_canvas != 'default-retail' %}active{% endif %}" id="canvas-addon-mount">
+                {{ render_addon_hook('pos:canvas_mount') }}
+            </div>
+
+        </section>
+
+        <!-- Right Panel: Unified Order Ticket (38% width) -->
+        <aside class="pos-order-ticket-container" id="pos-order-ticket">
+            
+            <!-- Ticket Header -->
+            <div class="ticket-header">
+                <div class="ticket-header-title">
+                    <span class="ticket-icon">🧾</span>
+                    <h2>Current Ticket</h2>
+                </div>
+                <span class="ticket-item-count" id="ticketItemCount">0 Items</span>
+            </div>
+
+            <!-- Scrollable Itemized Line Items Table -->
+            <div class="ticket-lines-scroll" id="ticketLinesScroll">
+                <div class="ticket-empty-state" id="ticketEmptyState">
+                    <div class="empty-icon">🛒</div>
+                    <p class="empty-title">Ticket is empty</p>
+                    <p class="empty-subtitle">Scan a barcode or select an item from the grid</p>
+                </div>
+                <div class="ticket-lines-list" id="ticketLinesList" style="display: none;">
+                    <!-- Line items dynamically rendered here -->
+                </div>
+            </div>
+
+            <!-- Slot for custom cart actions from addons -->
+            <div class="addon-cart-slot">
+                {{ render_addon_hook('pos:cart_actions') }}
+            </div>
+
+            <!-- Ticket Financial Summary -->
+            <div class="ticket-summary">
+                <div class="summary-line">
+                    <span class="summary-label">Subtotal</span>
+                    <span class="summary-value" id="sumSubtotal">$0.00</span>
+                </div>
+                <div class="summary-line discount-line" id="sumDiscountRow" style="display: none;">
+                    <span class="summary-label">
+                        Discount
+                        <button type="button" class="btn-link-action" id="btnEditDiscount">Edit</button>
+                    </span>
+                    <span class="summary-value" id="sumDiscount">-$0.00</span>
+                </div>
+                <div class="summary-line credit-line" id="sumCreditRow" style="display: none;">
+                    <span class="summary-label">
+                        Store Credit Applied
+                        <button type="button" class="btn-link-action text-danger" id="btnClearCredit">Remove</button>
+                    </span>
+                    <span class="summary-value" id="sumCredit">-$0.00</span>
+                </div>
+                <div class="summary-line">
+                    <span class="summary-label">Sales Tax (<span id="sumTaxRate">{{ tax_rate }}%</span>)</span>
+                    <span class="summary-value" id="sumTax">$0.00</span>
+                </div>
+                <div class="summary-line grand-total-line">
+                    <span class="summary-label">Total Due</span>
+                    <span class="summary-value total-amount" id="sumGrandTotal">$0.00</span>
+                </div>
+            </div>
+
+            <!-- Bottom Action Dock -->
+            <div class="ticket-action-dock">
+                <div class="dock-secondary-row">
+                    <button type="button" class="btn btn-secondary btn-dock-action" id="btnClearTicket" title="Clear Ticket">
+                        <span>🗑 Clear</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-dock-action" id="btnHoldTicket" title="Hold Order (F8)">
+                        <span>⏸ Hold (F8)</span>
+                        <span class="badge-pill-held" id="heldOrdersCountBadge" style="display: none;">0</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-dock-action" id="btnOrderDiscount" title="Apply Discount">
+                        <span>🏷 Discount</span>
+                    </button>
+                </div>
+                <button type="button" class="btn btn-success btn-dock-tender" id="btnOpenTenderModal" title="Tender / Pay (F12)">
+                    <span class="tender-title">TENDER / PAY</span>
+                    <span class="tender-hotkey">F12</span>
+                    <span class="tender-amount" id="dockTenderAmount">$0.00</span>
+                </button>
+            </div>
+        </aside>
+
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: Customer Attachment & NFC Tap Modal (F4)                     -->
+    <!-- ===================================================================== -->
+    <div class="pos-modal-backdrop" id="customerModalBackdrop" style="display: none;">
+        <div class="pos-modal pos-modal-md">
+            <div class="pos-modal-header">
+                <h3>👤 Attach Customer / NFC Loyalty</h3>
+                <button type="button" class="pos-modal-close" id="btnCloseCustomerModal">&times;</button>
+            </div>
+            <div class="pos-modal-body">
+                <div class="search-box-modal">
+                    <label for="customerSearchInput">Search Phone, Name, or Tap NFC Card:</label>
+                    <div class="input-with-action">
+                        <input type="text" id="customerSearchInput" placeholder="Enter phone, full name, or NFC UID..." autocomplete="off">
+                        <button type="button" class="btn btn-primary" id="btnSearchCustomer">Search</button>
+                    </div>
+                    <div class="nfc-tap-helper">
+                        <span class="nfc-pulse-icon">📡</span>
+                        <span>Scanner Active: Tap physical NFC card anytime, or click:</span>
+                        <button type="button" class="btn btn-sm btn-outline-info" id="btnSimulateNfcTap">
+                            Simulate NFC Tap
+                        </button>
+                    </div>
+                </div>
+
+                <div class="customer-search-results" id="customerSearchResults">
+                    <!-- Search matches populated dynamically -->
+                </div>
+            </div>
+            <div class="pos-modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnDismissCustomerModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: Tender / Split Payment Modal (F12)                           -->
+    <!-- ===================================================================== -->
+    <div class="pos-modal-backdrop" id="tenderModalBackdrop" style="display: none;">
+        <div class="pos-modal pos-modal-lg">
+            <div class="pos-modal-header">
+                <h3>💵 Tender / Complete Payment</h3>
+                <button type="button" class="pos-modal-close" id="btnCloseTenderModal">&times;</button>
+            </div>
+            <div class="pos-modal-body tender-modal-grid">
+                
+                <!-- Left: Payment Options & Split Tender Inputs -->
+                <div class="tender-inputs-col">
+                    
+                    <!-- Store Credit Section (if customer attached) -->
+                    <div class="tender-section-card" id="tenderCreditSection">
+                        <div class="tender-sec-header">
+                            <span class="sec-title">💳 Store Credit</span>
+                            <span class="sec-balance" id="tenderCustomerCreditBalance">Balance: $0.00</span>
+                        </div>
+                        <div class="tender-input-row">
+                            <input type="number" id="tenderCreditInput" step="0.01" min="0" placeholder="0.00" class="form-input-lg">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btnApplyMaxCredit">Apply Max</button>
+                        </div>
+                    </div>
+
+                    <!-- Cash Section -->
+                    <div class="tender-section-card">
+                        <div class="tender-sec-header">
+                            <span class="sec-title">💵 Cash</span>
+                        </div>
+                        <div class="tender-input-row">
+                            <input type="number" id="tenderCashInput" step="0.01" min="0" placeholder="0.00" class="form-input-lg">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btnExactCash">Exact</button>
+                        </div>
+                        <!-- Quick Cash Preset Buttons -->
+                        <div class="quick-cash-presets">
+                            <button type="button" class="btn-cash-chip" data-cash="1">+$1</button>
+                            <button type="button" class="btn-cash-chip" data-cash="5">+$5</button>
+                            <button type="button" class="btn-cash-chip" data-cash="10">+$10</button>
+                            <button type="button" class="btn-cash-chip" data-cash="20">+$20</button>
+                            <button type="button" class="btn-cash-chip" data-cash="50">+$50</button>
+                            <button type="button" class="btn-cash-chip" data-cash="100">+$100</button>
+                        </div>
+                    </div>
+
+                    <!-- Card Section -->
+                    <div class="tender-section-card">
+                        <div class="tender-sec-header">
+                            <span class="sec-title">💳 Credit / Debit Card</span>
+                        </div>
+                        <div class="tender-input-row">
+                            <input type="number" id="tenderCardInput" step="0.01" min="0" placeholder="0.00" class="form-input-lg">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btnRemainingCard">Remaining</button>
+                        </div>
+                    </div>
+
+                    <!-- Optional Note -->
+                    <div class="form-group-note">
+                        <input type="text" id="tenderOrderNotes" placeholder="Optional transaction notes / receipt memo..." class="form-input-sm">
+                    </div>
+                </div>
+
+                <!-- Right: Summary & Change Due Display -->
+                <div class="tender-summary-col">
+                    <div class="tender-stat-card">
+                        <span class="stat-label">TOTAL DUE</span>
+                        <span class="stat-value text-accent" id="tenderTotalDueDisplay">$0.00</span>
+                    </div>
+
+                    <div class="tender-stat-card">
+                        <span class="stat-label">TOTAL TENDERED</span>
+                        <span class="stat-value" id="tenderTotalTenderedDisplay">$0.00</span>
+                    </div>
+
+                    <div class="tender-stat-card highlight-card" id="tenderBalanceCard">
+                        <span class="stat-label" id="tenderBalanceLabel">REMAINING DUE</span>
+                        <span class="stat-value" id="tenderBalanceDisplay">$0.00</span>
+                    </div>
+
+                    <button type="button" class="btn btn-success btn-lg btn-complete-checkout" id="btnSubmitCheckout" disabled>
+                        ✓ Complete Transaction
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: Hold & Resume Orders Modal (F8)                              -->
+    <!-- ===================================================================== -->
+    <div class="pos-modal-backdrop" id="holdModalBackdrop" style="display: none;">
+        <div class="pos-modal pos-modal-md">
+            <div class="pos-modal-header">
+                <h3>⏸ Held Orders (Parked Tickets)</h3>
+                <button type="button" class="pos-modal-close" id="btnCloseHoldModal">&times;</button>
+            </div>
+            <div class="pos-modal-body">
+                <!-- Hold Current Ticket Card -->
+                <div class="hold-action-box" id="holdActionBox">
+                    <label for="holdNotesInput">Hold Active Ticket:</label>
+                    <div class="input-with-action">
+                        <input type="text" id="holdNotesInput" placeholder="Customer name or holding note...">
+                        <button type="button" class="btn btn-warning" id="btnConfirmHold">Hold Active Ticket</button>
+                    </div>
+                </div>
+
+                <hr class="modal-divider">
+
+                <h4>Parked Tickets</h4>
+                <div class="held-orders-list" id="heldOrdersList">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <div class="pos-modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnDismissHoldModal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 4: Order Discount Modal                                         -->
+    <!-- ===================================================================== -->
+    <div class="pos-modal-backdrop" id="discountModalBackdrop" style="display: none;">
+        <div class="pos-modal pos-modal-sm">
+            <div class="pos-modal-header">
+                <h3>🏷 Order Discount</h3>
+                <button type="button" class="pos-modal-close" id="btnCloseDiscountModal">&times;</button>
+            </div>
+            <div class="pos-modal-body">
+                <label for="orderDiscountAmount">Discount Amount ($):</label>
+                <input type="number" id="orderDiscountAmount" step="0.01" min="0" placeholder="0.00" class="form-input-lg">
+            </div>
+            <div class="pos-modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnRemoveDiscount">Remove Discount</button>
+                <button type="button" class="btn btn-primary" id="btnApplyDiscount">Apply Discount</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 5: Receipt Confirmation Modal                                   -->
+    <!-- ===================================================================== -->
+    <div class="pos-modal-backdrop" id="receiptModalBackdrop" style="display: none;">
+        <div class="pos-modal pos-modal-md receipt-modal">
+            <div class="receipt-checkmark">✓</div>
+            <h2 class="receipt-heading">Payment Successful!</h2>
+            <p class="receipt-subheading" id="receiptOrderId">Order #ORD-XXXX</p>
+
+            <div class="receipt-change-box" id="receiptChangeBox" style="display: none;">
+                <span class="change-label">Change Due</span>
+                <span class="change-amount" id="receiptChangeAmount">$0.00</span>
+            </div>
+
+            <div class="receipt-summary-card" id="receiptDetailsCard">
+                <!-- Summary of payment tenders -->
+            </div>
+
+            <div class="receipt-actions">
+                <button type="button" class="btn btn-primary btn-lg" id="btnNewSale">
+                    + Start New Sale
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Bubble -->
+    <div class="pos-toast-container" id="posToastContainer">
+        <div class="pos-toast" id="posToast" style="display: none;">
+            <span class="toast-icon" id="posToastIcon">✓</span>
+            <span class="toast-msg" id="posToastMsg">Notice</span>
+        </div>
+    </div>
+
+    <!-- Application Client Scripts -->
+    <script src="/static/js/pos_register.js"></script>
+</body>
+</html>

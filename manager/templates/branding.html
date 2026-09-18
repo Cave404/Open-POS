@@ -134,6 +134,15 @@
                             </div>
                             <span class="form-hint">Default sales tax rate applied to register line items.</span>
                         </div>
+
+                        <div class="form-group">
+                            <label for="default_pos_view">Default Register View</label>
+                            <select id="default_pos_view" name="default_pos_view" style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px;">
+                                <option value="default-retail">🏷️ Standard Retail Register</option>
+                                <option value="tcg_pos">🃏 TCG Singles &amp; Intake (TCG POS)</option>
+                            </select>
+                            <span class="form-hint">Workspace canvas to load automatically when opening /pos.</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -208,6 +217,9 @@ function populateForm(data) {
     if (data.tax_rate !== undefined) {
         document.getElementById('tax_rate').value = data.tax_rate !== null ? data.tax_rate : 8.25;
     }
+    if (data.default_pos_view !== undefined) {
+        document.getElementById('default_pos_view').value = data.default_pos_view || "default-retail";
+    }
 
     updateLogoPreview(data.store_logo_url || "");
 }
@@ -277,6 +289,7 @@ async function saveSettings() {
         store_location: document.getElementById('store_location').value.trim(),
         currency_symbol: document.getElementById('currency_symbol').value.trim() || "$",
         tax_rate: parseFloat(document.getElementById('tax_rate').value) || 0.0,
+        default_pos_view: document.getElementById('default_pos_view').value || "default-retail",
         store_logo_url: currentLogoUrl
     };
 
