@@ -1,0 +1,51 @@
+<!-- Pre-Update Changelog Modal Component -->
+<div id="changelogModal" class="openpos-modal-backdrop" style="display:none; position:fixed; inset:0; z-index:10001; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); align-items:center; justify-content:center;">
+    <div class="openpos-modal-card" style="background:#1a1d24; border:1px solid #2d3343; border-radius:16px; max-width:620px; width:92%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 24px 64px rgba(0,0,0,0.7); overflow:hidden; animation: modalFadeIn 0.2s ease;">
+        <!-- Modal Header -->
+        <div style="padding:20px 24px 16px; border-bottom:1px solid #2d3343; display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+            <div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                    <span style="font-size:11px; font-weight:800; background:rgba(16,185,129,0.2); color:#34d399; border:1px solid rgba(16,185,129,0.4); padding:2px 8px; border-radius:12px; text-transform:uppercase; letter-spacing:0.8px;">
+                        Update Available
+                    </span>
+                    <span id="clModalDeltaBadge" style="font-size:12px; font-weight:700; color:#38bdf8;">
+                        v1.0.9 &rarr; v1.1.0
+                    </span>
+                </div>
+                <h2 id="clModalTitle" style="font-size:19px; font-weight:800; color:#f1f5f9; margin:0;">Open-POS Update</h2>
+                <div style="font-size:12px; color:#64748b; margin-top:2px;">
+                    Published: <span id="clModalDate">—</span>
+                </div>
+            </div>
+            <button onclick="closeChangelogModal()" style="background:none; border:none; color:#64748b; font-size:22px; cursor:pointer; line-height:1; padding:2px 6px; border-radius:6px;" title="Dismiss">&times;</button>
+        </div>
+
+        <!-- Scrollable Changelog Body -->
+        <div id="clModalBody" style="padding:18px 24px; overflow-y:auto; flex:1; font-size:13px; color:#cbd5e1;">
+            <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Live Progress Status Wrap (hidden until update triggered) -->
+        <div id="clModalProgressWrap" style="display:none; padding:12px 24px; background:#12141a; border-top:1px solid #232834;">
+            <div style="background:#232834; border-radius:8px; height:8px; overflow:hidden; margin-bottom:8px;">
+                <div id="clModalProgressBar" style="height:100%; background:linear-gradient(90deg,#0284c7,#10b981); width:0%; transition:width 0.4s ease; border-radius:8px;"></div>
+            </div>
+            <div id="clModalProgressMsg" style="font-size:12px; color:#94a3b8; text-align:center;">Initiating download &amp; pre-flight verification...</div>
+        </div>
+
+        <!-- Sticky Modal Footer Actions -->
+        <div id="clModalFooter" style="padding:14px 24px; background:#14171f; border-top:1px solid #232834; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <a href="/manager/updates" class="btn-outline-action" style="text-decoration:none; font-size:13px; padding:7px 12px; background:#232834; border:1px solid #3d4455; color:#cbd5e1; border-radius:6px;">
+                ⏰ Schedule for Maintenance
+            </a>
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeChangelogModal()" style="background:#232834; color:#94a3b8; border:1px solid #3d4455; padding:8px 14px; border-radius:8px; font-size:13px; cursor:pointer;">
+                    Dismiss
+                </button>
+                <button id="clModalInstallBtn" onclick="executeInstallFromModal()" style="background:linear-gradient(135deg,#059669,#10b981); color:#ffffff; border:none; padding:8px 18px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(16,185,129,0.3);">
+                    🚀 Install &amp; Restart Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

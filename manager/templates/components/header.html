@@ -8,6 +8,10 @@
         <span>Addon Manager</span>
     </a>
     {% endif %}
+
+    <!-- Update Toast Floating Anchor -->
+    <div id="headerUpdateToastAnchor" style="display:inline-flex; align-items:center;"></div>
+
     <div class="notification-bell-wrapper">
         <div class="notification-wrapper">
             <button id="notifBellBtn" class="btn-icon-tray" title="System Notifications">
@@ -28,5 +32,12 @@
         </div>
     </div>
     <span class="status-pill status-online">Engine: Online</span>
-    <a href="/manager/about" class="version-badge-link" title="View System Credits &amp; Documentation">v1.0.9</a>
+    <a href="/manager/about" class="version-badge-link" id="headerVersionBadge" title="View System Credits &amp; Documentation">v1.0.9</a>
 </div>
+
+<!-- Embedded Modals -->
+{% include "components/about_modal.html" ignore missing %}
+{% include "components/changelog_modal.html" ignore missing %}
+
+<!-- Client Update Notifier Script -->
+<script src="/static/js/update_notifier.js" defer></script>

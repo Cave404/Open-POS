@@ -133,6 +133,13 @@ BUILTIN_APPLETS = [
         "icon": "puzzle.png",
         "target": "/manager/addons"
     },
+    {
+        "id": "updates",
+        "title": "System_Updates",
+        "category": "System_Admin",
+        "icon": "tools.png",
+        "target": "/manager/updates"
+    },
 ]
 
 # Informative metadata for applets currently undergoing active engineering
@@ -142,6 +149,12 @@ APPLETS_META = {
         "icon": "💾",
         "category": "Desktop Tools",
         "description": "Run SQLite/PostgreSQL vacuum compaction, schema integrity checks, automated backups, and catalog restore operations."
+    },
+    "updates": {
+        "title": "System Updates",
+        "icon": "🔄",
+        "category": "System Admin",
+        "description": "Monitor GitHub releases, inspect changelogs, configure maintenance windows, and apply atomic system updates."
     },
     "network": {
         "title": "Network Settings",
@@ -355,6 +368,39 @@ def manager_branding():
 def manager_about():
     """Renders the About & Credits dependency audit view."""
     return render_template('about.html')
+
+
+@manager_bp.route('/updates')
+@manager_bp.route('/admin/updates')
+def manager_updates():
+    """Renders the Core Auto-Updater & Scheduled Maintenance Administration Panel."""
+    from core.updater.checker import check_for_system_updates
+    from core.updater.scheduler import get_update_preferences
+    import importlib.metadata
+
+    update_info = check_for_system_updates(force=False)
+    preferences = get_update_preferences()
+
+    packages = []
+    try:
+        for dist in importlib.metadata.distributions():
+            packages.append({
+                "name": dist.metadata.get("Name", dist.name if hasattr(dist, 'name') else "Unknown"),
+                "version": dist.version,
+                "summary": dist.metadata.get("Summary", "")
+            })
+        packages.sort(key=lambda p: p["name"].lower())
+    except Exception:
+        packages = []
+
+    return render_template(
+        'admin/updates.html',
+        current_version=Config.VERSION,
+        update_info=update_info,
+        preferences=preferences,
+        packages=packages,
+        is_locked=is_section_locked('admin')
+    )
 
 
 @manager_bp.route('/placeholder/<applet_id>')

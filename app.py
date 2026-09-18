@@ -5,6 +5,7 @@ from core.settings import seed_default_settings
 from manager.routes import manager_bp, api_bp
 from core.routes.customer_routes import core_customers_bp
 from core.routes.pos_routes import pos_bp, run_pos_migrations
+from core.routes.system_routes import system_bp
 from core.addons.ui_hooks import render_addon_hook, has_addon_canvas
 
 def create_app():
@@ -25,6 +26,7 @@ def create_app():
     app.register_blueprint(api_bp)
     app.register_blueprint(core_customers_bp)
     app.register_blueprint(pos_bp)
+    app.register_blueprint(system_bp)
 
     # Expose Addon UI Hooks to Jinja2 templates
     app.jinja_env.globals['render_addon_hook'] = render_addon_hook
@@ -34,10 +36,12 @@ def create_app():
     from core.addons import addon_manager
     addon_manager.init_app(app)
 
-    # Start background update checker (30-second boot delay, then hourly)
+    # Start background update checker and maintenance scheduler
     try:
         from core.updater.checker import start_background_checker
+        from core.updater.scheduler import start_update_scheduler_daemon
         start_background_checker(app)
+        start_update_scheduler_daemon(app)
     except Exception:
         pass  # Never block startup on updater failure
 

@@ -1,0 +1,56 @@
+<!-- About OpenPOS Modal Component -->
+<div id="aboutModal" class="openpos-modal-backdrop" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.7); backdrop-filter:blur(5px); align-items:center; justify-content:center;">
+    <div class="openpos-modal-card" style="background:#1a1d24; border:1px solid #2d3343; border-radius:16px; max-width:520px; width:90%; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden; animation: modalFadeIn 0.2s ease;">
+        <!-- Modal Header -->
+        <div style="padding:22px 26px 16px; border-bottom:1px solid #2d3343; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="font-size:26px;">🏪</div>
+                <div>
+                    <h2 style="font-size:18px; font-weight:800; color:#f1f5f9; margin:0;">Open-POS</h2>
+                    <div style="font-size:12px; color:#94a3b8;">Self-Hosted Point of Sale Engine</div>
+                </div>
+            </div>
+            <button onclick="closeAboutModal()" style="background:none; border:none; color:#94a3b8; font-size:22px; cursor:pointer; line-height:1; padding:4px 8px; border-radius:6px;" title="Close">&times;</button>
+        </div>
+
+        <!-- Modal Body -->
+        <div style="padding:20px 26px; color:#cbd5e1; font-size:13px; line-height:1.6;">
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #232834;">
+                <span style="color:#94a3b8;">Installed Engine Version</span>
+                <span id="aboutModalVersion" style="font-weight:700; color:#38bdf8;">v1.0.9</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #232834;">
+                <span style="color:#94a3b8;">Runtime Status</span>
+                <span style="color:#34d399; font-weight:600;">● Online &amp; Healthy</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #232834;">
+                <span style="color:#94a3b8;">Release Channel</span>
+                <span style="color:#cbd5e1;">GitHub Releases (Cave404/Open-POS)</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #232834;">
+                <span style="color:#94a3b8;">Auto-Update Safety</span>
+                <span style="color:#a78bfa; font-weight:600;">Protected data/ &amp; rollback enabled</span>
+            </div>
+
+            <div style="margin-top:18px; padding:12px; background:#12141a; border:1px solid #2d3343; border-radius:8px;">
+                <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Latest Check Status:</div>
+                <div id="aboutCheckStatusText" style="font-size:13px; font-weight:600; color:#f1f5f9;">Checking updates...</div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="padding:14px 26px 18px; background:#14171f; border-top:1px solid #232834; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <a href="/manager/updates" class="btn-outline-action" style="text-decoration:none; font-size:12px; padding:6px 12px; background:#232834; border:1px solid #3d4455; color:#cbd5e1; border-radius:6px;">
+                🛠️ Open Updates Panel
+            </a>
+            <div style="display:flex; gap:8px;">
+                <button id="aboutCheckBtn" onclick="checkUpdatesFromAboutModal()" style="background:#0284c7; color:#fff; border:none; padding:7px 14px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">
+                    🔄 Check Now
+                </button>
+                <button onclick="closeAboutModal()" style="background:#232834; color:#94a3b8; border:1px solid #3d4455; padding:7px 14px; border-radius:6px; font-size:12px; cursor:pointer;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
