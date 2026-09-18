@@ -66,6 +66,26 @@
         </div>
     </header>
 
+    <!-- TCG Addon Workstation Promotional Banner (Active when tcg_pos is enabled) -->
+    {% for canvas in canvases %}
+    {% if canvas.addon_id == 'tcg_pos' %}
+    <div class="tcg-workstation-banner" style="background: linear-gradient(90deg, rgba(30, 58, 138, 0.45), rgba(88, 28, 135, 0.45)); border-bottom: 1px solid rgba(99, 102, 241, 0.4); padding: 0.6rem 1.75rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #e2e8f0;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">🃏</span>
+            <span><strong>TCG POS Active:</strong> Dedicated full-viewport workstations are ready for singles checkout and buylist intake.</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <a href="/tcg/register" class="btn btn-sm btn-primary" style="font-size: 0.8rem; font-weight: 700; text-decoration: none; padding: 0.35rem 0.85rem; border-radius: 6px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border: 1px solid #3b82f6; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);">
+                ⚡ Launch TCG Register Workstation
+            </a>
+            <a href="/tcg/intake" class="btn btn-sm btn-secondary" style="font-size: 0.8rem; font-weight: 700; text-decoration: none; padding: 0.35rem 0.85rem; border-radius: 6px; background: #1e293b; color: #cbd5e1; border: 1px solid #475569;">
+                📥 Card Intake / Buylist
+            </a>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
     <!-- Main POS Dual-Panel Workstation Layout -->
     <main class="pos-workstation">
 
