@@ -17,6 +17,7 @@ from core.addons.catalog import (
     fetch_catalog,
     get_catalog_item,
     is_compatible,
+    check_addon_updates,
     DEFAULT_CATALOG_URL
 )
 from core.addons.installer import (
@@ -48,6 +49,7 @@ __all__ = [
     "fetch_catalog",
     "get_catalog_item",
     "is_compatible",
+    "check_addon_updates",
     "DEFAULT_CATALOG_URL",
     "install_remote_addon",
     "extract_addon_zip",

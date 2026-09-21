@@ -144,3 +144,78 @@ def get_catalog_item(addon_id: str) -> Optional[Dict[str, Any]]:
         if isinstance(item, dict) and item.get("id") == addon_id:
             return item
     return None
+
+
+def check_addon_updates() -> Dict[str, Dict[str, Any]]:
+    """
+    For each installed addon discovered by Open-POS:
+      1. Checks repo_url from local manifest.json or catalog item.
+      2. If GitHub repository, queries raw manifest.json with 3-second timeout:
+         https://raw.githubusercontent.com/<owner>/<repo>/main/manifest.json
+      3. If remote manifest semver > local installed version:
+         marks has_update=True and latest_version=remote_version.
+      4. Fallback: compares against catalog item version.
+    Returns dictionary mapping addon_id -> {
+        "has_update": bool,
+        "installed_version": str,
+        "latest_version": str,
+        "download_url": Optional[str],
+        "repo_url": Optional[str]
+    }
+    """
+    from core.addons.loader import addon_manager
+    results: Dict[str, Dict[str, Any]] = {}
+
+    all_addons = addon_manager.addons
+    catalog_list = fetch_catalog()
+    catalog_map = {item["id"]: item for item in catalog_list if isinstance(item, dict) and "id" in item}
+
+    for addon_id, record in all_addons.items():
+        installed_ver = record.manifest.get("version", record.version or "1.0.0")
+        repo_url = record.manifest.get("repo_url")
+        cat_item = catalog_map.get(addon_id, {})
+        if not repo_url:
+            repo_url = cat_item.get("repo_url")
+
+        has_update = False
+        latest_ver = installed_ver
+        download_url = cat_item.get("download_url")
+
+        # Step 1: Query raw manifest from GitHub if repo_url is available
+        if repo_url:
+            gh_match = re.search(r"github\.com[/:]([^/]+)/([^/\.]+)", repo_url)
+            if gh_match:
+                owner, repo_name = gh_match.group(1), gh_match.group(2)
+                raw_manifest_url = f"https://raw.githubusercontent.com/{owner}/{repo_name}/main/manifest.json"
+                try:
+                    r_resp = requests.get(raw_manifest_url, timeout=3)
+                    if r_resp.status_code == 200:
+                        remote_manifest = r_resp.json()
+                        remote_ver = remote_manifest.get("version")
+                        if remote_ver and parse_version(remote_ver) > parse_version(installed_ver):
+                            has_update = True
+                            latest_ver = remote_ver
+                            if not download_url:
+                                download_url = f"https://github.com/{owner}/{repo_name}/archive/refs/heads/main.zip"
+                except Exception as ex:
+                    logger.debug(f"[ADDON_CATALOG] Could not fetch remote manifest for '{addon_id}': {ex}")
+
+        # Step 2: Fallback to catalog version comparison if not already marked
+        if not has_update and cat_item:
+            cat_ver = cat_item.get("version")
+            if cat_ver and parse_version(cat_ver) > parse_version(installed_ver):
+                has_update = True
+                latest_ver = cat_ver
+                if not download_url:
+                    download_url = cat_item.get("download_url")
+
+        results[addon_id] = {
+            "has_update": has_update,
+            "installed_version": installed_ver,
+            "latest_version": latest_ver,
+            "download_url": download_url,
+            "repo_url": repo_url
+        }
+
+    return results
+

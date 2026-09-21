@@ -94,6 +94,13 @@ class AddonRecord:
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def to_dict(self) -> Dict[str, Any]:
+        has_config_schema = False
+        try:
+            if self.dir_path and os.path.isdir(self.dir_path):
+                has_config_schema = os.path.isfile(os.path.join(self.dir_path, "config_schema.json"))
+        except Exception:
+            pass
+
         return {
             "id": self.id,
             "name": self.name,
@@ -113,7 +120,9 @@ class AddonRecord:
             "enabled": self.enabled,
             "error": self.error,
             "traceback": self.traceback,
-            "has_settings": bool(self.settings_route),
+            "has_settings": bool(self.settings_route or has_config_schema),
+            "has_config_schema": has_config_schema,
+            "repo_url": self.manifest.get("repo_url"),
             "reload_required": self.reload_required,
         }
 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Addon Manager - Open-POS</title>
     <link rel="stylesheet" href="/static/css/manager.css">
+    <link rel="stylesheet" href="/static/css/addons.css">
     <script src="/static/js/notifications.js"></script>
     <script src="/static/js/lockout_guard.js" data-section="addons"></script>
     <script src="/static/js/addons.js"></script>
@@ -19,10 +20,12 @@
         }
 
         /* Stat Metrics Row */
-        .metrics-row {
+        .metrics-row,
+        .addon-metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
         }
 
         .metric-card {
@@ -65,15 +68,17 @@
         }
 
         /* Toolbar & Controls */
-        .toolbar-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 16px 20px;
+        .toolbar-card,
+        .addon-filter-bar {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding: 0.75rem 1rem;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
             flex-wrap: wrap;
         }
 
@@ -138,20 +143,23 @@
         }
 
         /* Addons Grid */
-        .addons-grid {
+        .addons-grid,
+        .addon-cards-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
             gap: 1.5rem;
+            align-items: stretch;
         }
 
         .addon-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 1.5rem;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            justify-content: space-between;
+            gap: 1.25rem;
             transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
             position: relative;
         }
@@ -159,7 +167,95 @@
         .addon-card:hover {
             border-color: rgba(99, 102, 241, 0.4);
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        /* Update Available Pill & Badge */
+        .btn-update-pill,
+        .badge-update-available {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #ffffff !important;
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            padding: 3px 9px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+            transition: all 0.15s ease;
+        }
+
+        .btn-update-pill:hover,
+        .badge-update-available:hover {
+            filter: brightness(1.15);
+            transform: translateY(-1px);
+        }
+
+        /* Universal Dynamic Addon Config Modal Styles */
+        .config-field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .config-field-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f0f6fc;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .config-field-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .config-input,
+        .config-select {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #f0f6fc;
+            padding: 8px 12px;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.15s ease;
+        }
+
+        .config-input:focus,
+        .config-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .config-secret-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .btn-toggle-secret {
+            position: absolute;
+            right: 8px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 14px;
+        }
+
+        .btn-toggle-secret:hover {
+            color: var(--text-main);
         }
 
         .addon-card.status-error {
@@ -939,20 +1035,6 @@
                 </svg>
                 <span>⮌ Open Register</span>
             </a>
-            <!-- Addon Manager Global Navigation Button -->
-            <a href="/manager/addons" class="btn-nav-addon-manager active" title="Addon Manager">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/>
-                </svg>
-                <span>Addon Manager</span>
-            </a>
-            <button class="btn-addon-logs" id="btnViewAddonLogs" onclick="openAddonLogsModal()" title="View Addon Logs">
-                <span>📜</span> View Addon Logs
-            </button>
-            <button class="btn-import-zip" id="btnImportAddon" onclick="document.getElementById('addonZipInput').click()" title="Import Addon (.zip)">
-                <span>📦</span> Import Addon (.zip)
-            </button>
-            <input type="file" id="addonZipInput" accept=".zip" style="display: none;" onchange="handleZipUpload(event)">
             <div class="notification-wrapper">
                 <button id="notifBellBtn" class="btn-icon-tray" title="System Notifications">
                     &#128276; <span id="notifBadge" class="badge-count" style="display: none;">0</span>
@@ -976,15 +1058,27 @@
     <div class="view-container {% if is_locked %}locked{% endif %}">
         <div class="addons-container">
 
-            <!-- Primary View Mode Segmented Control -->
-            <div class="segmented-control-wrap">
-                <div class="segmented-control" role="tablist">
-                    <button type="button" class="segmented-btn active" id="tabInstalledAddons" role="tab" aria-selected="true" onclick="switchMainTab('installed')">
-                        <span>📦</span> Installed Addons
+            <!-- Primary View Mode Tabs & Secondary Action Container -->
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 segmented-control-wrap">
+                <!-- Left Side: Tabs -->
+                <div class="segmented-control nav nav-pills custom-tab-pills" role="tablist">
+                    <button type="button" class="segmented-btn nav-link active" id="tabInstalledAddons" role="tab" aria-selected="true" onclick="switchMainTab('installed')">
+                        📦 Installed Addons
                     </button>
-                    <button type="button" class="segmented-btn" id="tabAddonCatalog" role="tab" aria-selected="false" onclick="switchMainTab('catalog')">
-                        <span>🌐</span> Addon Catalog <span class="catalog-live-badge">Online</span>
+                    <button type="button" class="segmented-btn nav-link" id="tabAddonCatalog" role="tab" aria-selected="false" onclick="switchMainTab('catalog')">
+                        🌐 Addon Catalog <span class="catalog-live-badge ms-1">ONLINE</span>
                     </button>
+                </div>
+
+                <!-- Right Side: Secondary Actions (Logs & Import) -->
+                <div class="d-flex align-items-center gap-2">
+                    <a href="/manager/addons/logs" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2" id="btnViewAddonLogs" onclick="openAddonLogsModal(); return false;" title="View Addon Logs">
+                        <span>📜 View Addon Logs</span>
+                    </a>
+                    <button type="button" class="btn btn-sm btn-primary btn-import-zip d-inline-flex align-items-center gap-2" id="btnImportAddon" onclick="document.getElementById('addonZipInput').click()" title="Import Addon (.zip)">
+                        <span>📦 Import Addon (.zip)</span>
+                    </button>
+                    <input type="file" id="addonZipInput" accept=".zip" style="display: none;" onchange="handleZipUpload(event)">
                 </div>
             </div>
 
@@ -1155,8 +1249,38 @@
         </div>
     </div>
 
+    <!-- Universal Schema-Driven Addon Configuration Modal -->
+    <div class="modal-overlay" id="addonConfigModal">
+        <div class="modal-card" style="max-width: 680px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color: #60a5fa;">
+                    <span>⚙️</span>
+                    <span id="configModalTitle">Addon Configuration</span>
+                </div>
+                <button class="btn-modal-close" onclick="closeAddonConfigModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="configModalBody">
+                <div class="config-modal-loading" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    <div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem; margin-bottom: 12px;"></div>
+                    <div>Loading configuration schema...</div>
+                </div>
+                <form id="addonConfigForm" style="display: none;" onsubmit="saveAddonConfig(event)">
+                    <div id="configModalDescription" style="margin-bottom: 16px; font-size: 13px; color: var(--text-muted); line-height: 1.5;"></div>
+                    <div id="configFormFields" style="display: flex; flex-direction: column; gap: 16px;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-dismiss" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main);" onclick="closeAddonConfigModal()">Cancel</button>
+                <button type="button" class="btn-dismiss" id="btnSaveAddonConfig" style="background: var(--accent-blue); color: white;" onclick="document.getElementById('addonConfigForm').requestSubmit()">
+                    💾 Save Preferences
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let allAddons = [];
+        let allAddonUpdates = {};
         let currentFilter = 'ALL';
         let currentSearch = '';
 
@@ -1166,6 +1290,8 @@
         window.catalogAddons = allCatalogAddons;
         window.catalogData = allCatalogAddons;
         let currentCatalogSearch = '';
+
+        let activeConfigAddonId = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadAddons();
@@ -1198,6 +1324,15 @@
                         renderAddonsGrid();
                     }).catch(() => {});
                 }
+
+                // Poll live remote addon updates in parallel
+                fetch('/api/addons/updates').then(r => r.json()).then(data => {
+                    if (data && data.success && data.updates) {
+                        allAddonUpdates = data.updates;
+                        renderAddonsGrid();
+                    }
+                }).catch(() => {});
+
                 const res = await fetch('/manager/api/addons');
                 if (!res.ok) throw new Error('Failed to load addons');
                 allAddons = await res.json();
@@ -1290,7 +1425,7 @@
 
             // Icon resolution: image or default SVG fallback
             const puzzleSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/></svg>`;
-            
+
             const rawIcon = addon.icon_url || addon.icon;
             const isImg = rawIcon && (rawIcon.endsWith('.png') || rawIcon.endsWith('.svg') || rawIcon.endsWith('.jpg') || rawIcon.startsWith('http') || rawIcon.startsWith('/'));
 
@@ -1299,9 +1434,16 @@
                    <div class="addon-icon-fallback" style="display: none;">${puzzleSvg}</div>`
                 : `<div class="addon-icon-fallback" style="display: flex;">${(addon.icon && !isImg && addon.icon.length <= 4) ? addon.icon : puzzleSvg}</div>`;
 
-            // Check if newer catalog version is available
+            // Check remote version polling updates
+            const updateInfo = allAddonUpdates[addon.id];
             const catalogItem = allCatalogAddons.find(c => c.id === addon.id);
-            const hasUpdate = catalogItem && (catalogItem.has_update || (catalogItem.version && catalogItem.version !== addon.version));
+            const hasUpdate = (updateInfo && updateInfo.has_update) || (catalogItem && (catalogItem.has_update || (catalogItem.version && catalogItem.version !== addon.version)));
+            const latestVer = (updateInfo && updateInfo.latest_version) || (catalogItem && catalogItem.version) || 'latest';
+
+            // Active Update Available Pill
+            const updatePill = hasUpdate
+                ? `<button type="button" class="btn-update-pill" onclick="triggerAddonUpdate('${addon.id}', '${latestVer}')" title="In-place update to v${latestVer}">▲ Update Available (v${latestVer})</button>`
+                : '';
 
             // View Error button
             const errorBtn = isError
@@ -1310,7 +1452,7 @@
 
             // Update button
             const updateBtn = hasUpdate
-                ? `<button class="btn btn-sm btn-primary btn-update-addon" onclick="triggerAddonUpdate('${addon.id}', '${catalogItem.version}')" title="In-place update to v${catalogItem.version}">Update</button>`
+                ? `<button class="btn btn-sm btn-primary btn-update-addon" onclick="triggerAddonUpdate('${addon.id}', '${latestVer}')" title="In-place update to v${latestVer}">Update</button>`
                 : '';
 
             // Rollback button
@@ -1318,15 +1460,17 @@
                 ? `<button class="btn btn-sm btn-secondary btn-rollback-menu" onclick="openRollbackModal('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Version History & Rollback">⏪ Rollback</button>`
                 : '';
 
-            // Configure button
+            // Universal Configure button
             let configBtn = '';
-            if (addon.settings_route) {
+            if (addon.has_config_schema) {
+                configBtn = `<button class="btn btn-sm btn-secondary btn-configure-addon ${addon.status !== 'ACTIVE' ? 'disabled' : ''}" onclick="openAddonConfigModal('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Configure Addon Preferences">Configure</button>`;
+            } else if (addon.settings_route) {
                 configBtn = `<a href="${addon.settings_route}" class="btn btn-sm btn-secondary btn-configure-addon ${addon.status !== 'ACTIVE' ? 'disabled' : ''}">Configure</a>`;
             } else {
                 configBtn = `<button class="btn btn-sm btn-secondary btn-configure-addon disabled" disabled title="No configure route specified">Configure</button>`;
             }
 
-            // Uninstall button - Guaranteed on every card (both Active and Failed)
+            // Uninstall button - Guaranteed on every card
             let uninstallBtn = '';
             if (addon.dir_type !== 'builtin') {
                 uninstallBtn = `<button class="btn btn-sm btn-danger btn-uninstall-addon" onclick="confirmRemoveAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Permanently Delete Addon">🗑 Uninstall</button>`;
@@ -1343,6 +1487,7 @@
                         <div class="addon-title-group">
                             <h3 class="addon-title">${addon.name || addon.id}</h3>
                             <span class="addon-version-pill">v${addon.version || '1.0.0'}</span>
+                            ${updatePill}
                             <span class="addon-author">by ${addon.author || 'OpenPOS'}</span>
                         </div>
                     </div>
@@ -1377,6 +1522,193 @@
 
             return card;
         }
+
+        /* ── Dynamic Universal Configuration Modal Handlers ── */
+        async function openAddonConfigModal(addonId, addonName) {
+            activeConfigAddonId = addonId;
+            const modal = document.getElementById('addonConfigModal');
+            const titleEl = document.getElementById('configModalTitle');
+            const descEl = document.getElementById('configModalDescription');
+            const fieldsEl = document.getElementById('configFormFields');
+            const loadingEl = document.querySelector('.config-modal-loading');
+            const formEl = document.getElementById('addonConfigForm');
+            const saveBtn = document.getElementById('btnSaveAddonConfig');
+
+            titleEl.textContent = `Configure: ${addonName || addonId}`;
+            descEl.textContent = '';
+            fieldsEl.innerHTML = '';
+            loadingEl.style.display = 'block';
+            formEl.style.display = 'none';
+            saveBtn.disabled = true;
+
+            modal.classList.add('open');
+
+            try {
+                const res = await fetch(`/api/addons/${addonId}/config`);
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to load configuration schema.');
+                }
+
+                const schema = data.schema || {};
+                const values = data.values || {};
+                descEl.textContent = schema.description || 'Adjust settings and preferences for this addon below.';
+
+                let fields = schema.fields;
+                if (!Array.isArray(fields) && schema.properties) {
+                    fields = Object.entries(schema.properties).map(([name, prop]) => ({
+                        name: name,
+                        ...prop
+                    }));
+                }
+
+                if (!fields || fields.length === 0) {
+                    fieldsEl.innerHTML = '<div style="color: var(--text-muted); font-size: 13px;">No configurable options defined in schema.</div>';
+                } else {
+                    fields.forEach(f => {
+                        const name = f.name;
+                        const label = f.label || name;
+                        const desc = f.description || '';
+                        const type = (f.type || 'string').toLowerCase();
+                        const val = values[name] !== undefined ? values[name] : (f.default !== undefined ? f.default : '');
+
+                        const group = document.createElement('div');
+                        group.className = 'config-field-group';
+
+                        if (type === 'boolean' || type === 'bool' || type === 'toggle') {
+                            group.innerHTML = `
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0;">
+                                    <div>
+                                        <div class="config-field-label">${escapeToastHtml(label)}</div>
+                                        ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                    </div>
+                                    <label class="switch-toggle toggle-wrap" style="margin: 0;">
+                                        <input type="checkbox" name="${escapeToastHtml(name)}" class="switch-input config-input-field" ${val ? 'checked' : ''}>
+                                        <div class="switch-slider toggle-slider"></div>
+                                    </label>
+                                </div>
+                            `;
+                        } else if (type === 'select') {
+                            const options = f.options || [];
+                            const optsHtml = options.map(opt => {
+                                const optVal = typeof opt === 'object' ? opt.value : opt;
+                                const optLabel = typeof opt === 'object' ? opt.label : opt;
+                                const isSelected = String(optVal) === String(val) ? 'selected' : '';
+                                return `<option value="${escapeToastHtml(String(optVal))}" ${isSelected}>${escapeToastHtml(String(optLabel))}</option>`;
+                            }).join('');
+
+                            group.innerHTML = `
+                                <label class="config-field-label">${escapeToastHtml(label)}</label>
+                                ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                <select name="${escapeToastHtml(name)}" class="config-select config-input-field">
+                                    ${optsHtml}
+                                </select>
+                            `;
+                        } else if (type === 'secret' || type === 'password') {
+                            group.innerHTML = `
+                                <label class="config-field-label">${escapeToastHtml(label)}</label>
+                                ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                <div class="config-secret-wrap">
+                                    <input type="password" name="${escapeToastHtml(name)}" value="${escapeToastHtml(String(val))}" class="config-input config-input-field" style="padding-right: 36px;">
+                                    <button type="button" class="btn-toggle-secret" onclick="toggleSecretVisibility(this)" title="Show/Hide">👁️</button>
+                                </div>
+                            `;
+                        } else if (type === 'number' || type === 'integer' || type === 'float') {
+                            const minAttr = f.min !== undefined ? `min="${f.min}"` : '';
+                            const maxAttr = f.max !== undefined ? `max="${f.max}"` : '';
+                            const stepAttr = (type === 'float' || String(val).includes('.')) ? 'step="any"' : 'step="1"';
+                            group.innerHTML = `
+                                <label class="config-field-label">${escapeToastHtml(label)}</label>
+                                ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                <input type="number" name="${escapeToastHtml(name)}" value="${val !== null ? val : ''}" ${minAttr} ${maxAttr} ${stepAttr} class="config-input config-input-field">
+                            `;
+                        } else {
+                            group.innerHTML = `
+                                <label class="config-field-label">${escapeToastHtml(label)}</label>
+                                ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                <input type="text" name="${escapeToastHtml(name)}" value="${escapeToastHtml(String(val))}" class="config-input config-input-field">
+                            `;
+                        }
+                        fieldsEl.appendChild(group);
+                    });
+                }
+
+                loadingEl.style.display = 'none';
+                formEl.style.display = 'block';
+                saveBtn.disabled = false;
+            } catch (err) {
+                loadingEl.innerHTML = `
+                    <div style="color: #f87171; margin-bottom: 12px;">⚠️ Error loading settings</div>
+                    <div style="font-size: 13px; color: var(--text-muted);">${escapeToastHtml(err.message)}</div>
+                `;
+            }
+        }
+
+        function closeAddonConfigModal() {
+            const modal = document.getElementById('addonConfigModal');
+            if (modal) modal.classList.remove('open');
+            activeConfigAddonId = null;
+        }
+
+        function toggleSecretVisibility(btn) {
+            const input = btn.parentElement.querySelector('input');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🔒';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        async function saveAddonConfig(e) {
+            if (e) e.preventDefault();
+            if (!activeConfigAddonId) return;
+
+            const saveBtn = document.getElementById('btnSaveAddonConfig');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '⏳ Saving...';
+
+            const form = document.getElementById('addonConfigForm');
+            const inputs = form.querySelectorAll('.config-input-field');
+            const payload = {};
+
+            inputs.forEach(inp => {
+                const name = inp.name;
+                if (!name) return;
+                if (inp.type === 'checkbox') {
+                    payload[name] = inp.checked;
+                } else if (inp.type === 'number') {
+                    payload[name] = inp.value === '' ? null : Number(inp.value);
+                } else {
+                    payload[name] = inp.value;
+                }
+            });
+
+            try {
+                const res = await fetch(`/api/addons/${activeConfigAddonId}/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to save configuration.');
+                }
+
+                if (typeof showAddonToast === 'function') {
+                    showAddonToast(activeConfigAddonId, "Preferences Saved", "Settings updated successfully.", "success");
+                }
+                closeAddonConfigModal();
+            } catch (err) {
+                alert(`Error saving preferences: ${err.message}`);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            }
+        }
+
 
         async function toggleAddonState(addonId, enabled) {
             try {

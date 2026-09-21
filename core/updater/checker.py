@@ -128,6 +128,94 @@ def parse_markdown_changelog(body: str) -> Dict[str, List[str]]:
     return categories
 
 
+def _get_local_git_sha() -> Optional[str]:
+    """Retrieves current git commit SHA or build SHA for the local installation."""
+    env_sha = os.environ.get("OPENPOS_GIT_SHA") or os.environ.get("BUILD_SHA") or getattr(Config, "GIT_SHA", None)
+    if env_sha:
+        return str(env_sha).strip()
+
+    for b_path in [os.path.join(Config.DATA_DIR, "build_info.json"), os.path.join(Config.BASE_DIR, "build_info.json")]:
+        if os.path.isfile(b_path):
+            try:
+                with open(b_path, "r", encoding="utf-8") as f:
+                    bdata = json.load(f)
+                sha = bdata.get("commit_sha") or bdata.get("sha")
+                if sha:
+                    return str(sha).strip()
+            except Exception:
+                pass
+
+    try:
+        import subprocess
+        out = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Config.BASE_DIR,
+            stderr=subprocess.DEVNULL,
+            timeout=3
+        ).decode("utf-8").strip()
+        if out:
+            return out
+    except Exception:
+        pass
+
+    return None
+
+
+def _check_remote_branch_commit(repo: str = GITHUB_REPO, branch: str = "main") -> Optional[Dict[str, Any]]:
+    """
+    Fallback checker: queries GitHub Commits API for branch 'main'.
+    If the remote commit SHA differs from the local build SHA, returns update payload.
+    """
+    commit_url = f"https://api.github.com/repos/{repo}/commits/{branch}"
+    logger.info(f"[UPDATER] Checking GitHub fallback branch commit at: {commit_url}")
+    try:
+        c_res = requests.get(
+            commit_url,
+            timeout=REQUEST_TIMEOUT_SEC,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"OpenPOS-Updater/{Config.VERSION}"
+            }
+        )
+        if c_res.status_code == 200:
+            commit_data = c_res.json()
+            remote_sha = commit_data.get("sha", "").strip()
+            local_sha = _get_local_git_sha()
+            commit_obj = commit_data.get("commit", {})
+            commit_msg = commit_obj.get("message", "").strip()
+            published_at = commit_obj.get("author", {}).get("date") or commit_obj.get("committer", {}).get("date", "")
+            first_line = commit_msg.splitlines()[0] if commit_msg else f"Commit {remote_sha[:7]}"
+
+            is_commit_ahead = False
+            if remote_sha and local_sha:
+                if not remote_sha.startswith(local_sha) and not local_sha.startswith(remote_sha):
+                    is_commit_ahead = True
+
+            short_sha = remote_sha[:7] if remote_sha else "unknown"
+            result = {
+                "checked": True,
+                "update_available": is_commit_ahead,
+                "available": is_commit_ahead,
+                "current_version": Config.VERSION,
+                "latest_version": f"rev-{short_sha}",
+                "release_name": f"{branch.capitalize()} Branch: {first_line}",
+                "published_at": published_at,
+                "release_date": published_at,
+                "download_url": f"https://github.com/{repo}/archive/refs/heads/{branch}.zip",
+                "html_url": commit_data.get("html_url") or f"https://github.com/{repo}/tree/{branch}",
+                "changelog": {"added": [], "changed": [first_line], "fixed": [], "removed": []},
+                "raw_notes": commit_msg,
+                "remote_sha": remote_sha,
+                "local_sha": local_sha,
+                "is_branch_fallback": True,
+                "error": None
+            }
+            return result
+    except Exception as ce:
+        logger.warning(f"[UPDATER] Branch commit fallback query failed: {ce}")
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Core Check Function
 # ---------------------------------------------------------------------------
@@ -135,12 +223,22 @@ def check_for_system_updates(force: bool = False, repo: str = GITHUB_REPO) -> Di
     """
     Queries GitHub Releases API for repo to check if a new version is available.
     Uses local file cache (2-hour TTL) to prevent API rate limiting unless force=True.
+    Falls back to querying the remote main branch commit if no newer release tag is found.
     """
     os.makedirs(os.path.join(Config.DATA_DIR, "cache"), exist_ok=True)
     now = datetime.now(timezone.utc).timestamp()
 
-    # 1. Check local file cache
-    if not force:
+    # 1. Check local file cache unless force=True
+    if force:
+        for cache_path in [UPDATE_CACHE_PATH, UPDATE_CHECK_CACHE_PATH]:
+            try:
+                if os.path.exists(cache_path):
+                    os.remove(cache_path)
+            except Exception as ce:
+                logger.warning(f"[UPDATER] Failed to purge cache file {cache_path}: {ce}")
+        with _cache_lock:
+            _update_cache["checked"] = False
+    else:
         for cache_path in [UPDATE_CACHE_PATH, UPDATE_CHECK_CACHE_PATH]:
             if os.path.exists(cache_path):
                 try:
@@ -167,66 +265,76 @@ def check_for_system_updates(force: bool = False, repo: str = GITHUB_REPO) -> Di
             }
         )
 
-        if res.status_code != 200:
-            err_msg = f"GitHub API returned HTTP {res.status_code}"
-            logger.warning(f"[UPDATER] {err_msg}")
-            out = {
+        result = None
+        if res.status_code == 200:
+            release = res.json()
+            latest_tag = release.get("tag_name", "").strip()
+            body = release.get("body", "")
+            is_newer = _is_newer(latest_tag, Config.VERSION)
+
+            parsed_changelog = parse_markdown_changelog(body)
+            published_at = release.get("published_at", release.get("created_at", ""))
+
+            result = {
                 "checked": True,
-                "update_available": False,
-                "available": False,
+                "update_available": is_newer,
+                "available": is_newer,  # backwards-compatibility alias
                 "current_version": Config.VERSION,
-                "latest_version": None,
-                "release_name": None,
-                "published_at": None,
-                "release_date": None,
-                "download_url": None,
-                "html_url": None,
-                "changelog": {"added": [], "changed": [], "fixed": [], "removed": []},
-                "raw_notes": "",
-                "error": err_msg
+                "latest_version": latest_tag,
+                "release_name": release.get("name") or latest_tag,
+                "published_at": published_at,
+                "release_date": published_at,  # backwards-compatibility alias
+                "download_url": release.get("zipball_url"),
+                "html_url": release.get("html_url"),
+                "changelog": parsed_changelog,
+                "raw_notes": body,
+                "error": None
             }
-            with _cache_lock:
-                _update_cache.update(out)
-            return out
 
-        release = res.json()
-        latest_tag = release.get("tag_name", "").strip()
-        body = release.get("body", "")
-        is_newer = _is_newer(latest_tag, Config.VERSION)
+            # If release is not newer, fallback to comparing remote main branch commit
+            if not is_newer:
+                branch_check = _check_remote_branch_commit(repo=repo)
+                if branch_check and branch_check.get("update_available"):
+                    result = branch_check
+        else:
+            # Non-200 release status (e.g. 404): Try branch commit fallback
+            branch_check = _check_remote_branch_commit(repo=repo)
+            if branch_check:
+                result = branch_check
+            else:
+                err_msg = f"GitHub API returned HTTP {res.status_code}"
+                logger.warning(f"[UPDATER] {err_msg}")
+                result = {
+                    "checked": True,
+                    "update_available": False,
+                    "available": False,
+                    "current_version": Config.VERSION,
+                    "latest_version": None,
+                    "release_name": None,
+                    "published_at": None,
+                    "release_date": None,
+                    "download_url": None,
+                    "html_url": None,
+                    "changelog": {"added": [], "changed": [], "fixed": [], "removed": []},
+                    "raw_notes": "",
+                    "error": err_msg
+                }
 
-        parsed_changelog = parse_markdown_changelog(body)
-        published_at = release.get("published_at", release.get("created_at", ""))
-
-        result = {
-            "checked": True,
-            "update_available": is_newer,
-            "available": is_newer,  # backwards-compatibility alias
-            "current_version": Config.VERSION,
-            "latest_version": latest_tag,
-            "release_name": release.get("name") or latest_tag,
-            "published_at": published_at,
-            "release_date": published_at,  # backwards-compatibility alias
-            "download_url": release.get("zipball_url"),
-            "html_url": release.get("html_url"),
-            "changelog": parsed_changelog,
-            "raw_notes": body,
-            "error": None
-        }
-
-        # Cache results to disk
-        payload = {"cached_at": now, "data": result}
-        for cpath in [UPDATE_CACHE_PATH, UPDATE_CHECK_CACHE_PATH]:
-            try:
-                with open(cpath, "w", encoding="utf-8") as f:
-                    json.dump(payload, f, indent=2)
-            except Exception as ce:
-                logger.warning(f"[UPDATER] Failed to write cache {cpath}: {ce}")
+        # Cache valid results to disk
+        if result and not result.get("error"):
+            payload = {"cached_at": now, "data": result}
+            for cpath in [UPDATE_CACHE_PATH, UPDATE_CHECK_CACHE_PATH]:
+                try:
+                    with open(cpath, "w", encoding="utf-8") as f:
+                        json.dump(payload, f, indent=2)
+                except Exception as ce:
+                    logger.warning(f"[UPDATER] Failed to write cache {cpath}: {ce}")
 
         with _cache_lock:
             _update_cache.update(result)
 
-        if is_newer:
-            logger.info(f"[UPDATER] System update available: {Config.VERSION} -> {latest_tag}")
+        if result.get("update_available"):
+            logger.info(f"[UPDATER] System update available: {Config.VERSION} -> {result.get('latest_version')}")
         else:
             logger.info(f"[UPDATER] System is up to date ({Config.VERSION}).")
 

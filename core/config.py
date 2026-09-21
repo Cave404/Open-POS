@@ -24,6 +24,7 @@ else:
 
 REQUIRED_DATA_DIRS = [
     "data/config",
+    "data/config/addons",
     "data/db",
     "data/logs",
     "data/cache",
@@ -72,6 +73,7 @@ class Config:
     LOGS_DIR = LOGS_DIR
     CUSTOM_ADDONS_DIR = CUSTOM_ADDONS_DIR
     CONFIG_DIR = CONFIG_DIR
+    ADDONS_CONFIG_DIR = os.path.join(CONFIG_DIR, 'addons')
     BACKUP_DIR = BACKUP_DIR
     REQUIRED_DATA_DIRS = REQUIRED_DATA_DIRS
 

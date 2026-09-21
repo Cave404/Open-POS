@@ -506,6 +506,7 @@ def api_uninstall_addon(addon_id):
     return jsonify(result), status_code
 
 
+@api_bp.route('/addons', methods=['GET'])
 @manager_bp.route('/api/addons', methods=['GET'])
 def get_addons():
     """Returns a list of all discovered addons, statuses, and runtime diagnostics."""
@@ -661,6 +662,204 @@ def api_get_addon_logs():
     limit = int(request.args.get('limit', 150))
     logs = read_addon_logs(limit=limit)
     return jsonify({"status": "ok", "logs": logs, "total": len(logs)}), 200
+
+
+@api_bp.route('/addons/<addon_id>/config', methods=['GET'])
+@manager_bp.route('/api/addons/<addon_id>/config', methods=['GET'])
+def api_get_addon_config(addon_id):
+    """
+    Reads schema from config_schema.json in addon directory (if present)
+    and saved values from data/config/addons/<addon_id>.json (falling back to schema defaults).
+    """
+    from core.addons import addon_manager
+    from core.config import Config
+
+    record = addon_manager.addons.get(addon_id)
+    addon_dir = None
+    if record and record.dir_path and os.path.isdir(record.dir_path):
+        addon_dir = record.dir_path
+    else:
+        custom_dir = getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))
+        candidate = os.path.join(custom_dir, addon_id)
+        if os.path.isdir(candidate):
+            addon_dir = candidate
+
+    if not addon_dir:
+        return jsonify({"success": False, "error": f"Addon '{addon_id}' not found."}), 404
+
+    schema_file = os.path.join(addon_dir, 'config_schema.json')
+    schema = {}
+    if os.path.isfile(schema_file):
+        try:
+            with open(schema_file, 'r', encoding='utf-8') as sf:
+                schema = json.load(sf)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Invalid config_schema.json: {e}"}), 400
+
+    defaults = {}
+    fields = schema.get("fields", [])
+    if isinstance(fields, list):
+        for f in fields:
+            if isinstance(f, dict) and "name" in f:
+                defaults[f["name"]] = f.get("default", None)
+    elif isinstance(schema.get("properties"), dict):
+        for prop_name, prop_data in schema["properties"].items():
+            if isinstance(prop_data, dict):
+                defaults[prop_name] = prop_data.get("default", None)
+
+    addons_config_dir = getattr(Config, 'ADDONS_CONFIG_DIR', os.path.join(Config.CONFIG_DIR, 'addons'))
+    os.makedirs(addons_config_dir, exist_ok=True)
+    val_file = os.path.join(addons_config_dir, f"{addon_id}.json")
+
+    saved_values = {}
+    if os.path.isfile(val_file):
+        try:
+            with open(val_file, 'r', encoding='utf-8') as vf:
+                saved_values = json.load(vf)
+        except Exception:
+            saved_values = {}
+
+    effective_values = dict(defaults)
+    if isinstance(saved_values, dict):
+        effective_values.update(saved_values)
+
+    addon_name = record.name if record else addon_id
+
+    return jsonify({
+        "success": True,
+        "addon_id": addon_id,
+        "addon_name": addon_name,
+        "schema": schema,
+        "values": effective_values
+    }), 200
+
+
+@api_bp.route('/addons/<addon_id>/config', methods=['POST'])
+@manager_bp.route('/api/addons/<addon_id>/config', methods=['POST'])
+def api_save_addon_config(addon_id):
+    """
+    Validates payload against config_schema.json, writes settings to
+    data/config/addons/<addon_id>.json, and invokes on_config_updated(new_config) if defined.
+    """
+    from core.addons import addon_manager
+    from core.config import Config
+
+    record = addon_manager.addons.get(addon_id)
+    addon_dir = None
+    if record and record.dir_path and os.path.isdir(record.dir_path):
+        addon_dir = record.dir_path
+    else:
+        custom_dir = getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))
+        candidate = os.path.join(custom_dir, addon_id)
+        if os.path.isdir(candidate):
+            addon_dir = candidate
+
+    if not addon_dir:
+        return jsonify({"success": False, "error": f"Addon '{addon_id}' not found."}), 404
+
+    payload = request.get_json(silent=True) or {}
+
+    schema_file = os.path.join(addon_dir, 'config_schema.json')
+    schema = {}
+    if os.path.isfile(schema_file):
+        try:
+            with open(schema_file, 'r', encoding='utf-8') as sf:
+                schema = json.load(sf)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Invalid config_schema.json: {e}"}), 400
+
+    fields_dict = {}
+    if isinstance(schema.get("fields"), list):
+        for f in schema["fields"]:
+            if isinstance(f, dict) and "name" in f:
+                fields_dict[f["name"]] = f
+    elif isinstance(schema.get("properties"), dict):
+        for prop_name, prop_data in schema["properties"].items():
+            if isinstance(prop_data, dict):
+                f_entry = dict(prop_data)
+                f_entry["name"] = prop_name
+                fields_dict[prop_name] = f_entry
+
+    validated_values = {}
+    for key, val in payload.items():
+        field_def = fields_dict.get(key)
+        if field_def:
+            ftype = str(field_def.get("type", "string")).lower()
+            if ftype in ("boolean", "bool", "toggle"):
+                validated_values[key] = bool(val)
+            elif ftype in ("number", "integer", "int", "float"):
+                try:
+                    num = float(val) if ("." in str(val) or ftype == "float") else int(val)
+                    if "min" in field_def and num < field_def["min"]:
+                        return jsonify({"success": False, "error": f"Field '{key}' must be at least {field_def['min']}."}), 400
+                    if "max" in field_def and num > field_def["max"]:
+                        return jsonify({"success": False, "error": f"Field '{key}' must be at most {field_def['max']}."}), 400
+                    validated_values[key] = num
+                except (ValueError, TypeError):
+                    return jsonify({"success": False, "error": f"Field '{key}' must be a valid number."}), 400
+            elif ftype == "select":
+                opts = field_def.get("options", [])
+                valid_opts = [opt["value"] if isinstance(opt, dict) else opt for opt in opts]
+                if valid_opts and val not in valid_opts:
+                    return jsonify({"success": False, "error": f"Invalid choice '{val}' for field '{key}'."}), 400
+                validated_values[key] = val
+            else:
+                validated_values[key] = str(val) if val is not None else ""
+        else:
+            validated_values[key] = val
+
+    addons_config_dir = getattr(Config, 'ADDONS_CONFIG_DIR', os.path.join(Config.CONFIG_DIR, 'addons'))
+    os.makedirs(addons_config_dir, exist_ok=True)
+    val_file = os.path.join(addons_config_dir, f"{addon_id}.json")
+
+    existing_file_values = {}
+    if os.path.isfile(val_file):
+        try:
+            with open(val_file, 'r', encoding='utf-8') as vf:
+                existing_file_values = json.load(vf)
+        except Exception:
+            existing_file_values = {}
+
+    existing_file_values.update(validated_values)
+
+    try:
+        with open(val_file, 'w', encoding='utf-8') as vf:
+            json.dump(existing_file_values, vf, indent=2)
+    except Exception as we:
+        return jsonify({"success": False, "error": f"Failed to persist configuration: {we}"}), 500
+
+    hook_invoked = False
+    if record and record.status == "ACTIVE" and record.module:
+        if hasattr(record.module, "on_config_updated") and callable(record.module.on_config_updated):
+            try:
+                record.module.on_config_updated(existing_file_values)
+                hook_invoked = True
+            except Exception as he:
+                logger.warning(f"Error invoking on_config_updated for addon '{addon_id}': {he}")
+
+    try:
+        addon_manager.emit_hook("on_config_updated", addon_id=addon_id, config=existing_file_values)
+    except Exception:
+        pass
+
+    return jsonify({
+        "success": True,
+        "message": f"Configuration for addon '{addon_id}' saved successfully.",
+        "hook_invoked": hook_invoked,
+        "values": existing_file_values
+    }), 200
+
+
+@api_bp.route('/addons/updates', methods=['GET'])
+@manager_bp.route('/api/addons/updates', methods=['GET'])
+def api_get_addon_updates():
+    """Checks remote GitHub manifests and catalog to return update availability for installed addons."""
+    from core.addons.catalog import check_addon_updates
+    try:
+        updates = check_addon_updates()
+        return jsonify({"success": True, "updates": updates}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 def _is_route_registered(url_path: str) -> bool:

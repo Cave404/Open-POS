@@ -235,3 +235,12 @@ window.installRemoteAddon = installAddon;
 window.syncNotificationBell = syncNotificationBell;
 window.renderInstalledAddons = renderInstalledAddons;
 window.loadInstalledAddons = loadInstalledAddons;
+window.openAddonConfigModal = function(addonId, addonName) {
+    if (typeof openAddonConfigModal === 'function') return openAddonConfigModal(addonId, addonName);
+};
+window.closeAddonConfigModal = function() {
+    if (typeof closeAddonConfigModal === 'function') return closeAddonConfigModal();
+};
+window.saveAddonConfig = function(e) {
+    if (typeof saveAddonConfig === 'function') return saveAddonConfig(e);
+};
