@@ -17,8 +17,12 @@
     </a>
     {% endif %}
 
-    <!-- Update Toast Floating Anchor -->
-    <div id="headerUpdateToastAnchor" style="display:inline-flex; align-items:center;"></div>
+    <!-- Update Toast Floating Anchor & Action -->
+    <div id="headerUpdateToastAnchor" style="display:inline-flex; align-items:center;">
+        <a href="/manager/updates" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 text-decoration-none fw-semibold shadow-sm animate-pulse" id="headerUpdateAvailableBtn" style="{% if not update_available and not (update_info and update_info.update_available) %}display: none;{% endif %}" title="New system or package updates are available">
+            <span>↑ Update Available</span>
+        </a>
+    </div>
 
     <div class="notification-bell-wrapper">
         <div class="notification-wrapper">

@@ -56,6 +56,15 @@
                 }
             }
 
+            const headerBtn = document.getElementById('headerUpdateAvailableBtn');
+            if (headerBtn) {
+                headerBtn.style.display = data.update_available ? 'inline-flex' : 'none';
+            }
+            const updateBadge = document.getElementById('updateBadgeBtn');
+            if (updateBadge) {
+                updateBadge.style.display = data.update_available ? 'inline-flex' : 'none';
+            }
+
             if (data.update_available) {
                 renderFloatingToast(data);
             }

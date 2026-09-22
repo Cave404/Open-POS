@@ -255,6 +255,27 @@
             transition: opacity 0.2s, background 0.2s;
         }
         .btn-upgrade-pkg:hover { opacity: 0.9; }
+        .btn-pkg-details {
+            background: transparent;
+            border: 1px solid #475569;
+            color: #cbd5e1;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-pkg-details:hover {
+            border-color: #38bdf8;
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.08);
+        }
+        .hover-underline:hover {
+            text-decoration: underline !important;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="manager-body">
@@ -421,12 +442,21 @@
                     <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #f1f5f9;">Subsystem &amp; Python Package Updates</h3>
                     <span style="font-size: 12px; color: #64748b; margin-left: 6px;">(Python Environment &amp; Installed Dependencies)</span>
                 </div>
-                <button type="button" class="btn-outline-action" id="btnScanPackages" onclick="scanPackages()">
-                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
-                    </svg>
-                    <span>Scan for Updates</span>
-                </button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button type="button" class="btn-outline-action" id="btnScanPackages" onclick="scanPackages()">
+                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+                        </svg>
+                        <span>Scan for Updates</span>
+                    </button>
+                    <button type="button" class="btn-primary-action" id="btnUpgradeAllPackages" onclick="upgradeAllPackages()" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #2563eb; color: #fff; border: 1px solid #3b82f6; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 6px rgba(37,99,235,0.3);">
+                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                            <path d="m7.247 4.86-4.796 5.481c-.566.647-.106 1.659.753 1.659h9.592a1 1 0 0 0 .753-1.659l-4.796-5.48a1 1 0 0 0-1.506 0z"/>
+                        </svg>
+                        <span>⚡ Update All</span>
+                    </button>
+                </div>
             </div>
 
             <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
@@ -446,9 +476,9 @@
                     <thead>
                         <tr>
                             <th style="width: 35%;">Package</th>
-                            <th style="width: 25%;">Installed Version</th>
-                            <th style="width: 25%;">Latest Available</th>
-                            <th style="width: 15%; text-align: right;">Action</th>
+                            <th style="width: 20%;">Installed Version</th>
+                            <th style="width: 20%;">Latest Available</th>
+                            <th style="width: 25%; text-align: right;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="packagesTableBody">
@@ -675,13 +705,26 @@
                 packages.forEach(pkg => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td style="font-weight: 600; color: #38bdf8;">${pkg.name}</td>
+                        <td class="fw-semibold">
+                            <a href="https://pypi.org/project/${pkg.name}/" target="_blank" rel="noopener noreferrer" class="text-info text-decoration-none d-inline-flex align-items-center gap-1 hover-underline" title="View ${pkg.name} upstream on PyPI / Repository" style="color: #38bdf8; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                <span>${pkg.name}</span>
+                                <svg width="11" height="11" fill="currentColor" viewBox="0 0 16 16" style="opacity: 0.6;">
+                                    <path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/>
+                                    <path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/>
+                                </svg>
+                            </a>
+                        </td>
                         <td><span class="badge-current">${pkg.version}</span></td>
                         <td><span class="badge-latest">${pkg.latest_version}</span></td>
                         <td style="text-align: right;">
-                            <button type="button" class="btn-upgrade-pkg" onclick="upgradePackage('${pkg.name}', this)">
-                                <span>⬆</span> Upgrade
-                            </button>
+                            <div class="btn-group btn-group-sm" style="display: inline-flex; align-items: center; gap: 6px;">
+                                <button type="button" class="btn btn-outline-secondary btn-pkg-details" onclick="showPackageDetails('${pkg.name}')" data-pkg="${pkg.name}" title="Inspect package details &amp; release info">
+                                    Details
+                                </button>
+                                <button type="button" class="btn-upgrade-pkg" onclick="upgradePackage('${pkg.name}', this)" data-pkg="${pkg.name}" data-target="${pkg.latest_version}">
+                                    <span>⬆</span> Upgrade
+                                </button>
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -699,6 +742,142 @@
                 btn.innerHTML = origHtml;
             }
         }
+
+        async function upgradeAllPackages() {
+            const btn = document.getElementById('btnUpgradeAllPackages');
+            const toast = document.getElementById('pkgToast');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> Upgrading All...';
+
+            try {
+                const res = await fetch('/api/system/packages/upgrade-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    toast.className = 'toast-msg success';
+                    toast.textContent = data.message || 'All packages upgraded successfully.';
+                    toast.style.display = 'block';
+
+                    if (data.restart_required) {
+                        document.getElementById('restartWarningBanner').style.display = 'flex';
+                    }
+                    // Refresh table with updated packages
+                    await scanPackages();
+                } else {
+                    toast.className = 'toast-msg error';
+                    toast.textContent = data.error || data.message || 'Batch upgrade failed.';
+                    toast.style.display = 'block';
+                }
+            } catch (err) {
+                // If runtime reloads or supervisor restarts during pip install, handle gracefully
+                toast.className = 'toast-msg info';
+                toast.textContent = 'Package upgrades applied. Refreshing environment package status...';
+                toast.style.display = 'block';
+                document.getElementById('restartWarningBanner').style.display = 'flex';
+                setTimeout(() => { scanPackages(); }, 2500);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+
+        async function showPackageDetails(pkgName) {
+            const modal = document.getElementById('packageDetailsModal');
+            const spinner = document.getElementById('pkgModalSpinner');
+            const content = document.getElementById('pkgModalContent');
+            const title = document.getElementById('pkgModalTitle');
+
+            title.textContent = `${pkgName} Details`;
+            spinner.style.display = 'block';
+            content.style.display = 'none';
+            content.classList.add('d-none');
+            modal.style.display = 'flex';
+
+            try {
+                const res = await fetch(`/api/system/packages/${encodeURIComponent(pkgName)}/details`);
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    document.getElementById('pkgModalSummary').textContent = data.summary || 'No summary available.';
+                    document.getElementById('pkgModalLatest').textContent = data.version ? `v${data.version}` : 'Latest';
+                    document.getElementById('pkgModalLicense').textContent = data.license || 'Open Source';
+                    document.getElementById('pkgModalAuthor').textContent = data.author || 'Unknown';
+
+                    const linksContainer = document.getElementById('pkgModalLinks');
+                    linksContainer.innerHTML = '';
+
+                    // PyPI Link
+                    if (data.pypi_url) {
+                        const pypiLink = document.createElement('a');
+                        pypiLink.href = data.pypi_url;
+                        pypiLink.target = '_blank';
+                        pypiLink.rel = 'noopener noreferrer';
+                        pypiLink.className = 'btn-outline-action';
+                        pypiLink.style.cssText = 'text-decoration:none; font-size:12px; display:inline-flex; align-items:center; gap:6px; padding:4px 10px; background:#232834; border:1px solid #3d4455; color:#38bdf8; border-radius:6px;';
+                        pypiLink.innerHTML = `<span>📦</span> PyPI Project`;
+                        linksContainer.appendChild(pypiLink);
+                    }
+
+                    // Homepage / Repo Link
+                    if (data.home_page) {
+                        const homeLink = document.createElement('a');
+                        homeLink.href = data.home_page;
+                        homeLink.target = '_blank';
+                        homeLink.rel = 'noopener noreferrer';
+                        homeLink.className = 'btn-outline-action';
+                        homeLink.style.cssText = 'text-decoration:none; font-size:12px; display:inline-flex; align-items:center; gap:6px; padding:4px 10px; background:#232834; border:1px solid #3d4455; color:#cbd5e1; border-radius:6px;';
+                        homeLink.innerHTML = `<span>🌐</span> Homepage`;
+                        linksContainer.appendChild(homeLink);
+                    }
+
+                    // Project URLs (Source, Documentation, etc.)
+                    if (data.project_urls && typeof data.project_urls === 'object') {
+                        Object.entries(data.project_urls).forEach(([label, url]) => {
+                            if (url && url !== data.home_page && url !== data.pypi_url) {
+                                const extraLink = document.createElement('a');
+                                extraLink.href = url;
+                                extraLink.target = '_blank';
+                                extraLink.rel = 'noopener noreferrer';
+                                extraLink.className = 'btn-outline-action';
+                                extraLink.style.cssText = 'text-decoration:none; font-size:12px; display:inline-flex; align-items:center; gap:6px; padding:4px 10px; background:#232834; border:1px solid #3d4455; color:#cbd5e1; border-radius:6px;';
+                                extraLink.innerHTML = `<span>🔗</span> ${label}`;
+                                linksContainer.appendChild(extraLink);
+                            }
+                        });
+                    }
+
+                    spinner.style.display = 'none';
+                    content.style.display = 'block';
+                    content.classList.remove('d-none');
+                } else {
+                    spinner.style.display = 'none';
+                    document.getElementById('pkgModalSummary').textContent = data.error || 'Failed to retrieve package metadata from PyPI.';
+                    content.style.display = 'block';
+                    content.classList.remove('d-none');
+                }
+            } catch (err) {
+                spinner.style.display = 'none';
+                document.getElementById('pkgModalSummary').textContent = `Network error fetching details: ${err.message}`;
+                content.style.display = 'block';
+                content.classList.remove('d-none');
+            }
+        }
+
+        function closePackageDetailsModal() {
+            const modal = document.getElementById('packageDetailsModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        // Close details modal on click outside
+        window.addEventListener('click', (e) => {
+            const modal = document.getElementById('packageDetailsModal');
+            if (e.target === modal) {
+                closePackageDetailsModal();
+            }
+        });
 
         async function upgradePackage(name, btn) {
             btn.disabled = true;
@@ -752,5 +931,49 @@
             }
         }
     </script>
+
+    <!-- Package Details Inspector Modal -->
+    <div class="modal fade" id="packageDetailsModal" tabindex="-1" aria-hidden="true" style="display:none; position:fixed; inset:0; z-index:10001; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); align-items:center; justify-content:center;">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:560px; width:92%; margin:auto;">
+            <div class="modal-content bg-card border-subtle text-light" style="background:#1a1d24; border:1px solid #2d3343; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.7); overflow:hidden;">
+                <div class="modal-header border-subtle" style="padding:18px 24px; border-bottom:1px solid #2d3343; display:flex; align-items:center; justify-content:space-between;">
+                    <h5 class="modal-title d-flex align-items-center gap-2" style="margin:0; font-size:17px; font-weight:700; color:#f1f5f9; display:flex; align-items:center; gap:8px;">
+                        <span class="fs-5">📦</span>
+                        <span id="pkgModalTitle">Package Details</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="closePackageDetailsModal()" style="background:none; border:none; color:#94a3b8; font-size:24px; cursor:pointer; line-height:1;" title="Close">&times;</button>
+                </div>
+                <div class="modal-body" style="padding:22px 24px;">
+                    <div id="pkgModalSpinner" class="text-center py-4" style="text-align:center; padding:24px 0;">
+                        <div class="spinner-border text-primary" role="status" style="display:inline-block; width:32px; height:32px; border:3px solid rgba(56,189,248,0.2); border-top-color:#38bdf8; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+                        <p class="text-muted small mt-2" style="color:#94a3b8; font-size:13px; margin-top:12px;">Fetching upstream package metadata from PyPI...</p>
+                    </div>
+                    <div id="pkgModalContent" class="d-none" style="display:none;">
+                        <p id="pkgModalSummary" class="text-muted mb-3" style="color:#cbd5e1; font-size:13px; line-height:1.6; margin-bottom:18px;"></p>
+                        <ul class="list-group list-group-flush bg-transparent border-subtle mb-3" style="list-style:none; padding:0; margin:0 0 18px; background:rgba(255,255,255,0.02); border:1px solid #2d3343; border-radius:8px; overflow:hidden;">
+                            <li class="list-group-item bg-transparent text-light border-subtle d-flex justify-content-between px-0" style="padding:10px 16px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+                                <span class="text-muted" style="color:#94a3b8;">Latest Stable Release:</span>
+                                <span class="badge bg-success-subtle text-success" id="pkgModalLatest" style="background:rgba(16,185,129,0.15); color:#34d399; font-weight:600; padding:3px 10px; border-radius:6px;"></span>
+                            </li>
+                            <li class="list-group-item bg-transparent text-light border-subtle d-flex justify-content-between px-0" style="padding:10px 16px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+                                <span class="text-muted" style="color:#94a3b8;">License:</span>
+                                <span id="pkgModalLicense" style="color:#f1f5f9; font-weight:500;"></span>
+                            </li>
+                            <li class="list-group-item bg-transparent text-light border-subtle d-flex justify-content-between px-0" style="padding:10px 16px; display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+                                <span class="text-muted" style="color:#94a3b8;">Maintainer / Author:</span>
+                                <span id="pkgModalAuthor" style="color:#f1f5f9; font-weight:500;"></span>
+                            </li>
+                        </ul>
+                        <div id="pkgModalLinks" class="d-flex flex-wrap gap-2 pt-2 border-top border-subtle" style="display:flex; flex-wrap:wrap; gap:8px; padding-top:14px; border-top:1px solid #2d3343;">
+                            <!-- Injected PyPI & Repo Links -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-subtle" style="padding:14px 24px; border-top:1px solid #2d3343; display:flex; justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" onclick="closePackageDetailsModal()" style="background:#232834; border:1px solid #3d4455; color:#cbd5e1; padding:6px 16px; border-radius:6px; font-size:13px; cursor:pointer;">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

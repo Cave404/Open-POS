@@ -423,3 +423,26 @@ def start_background_checker(app=None, interval_seconds: int = POLL_INTERVAL_SEC
     )
     t.start()
     logger.info("[UPDATER] Background update checker thread started.")
+
+
+# ---------------------------------------------------------------------------
+# Python Package Dependencies Scanner
+# ---------------------------------------------------------------------------
+def get_outdated_packages() -> List[Dict[str, Any]]:
+    """
+    Runs pip list --outdated --format=json in active virtual environment
+    and returns available dependency updates for packages.
+    """
+    import sys
+    import subprocess
+    try:
+        cmd = [sys.executable, "-m", "pip", "list", "--outdated", "--format=json"]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+        if proc.returncode == 0 and proc.stdout.strip():
+            packages = json.loads(proc.stdout)
+            if isinstance(packages, list):
+                return packages
+    except Exception as e:
+        logger.warning(f"[UPDATER] Could not scan pip outdated packages: {e}")
+    return []
+

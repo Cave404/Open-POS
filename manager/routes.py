@@ -1968,6 +1968,23 @@ def api_system_package_upgrade():
         return jsonify({"status": "error", "message": f"Upgrade execution failed: {str(e)}"}), 500
 
 
+@api_bp.route('/system/packages/upgrade-all', methods=['POST'])
+@manager_bp.route('/api/system/packages/upgrade-all', methods=['POST'])
+def api_system_packages_upgrade_all():
+    """Batch upgrades all outdated packages in the virtual environment."""
+    from core.routes.system_routes import upgrade_all_packages
+    return upgrade_all_packages()
+
+
+@api_bp.route('/system/packages/<pkg_name>/details', methods=['GET'])
+@manager_bp.route('/api/system/packages/<pkg_name>/details', methods=['GET'])
+def api_system_packages_details(pkg_name):
+    """Fetches package details from PyPI."""
+    from core.routes.system_routes import get_package_details
+    return get_package_details(pkg_name)
+
+
+
 @api_bp.route('/system/restart', methods=['POST'])
 @manager_bp.route('/api/system/restart', methods=['POST'])
 def api_system_restart():

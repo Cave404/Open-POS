@@ -96,12 +96,13 @@
                     </div>
                 </div>
                 <!-- Update Available Badge -->
-                <button id="updateBadgeBtn"
+                <a id="updateBadgeBtn"
+                    href="/manager/updates"
                     title="A new version of Open-POS is available"
-                    onclick="openUpdateModal()"
-                    style="display:none; align-items:center; gap:6px; padding:4px 12px; background:linear-gradient(135deg,#059669,#10b981); color:#fff; border:none; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; box-shadow:0 0 10px rgba(16,185,129,0.4); animation: pulse-badge 2s ease-in-out infinite;">
-                    ⬆ Update Available
-                </button>
+                    class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 text-decoration-none fw-semibold shadow-sm animate-pulse"
+                    style="display:none; align-items:center; gap:6px; padding:4px 12px; background:linear-gradient(135deg,#059669,#10b981); color:#fff; border:none; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; box-shadow:0 0 10px rgba(16,185,129,0.4); text-decoration:none;">
+                    <span>⬆ Update Available</span>
+                </a>
                 <span class="status-pill status-online">Engine: Online</span>
             </div>
         </header>

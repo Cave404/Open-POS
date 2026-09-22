@@ -551,4 +551,88 @@ def test_system_packages_and_restart_api(client):
     assert restart_res.get_json()["status"] == "success"
 
 
+def test_upgrade_all_packages_api(client, monkeypatch):
+    """Asserts batch upgrade-all endpoint behaviors."""
+    from unittest.mock import MagicMock
+    import subprocess
+    import core.updater.checker as checker
+
+    # Case 1: No outdated packages
+    monkeypatch.setattr(checker, "get_outdated_packages", lambda: [])
+    res = client.post('/api/system/packages/upgrade-all')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["success"] is True
+    assert data["upgraded"] == []
+
+    # Case 2: Outdated packages present, mocked successful upgrade
+    mock_outdated = [
+        {"name": "urllib3", "version": "1.26.18", "latest_version": "2.2.1"},
+        {"name": "flask", "version": "2.2.0", "latest_version": "3.0.0"}
+    ]
+    monkeypatch.setattr(checker, "get_outdated_packages", lambda: mock_outdated)
+
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.stdout = "Successfully installed urllib3 flask"
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: mock_proc)
+
+    res2 = client.post('/api/system/packages/upgrade-all')
+    assert res2.status_code == 200
+    data2 = res2.get_json()
+    assert data2["success"] is True
+    assert "urllib3" in data2["upgraded"]
+    assert "flask" in data2["upgraded"]
+    assert data2["restart_required"] is True  # flask is a core package
+
+
+def test_package_details_api(client, monkeypatch):
+    """Asserts PyPI metadata query and validation for package details."""
+    from unittest.mock import MagicMock
+    import requests
+
+    # Case 1: Invalid package format
+    bad_res = client.get('/api/system/packages/invalid%20name!/details')
+    assert bad_res.status_code == 400
+
+    # Case 2: Successful PyPI query
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "info": {
+            "name": "flask",
+            "summary": "A simple framework for building complex web applications.",
+            "version": "3.0.0",
+            "author": "Armin Ronacher",
+            "license": "BSD-3-Clause",
+            "home_page": "https://palletsprojects.com/p/flask/",
+            "project_urls": {
+                "Documentation": "https://flask.palletsprojects.com/",
+                "Source": "https://github.com/pallets/flask"
+            }
+        }
+    }
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: mock_resp)
+
+    res = client.get('/api/system/packages/flask/details')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["success"] is True
+    assert data["name"] == "flask"
+    assert data["version"] == "3.0.0"
+    assert data["author"] == "Armin Ronacher"
+    assert "Documentation" in data["project_urls"]
+    assert data["pypi_url"] == "https://pypi.org/project/flask/"
+
+    # Case 3: PyPI 404 Not Found
+    mock_404 = MagicMock()
+    mock_404.status_code = 404
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: mock_404)
+
+    not_found_res = client.get('/api/system/packages/nonexistent-pkg-xyz/details')
+    assert not_found_res.status_code == 404
+    assert not_found_res.get_json()["success"] is False
+
+
+
 

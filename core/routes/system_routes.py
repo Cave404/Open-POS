@@ -14,6 +14,10 @@ maintenance window scheduling, and process restarting:
 import time
 import threading
 import logging
+import subprocess
+import sys
+import re
+import requests
 from flask import Blueprint, jsonify, request
 
 from core.config import Config
@@ -26,6 +30,8 @@ from core.updater.scheduler import (
 )
 
 logger = logging.getLogger(__name__)
+
+CORE_PACKAGES = {"flask", "waitress", "pywebview", "pystray", "psycopg", "pillow", "sqlalchemy"}
 
 system_bp = Blueprint('system', __name__, url_prefix='/api/system')
 
@@ -177,3 +183,81 @@ def api_update_apply():
             "success": False,
             "message": str(e)
         }), 500
+
+
+@system_bp.route("/packages/upgrade-all", methods=["POST"])
+def upgrade_all_packages():
+    """Upgrades all outdated packages detected in the virtual environment."""
+    from core.updater.checker import get_outdated_packages
+    from core.notifications import add_alert
+
+    try:
+        outdated = get_outdated_packages()
+        if not outdated:
+            return jsonify({
+                "status": "success",
+                "success": True,
+                "message": "All packages are already up to date.",
+                "upgraded": []
+            }), 200
+
+        pkg_names = [p["name"] for p in outdated if isinstance(p, dict) and re.match(r'^[A-Za-z0-9_\-\.]+$', p.get("name", ""))]
+        if not pkg_names:
+            return jsonify({
+                "status": "success",
+                "success": True,
+                "message": "No valid packages to upgrade.",
+                "upgraded": []
+            }), 200
+
+        cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir"] + pkg_names
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        if res.returncode != 0:
+            return jsonify({"status": "error", "success": False, "error": res.stderr or res.stdout}), 500
+
+        has_core = any(p.lower() in CORE_PACKAGES for p in pkg_names)
+        if has_core:
+            add_alert("WARNING", f"Core dependencies {pkg_names} were upgraded. System restart required.", "CORE")
+        else:
+            add_alert("INFO", f"Successfully upgraded {len(pkg_names)} packages.", "CORE")
+
+        return jsonify({
+            "status": "success",
+            "success": True,
+            "message": f"Successfully upgraded {len(pkg_names)} packages.",
+            "upgraded": pkg_names,
+            "restart_required": has_core
+        }), 200
+    except Exception as e:
+        logger.error(f"[SYSTEM_API] Batch upgrade failed: {e}", exc_info=True)
+        return jsonify({"status": "error", "success": False, "error": str(e)}), 500
+
+
+@system_bp.route("/packages/<pkg_name>/details", methods=["GET"])
+def get_package_details(pkg_name):
+    """Fetches summary, author, homepage, and description metadata from PyPI."""
+    if not re.match(r'^[A-Za-z0-9_\-\.]+$', pkg_name):
+        return jsonify({"status": "error", "success": False, "error": f"Invalid package name format '{pkg_name}'"}), 400
+
+    try:
+        resp = requests.get(f"https://pypi.org/pypi/{pkg_name}/json", timeout=6)
+        if resp.status_code != 200:
+            return jsonify({"status": "error", "success": False, "error": f"Package '{pkg_name}' not found on PyPI"}), 404
+
+        info = resp.json().get("info", {})
+        return jsonify({
+            "status": "success",
+            "success": True,
+            "name": info.get("name", pkg_name),
+            "summary": info.get("summary") or "No summary provided.",
+            "version": info.get("version"),
+            "author": info.get("author") or info.get("author_email") or "Unknown",
+            "license": info.get("license") or "Open Source",
+            "home_page": info.get("home_page") or info.get("project_url"),
+            "project_urls": info.get("project_urls") or {},
+            "pypi_url": f"https://pypi.org/project/{pkg_name}/"
+        }), 200
+    except Exception as e:
+        logger.error(f"[SYSTEM_API] Error fetching package details for '{pkg_name}': {e}")
+        return jsonify({"status": "error", "success": False, "error": str(e)}), 500
+
