@@ -24,6 +24,16 @@ def isolate_test_environment(monkeypatch, tmp_path):
     os.makedirs(test_custom_addons, exist_ok=True)
     os.makedirs(test_logs_dir, exist_ok=True)
 
+    import shutil
+    real_addons_dir = os.path.join(Config.BASE_DIR, 'data', 'custom_addons')
+    if os.path.isdir(real_addons_dir):
+        for item in os.listdir(real_addons_dir):
+            if item != "test_addon":
+                s = os.path.join(real_addons_dir, item)
+                d = os.path.join(test_custom_addons, item)
+                if os.path.isdir(s):
+                    shutil.copytree(s, d, dirs_exist_ok=True)
+
     # Monkeypatch Config paths to point exclusively to the isolated tmp_path
     monkeypatch.setattr(Config, "DB_ENGINE", "sqlite")
     monkeypatch.setattr(Config, "DB_NAME", test_db_file)

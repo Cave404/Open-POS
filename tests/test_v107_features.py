@@ -316,9 +316,12 @@ def settings():
     assert rec["dir_type"] == "custom"
 
     # 4. Protection check: Attempting to delete a built-in addon must be rejected
-    res_delete_builtin = client.delete("/api/addons/test_addon")
+    from core.addons.loader import AddonRecord
+    addon_manager.addons["builtin_mock"] = AddonRecord("builtin_mock", {"name": "Builtin Mock"}, "addons/builtin_mock", "builtin")
+    res_delete_builtin = client.delete("/api/addons/builtin_mock")
     assert res_delete_builtin.status_code == 400
     assert "Cannot remove built-in" in res_delete_builtin.get_json()["error"]
+    addon_manager.addons.pop("builtin_mock", None)
 
     # 5. Uninstall custom addon via DELETE /api/addons/<addon_id>
     res_delete_custom = client.delete(f"/api/addons/{addon_id}")

@@ -83,10 +83,37 @@ def get_system_logs(limit: int = 100) -> list:
 
     return logs
 
-# Ensure initial boot alert exists
-add_alert("INFO", f"Open-POS Engine {Config.VERSION} initialized and running normally.", "CORE")
-add_alert("INFO", "Telemetry collector mounted at data/logs/openpos_system.log", "CORE")
-add_alert("INFO", "USB NFC polling worker registered on port COM3", "NFC")
-add_alert("INFO", "Price Engine background evaluator initialized.", "PRICE_ENGINE")
+def add_system_notification(title: str = "System", message: str = "", level: str = "WARNING", subsystem: str = "CORE") -> dict:
+    """
+    Adds an actionable operational alert (WARNING, ERROR, CRITICAL) to the notification queue.
+    Routine INFO logs are strictly discarded from the notification bell.
+    """
+    clean_level = level.upper().strip() if level else "WARNING"
+    if clean_level not in {"WARNING", "ERROR", "CRITICAL"}:
+        return {}
+
+    msg = f"[{title}] {message}" if title and title.upper() != subsystem.upper() else message
+    clean_subsystem = subsystem.upper().strip() if subsystem else "CORE"
+    time_str = datetime.now().strftime("%H:%M:%S")
+
+    alert_item = {
+        "id": str(uuid.uuid4())[:8],
+        "timestamp": time_str,
+        "level": clean_level,
+        "subsystem": clean_subsystem,
+        "message": str(msg).strip(),
+        "read": False
+    }
+
+    with _queue_lock:
+        _alerts_queue.appendleft(alert_item)
+
+    return alert_item
+
+# Log routine boot telemetry directly to openpos_system.log without polluting notification bell
+log_event("INFO", f"Open-POS Engine {Config.VERSION} initialized and running normally.", "CORE")
+log_event("INFO", "Telemetry collector mounted at data/logs/openpos_system.log", "CORE")
+log_event("INFO", "USB NFC polling worker registered on port COM3", "NFC")
+log_event("INFO", "Price Engine background evaluator initialized.", "PRICE_ENGINE")
 
 

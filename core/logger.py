@@ -39,6 +39,36 @@ FORMATTER = logging.Formatter(
 _system_logger = None
 _addons_logger = None
 
+class NotificationLogHandler(logging.Handler):
+    """
+    Log handler that intercepts WARNING, ERROR, and CRITICAL log events
+    and routes them to user-facing system notifications drawer.
+    Filters out routine INFO and DEBUG telemetry.
+    """
+    def __init__(self, level=logging.WARNING):
+        super().__init__(level=level)
+
+    def emit(self, record):
+        # Only route WARNING and above to the notification bell drawer
+        if record.levelno < logging.WARNING:
+            return
+
+        try:
+            from core.notifications import add_system_notification
+            level_name = "WARNING" if record.levelno == logging.WARNING else "ERROR"
+            if record.levelno >= logging.CRITICAL:
+                level_name = "CRITICAL"
+
+            subsystem = record.name.split('.')[-1].upper() if record.name else "CORE"
+            add_system_notification(
+                title=record.name,
+                message=self.format(record),
+                level=level_name,
+                subsystem=subsystem
+            )
+        except Exception:
+            self.handleError(record)
+
 
 def setup_system_logger():
     """
@@ -70,6 +100,10 @@ def setup_system_logger():
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(FORMATTER)
         root_logger.addHandler(console_handler)
+
+        notif_handler = NotificationLogHandler(level=logging.WARNING)
+        notif_handler.setFormatter(FORMATTER)
+        root_logger.addHandler(notif_handler)
 
     # 2. Addons Dedicated Logger
     addons_logger = logging.getLogger("openpos.addons")

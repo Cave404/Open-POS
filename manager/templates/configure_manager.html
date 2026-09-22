@@ -272,41 +272,6 @@
                 </div>
             </div>
 
-            <!-- Section C: Subsystem & Python Package Updates -->
-            <div class="admin-card">
-                <div class="admin-card-header" style="justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 22px;">📦</span>
-                        <h3>Subsystem &amp; Python Package Updates</h3>
-                    </div>
-                    <button type="button" class="btn-action-sm" id="btnScanPackages">
-                        <span>🔍</span> Scan for Updates
-                    </button>
-                </div>
-
-                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
-                    Check the active Python virtual environment for newer stable upstream releases of core POS dependencies (Flask, Waitress, PyWebView, Psycopg, etc.).
-                </p>
-
-                <table class="packages-table">
-                    <thead>
-                        <tr>
-                            <th>Package</th>
-                            <th>Installed Version</th>
-                            <th>Latest Available</th>
-                            <th style="text-align: right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="packagesTableBody">
-                        <tr>
-                            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">
-                                Click "Scan for Updates" to query the environment package ledger.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
         </div>
     </div>
 
@@ -401,88 +366,7 @@ async function saveSecurityPolicy() {
     }
 }
 
-async function scanPackages() {
-    const tbody = document.getElementById('packagesTableBody');
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">
-                Checking upstream Python package ledger with pip...
-            </td>
-        </tr>
-    `;
 
-    try {
-        const res = await fetch('/api/system/packages');
-        const data = await res.json();
-        const packages = data.packages || [];
-
-        tbody.innerHTML = '';
-        if (packages.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="4" style="text-align: center; color: var(--success); padding: 24px;">
-                        ✓ All installed packages are currently up-to-date.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        packages.forEach(pkg => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="pkg-name-cell">${pkg.name}</td>
-                <td><span class="badge-current">${pkg.version}</span></td>
-                <td><span class="badge-latest">${pkg.latest_version}</span></td>
-                <td style="text-align: right;">
-                    <button type="button" class="btn-action-sm btn-action-primary" onclick="upgradePackage('${pkg.name}', this)">
-                        <span>⬆</span> Upgrade
-                    </button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (err) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="4" style="text-align: center; color: var(--danger); padding: 24px;">
-                    Failed to scan packages: ${err.message}
-                </td>
-            </tr>
-        `;
-    }
-}
-
-async function upgradePackage(name, btn) {
-    btn.disabled = true;
-    btn.textContent = 'Upgrading...';
-
-    try {
-        const res = await fetch('/api/system/packages/upgrade', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ package: name })
-        });
-        const data = await res.json();
-        if (res.ok && data.status === 'success') {
-            showToast(`Successfully upgraded ${name} to ${data.new_version || 'latest'}`);
-            btn.textContent = 'Upgraded ✓';
-            btn.style.background = 'var(--success)';
-
-            if (data.restart_required) {
-                document.getElementById('restartWarningBanner').style.display = 'flex';
-            }
-        } else {
-            showToast(data.message || `Failed to upgrade ${name}`, true);
-            btn.disabled = false;
-            btn.textContent = 'Upgrade';
-        }
-    } catch (err) {
-        showToast(`Upgrade error: ${err.message}`, true);
-        btn.disabled = false;
-        btn.textContent = 'Upgrade';
-    }
-}
 
 async function restartSystem() {
     try {
@@ -517,7 +401,6 @@ document.getElementById('toastClose').addEventListener('click', () => {
 
 document.getElementById('btnSaveAuth').addEventListener('click', saveSecurityPolicy);
 document.getElementById('bypassManagerToggle').addEventListener('change', saveSecurityPolicy);
-document.getElementById('btnScanPackages').addEventListener('click', scanPackages);
 document.getElementById('btnRestartPOS').addEventListener('click', restartSystem);
 
 document.addEventListener('DOMContentLoaded', loadAdminStatus);

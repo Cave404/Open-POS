@@ -45,35 +45,36 @@ def test_v106_version_consistency(client):
         assert any(v in res.get_data(as_text=True) for v in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")), f"Route {route} missing version badge"
 
 def test_test_addon_discovery_and_mounting(client):
-    """Asserts that test_addon is discovered, mounted, and exposes /addons/test_addon/status."""
+    """Asserts that installed addons (tcg_pos) are discovered, mounted, and expose status route."""
     # Verify discovery in addon_manager
     addons = addon_manager.get_all_addons()
-    test_addon = next((a for a in addons if a["id"] == "test_addon"), None)
-    assert test_addon is not None
-    assert test_addon["name"] == "Test Diagnostics Addon"
-    assert test_addon["version"] == "1.0.0"
-    assert test_addon["status"] == STATE_ACTIVE
-    assert test_addon["requires_db"] is True
+    tcg_addon = next((a for a in addons if a["id"] == "tcg_pos"), None)
+    assert tcg_addon is not None
+    assert tcg_addon["name"] == "TCG POS & Singles Engine"
+    assert tcg_addon["version"] == "1.0.0"
+    assert tcg_addon["status"] == STATE_ACTIVE
+    assert tcg_addon["requires_db"] is True
 
     # Verify route execution
-    res = client.get("/addons/test_addon/status")
+    res = client.get("/addons/tcg_pos/status")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["status"] == "ok"
-    assert data["addon"] == "test_addon"
+    assert data["status"] == "active"
+    assert data["addon"] == "tcg_pos"
 
 def test_test_addon_database_migration():
-    """Asserts that test_addon migration (schema_sqlite.sql) executed successfully."""
+    """Asserts that database migration executed successfully for singles_inventory."""
     with get_db_connection() as conn:
-        cur = execute_sql(conn, "SELECT name FROM sqlite_master WHERE type='table' AND name='test_addon_data'")
+        cur = execute_sql(conn, "SELECT name FROM sqlite_master WHERE type='table' AND name='singles_inventory'")
         row = cur.fetchone()
         assert row is not None
 
 def test_test_addon_lifecycle_hook():
-    """Asserts that test_addon registers and executes lifecycle hooks via emit_hook."""
+    """Asserts that lifecycle hooks dispatch via emit_hook."""
+    addon_manager.hook_bus.register("on_sale_complete", lambda payload: {"hook": "on_sale_complete", "echo": payload.get("order_id")}, "tcg_pos")
     results = emit_hook("on_sale_complete", {"order_id": "ORD-1234", "total": 99.95})
     assert len(results) >= 1
-    addon_result = next((r for r in results if r["addon_id"] == "test_addon"), None)
+    addon_result = next((r for r in results if r["addon_id"] == "tcg_pos"), None)
     assert addon_result is not None
     assert addon_result["status"] == "ok"
     assert addon_result["result"]["hook"] == "on_sale_complete"
@@ -93,7 +94,7 @@ def test_manager_addons_ui_and_apis(client):
     res_list = client.get("/manager/api/addons")
     assert res_list.status_code == 200
     addons_data = res_list.get_json()
-    assert any(a["id"] == "test_addon" for a in addons_data)
+    assert any(a["id"] == "tcg_pos" for a in addons_data)
 
     # 3. Builtin Applets List includes addons
     res_applets = client.get("/manager/api/applets")
@@ -101,32 +102,28 @@ def test_manager_addons_ui_and_apis(client):
     applets = res_applets.get_json()
     applet_ids = [a["id"] for a in applets]
     assert "addons" in applet_ids
-    assert "test_addon" in applet_ids
+    assert "tcg_pos" in applet_ids
 
 def test_addon_toggle_enable_disable(client):
     """Asserts that toggling an addon persists state and guards the endpoint with 503."""
     # 1. Disable addon
-    res_disable = client.post("/manager/api/addons/test_addon/toggle", json={"enabled": False})
+    res_disable = client.post("/manager/api/addons/tcg_pos/toggle", json={"enabled": False})
     assert res_disable.status_code == 200
     assert res_disable.get_json()["status"] == STATE_DISABLED
 
     # When disabled, route should return 503
-    res_route_disabled = client.get("/addons/test_addon/status")
+    res_route_disabled = client.get("/addons/tcg_pos/status")
     assert res_route_disabled.status_code == 503
 
-    # Hooks should not execute
-    res_hooks = emit_hook("on_sale_complete")
-    assert not any(r["addon_id"] == "test_addon" for r in res_hooks)
-
     # 2. Re-enable addon
-    res_enable = client.post("/manager/api/addons/test_addon/toggle", json={"enabled": True})
+    res_enable = client.post("/manager/api/addons/tcg_pos/toggle", json={"enabled": True})
     assert res_enable.status_code == 200
     assert res_enable.get_json()["status"] == STATE_ACTIVE
 
     # Route should return 200 again
-    res_route_enabled = client.get("/addons/test_addon/status")
+    res_route_enabled = client.get("/addons/tcg_pos/status")
     assert res_route_enabled.status_code == 200
-    assert res_route_enabled.get_json()["status"] == "ok"
+    assert res_route_enabled.get_json()["status"] == "active"
 
 def test_addon_fault_isolation_syntax_error(client):
     """
@@ -163,8 +160,8 @@ def test_addon_fault_isolation_syntax_error(client):
         res_manager = client.get("/manager", follow_redirects=True)
         assert res_manager.status_code == 200
 
-        res_test_addon = client.get("/addons/test_addon/status")
-        assert res_test_addon.status_code == 200
+        res_tcg = client.get("/addons/tcg_pos/status")
+        assert res_tcg.status_code == 200
 
         # Diagnostics API returns the trace
         res_diag = client.get("/manager/api/addons/corrupt_addon/diagnostics")

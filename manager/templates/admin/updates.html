@@ -222,6 +222,39 @@
         .toast-msg.success { background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399; }
         .toast-msg.error { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; }
         .toast-msg.info { background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #7dd3fc; }
+        .badge-current {
+            background: #232834;
+            color: #94a3b8;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #3d4455;
+        }
+        .badge-latest {
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+        .btn-upgrade-pkg {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: #ffffff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: opacity 0.2s, background 0.2s;
+        }
+        .btn-upgrade-pkg:hover { opacity: 0.9; }
     </style>
 </head>
 <body class="manager-body">
@@ -380,7 +413,57 @@
             </div>
         </div>
 
-        <!-- Maintenance Window Configuration Card -->
+        <!-- Middle Section: Subsystem & Python Package Dependencies -->
+        <div class="update-card" style="margin-bottom: 24px;">
+            <div class="card-header-flex">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">📦</span>
+                    <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #f1f5f9;">Subsystem &amp; Python Package Updates</h3>
+                    <span style="font-size: 12px; color: #64748b; margin-left: 6px;">(Python Environment &amp; Installed Dependencies)</span>
+                </div>
+                <button type="button" class="btn-outline-action" id="btnScanPackages" onclick="scanPackages()">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+                    </svg>
+                    <span>Scan for Updates</span>
+                </button>
+            </div>
+
+            <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
+                Check the active Python virtual environment for newer stable upstream releases of core POS dependencies (Flask, Waitress, PyWebView, Psycopg, etc.).
+            </p>
+
+            <div id="restartWarningBanner" style="display: none; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(234, 179, 8, 0.15); border: 1px solid rgba(234, 179, 8, 0.4); border-radius: 8px; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 10px; color: #facc15; font-size: 13px; font-weight: 500;">
+                    <span>⚠️</span>
+                    <span>Core packages have been upgraded. A system restart is required to load new binaries into runtime.</span>
+                </div>
+                <button type="button" class="btn-outline-action" onclick="restartSystem()" style="color: #facc15; border-color: rgba(250, 204, 21, 0.4);">Restart POS</button>
+            </div>
+
+            <div class="package-table-wrap">
+                <table class="package-table" id="packagesTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 35%;">Package</th>
+                            <th style="width: 25%;">Installed Version</th>
+                            <th style="width: 25%;">Latest Available</th>
+                            <th style="width: 15%; text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="packagesTableBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: #94a3b8; padding: 24px;">
+                                Click "Scan for Updates" to query the environment package ledger.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="pkgToast" class="toast-msg"></div>
+        </div>
+
+        <!-- Bottom Section: Maintenance Window & Scheduler Preferences -->
         <div class="update-card" style="margin-bottom: 24px;">
             <div class="card-header-flex">
                 <h3><span>⏰</span> Maintenance Window &amp; Scheduler Preferences</h3>
@@ -442,41 +525,6 @@
             </form>
         </div>
 
-        <!-- Python Environment & Dependency Audit -->
-        <div class="update-card">
-            <div class="card-header-flex">
-                <h3><span>🐍</span> Python Environment &amp; Installed Dependencies</h3>
-                <span style="font-size: 12px; color: #94a3b8;">{{ packages|length }} packages installed in venv</span>
-            </div>
-            <p style="font-size: 13px; color: #94a3b8; margin: 0 0 10px;">
-                OpenPOS executes in an isolated virtual environment (<code>venv</code>). The updater strictly preserves installed third-party libraries across all engine updates.
-            </p>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 8px;">
-                <input type="text" id="pkgSearch" placeholder="Filter packages..." style="background:#12141a; border:1px solid #3d4455; border-radius:6px; color:#fff; padding:6px 10px; font-size:13px; width:220px;" oninput="filterPackages()">
-            </div>
-
-            <div class="package-table-wrap">
-                <table class="package-table" id="pkgTable">
-                    <thead>
-                        <tr>
-                            <th style="width: 30%;">Package</th>
-                            <th style="width: 20%;">Version</th>
-                            <th style="width: 50%;">Summary</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for pkg in packages %}
-                            <tr>
-                                <td style="font-weight: 600; color: #38bdf8;">{{ pkg.name }}</td>
-                                <td><code>{{ pkg.version }}</code></td>
-                                <td style="color: #94a3b8;">{{ pkg.summary or '—' }}</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -592,13 +640,116 @@
             }
         }
 
-        function filterPackages() {
-            const query = document.getElementById('pkgSearch').value.toLowerCase();
-            const rows = document.querySelectorAll('#pkgTable tbody tr');
-            rows.forEach(r => {
-                const text = r.textContent.toLowerCase();
-                r.style.display = text.includes(query) ? '' : 'none';
-            });
+        async function scanPackages() {
+            const btn = document.getElementById('btnScanPackages');
+            const tbody = document.getElementById('packagesTableBody');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> Scanning...';
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; color: #94a3b8; padding: 24px;">
+                        Checking upstream Python package ledger with pip...
+                    </td>
+                </tr>
+            `;
+
+            try {
+                const res = await fetch('/api/system/packages');
+                const data = await res.json();
+                const packages = data.packages || [];
+
+                tbody.innerHTML = '';
+                if (packages.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: #34d399; padding: 24px;">
+                                ✓ All core POS packages and dependencies are currently up-to-date.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                packages.forEach(pkg => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-weight: 600; color: #38bdf8;">${pkg.name}</td>
+                        <td><span class="badge-current">${pkg.version}</span></td>
+                        <td><span class="badge-latest">${pkg.latest_version}</span></td>
+                        <td style="text-align: right;">
+                            <button type="button" class="btn-upgrade-pkg" onclick="upgradePackage('${pkg.name}', this)">
+                                <span>⬆</span> Upgrade
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #f87171; padding: 24px;">
+                            Failed to scan packages: ${err.message}
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+
+        async function upgradePackage(name, btn) {
+            btn.disabled = true;
+            btn.textContent = 'Upgrading...';
+            const toast = document.getElementById('pkgToast');
+
+            try {
+                const res = await fetch('/api/system/packages/upgrade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ package: name })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    toast.className = 'toast-msg success';
+                    toast.textContent = `Successfully upgraded ${name} to ${data.new_version || 'latest'}.`;
+                    toast.style.display = 'block';
+                    btn.textContent = 'Upgraded ✓';
+                    btn.style.background = '#059669';
+
+                    if (data.restart_required) {
+                        document.getElementById('restartWarningBanner').style.display = 'flex';
+                    }
+                } else {
+                    toast.className = 'toast-msg error';
+                    toast.textContent = data.message || `Failed to upgrade ${name}`;
+                    toast.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Upgrade';
+                }
+            } catch (err) {
+                toast.className = 'toast-msg error';
+                toast.textContent = `Upgrade error: ${err.message}`;
+                toast.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Upgrade';
+            }
+        }
+
+        async function restartSystem() {
+            const toast = document.getElementById('pkgToast');
+            try {
+                await fetch('/api/system/restart', { method: 'POST' });
+                toast.className = 'toast-msg info';
+                toast.textContent = 'System restart initiated. Reconnecting...';
+                toast.style.display = 'block';
+            } catch (err) {
+                toast.className = 'toast-msg error';
+                toast.textContent = `Restart error: ${err.message}`;
+                toast.style.display = 'block';
+            }
         }
     </script>
 </body>

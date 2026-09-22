@@ -377,9 +377,15 @@ def test_configure_manager_view_route(client):
     assert "Return to Dashboard" in html
     assert "requirePasswordToggle" in html
     assert "bypassManagerToggle" in html
-    assert "btnScanPackages" in html
     assert "password-grid" in html
     assert any(v in html for v in ("v1.0.9", "v1.0.8", "v1.0.7", "v1.0.6"))
+
+    # Verify btnScanPackages is now unified in Core Auto-Updater & Maintenance view (/manager/updates)
+    res_updates = client.get('/manager/updates')
+    assert res_updates.status_code == 200
+    html_updates = res_updates.get_data(as_text=True)
+    assert "btnScanPackages" in html_updates
+    assert "Subsystem &amp; Python Package Updates" in html_updates
 
 def test_notifications_service_and_apis(client):
     """Asserts that notification queue operations and REST endpoints function correctly."""

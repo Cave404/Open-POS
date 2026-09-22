@@ -171,6 +171,9 @@ class AddonManager:
                 continue
 
             for entry in os.listdir(scan_dir):
+                if entry == "test_addon":
+                    continue
+
                 entry_path = os.path.join(scan_dir, entry)
                 if not os.path.isdir(entry_path):
                     continue
