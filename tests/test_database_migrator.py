@@ -212,7 +212,9 @@ def test_js_bridge_save_recovery_file(tmp_path):
 
 def test_lockout_guard_contains_return_to_home():
     """Asserts that static/js/lockout_guard.js contains the prominent Return to Home button."""
-    guard_path = os.path.join(Config.BASE_DIR, "static", "js", "lockout_guard.js")
+    guard_path = os.path.join(Config.BASE_DIR, "ui", "static", "js", "lockout_guard.js")
+    if not os.path.isfile(guard_path):
+        guard_path = os.path.join(Config.BASE_DIR, "static", "js", "lockout_guard.js")
     with open(guard_path, "r", encoding="utf-8") as f:
         content = f.read()
 

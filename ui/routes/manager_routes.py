@@ -936,7 +936,12 @@ def get_system_credits():
     parsed from requirements.txt, enriched with installed versions, functional roles,
     license classifications, and upstream source repositories.
     """
-    req_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'requirements.txt'))
+    candidates = [
+        os.path.join(Config.BASE_DIR, 'requirements.txt'),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'requirements.txt')),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'requirements.txt')),
+    ]
+    req_file = next((c for c in candidates if os.path.exists(c)), candidates[0])
     dependencies = []
 
     if os.path.exists(req_file):
