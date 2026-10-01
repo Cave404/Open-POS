@@ -22,6 +22,7 @@ if BASE_DIR not in sys.path:
 
 from core.logger import setup_system_logger
 from core.config import Config
+from core.setup import is_setup_complete
 from hardware.dispatcher import hardware_dispatcher
 from ui.app import create_app
 import webview
@@ -181,16 +182,30 @@ def main():
     server_thread.start()
 
     try:
-        # Start PyWebView desktop client
-        webview.create_window(
-            title=f"OpenPOS - Register [{Config.VERSION}]",
-            url=entry_url,
-            width=1280,
-            height=800,
-            min_size=(1024, 680),
-            background_color="#0d1117",
-            js_api=JSBridge()
-        )
+        # Check if first-run onboarding setup is required
+        if not is_setup_complete():
+            webview.create_window(
+                title="OpenPOS - Initial Setup & Security Initialization",
+                url=f"http://127.0.0.1:{server_port}/setup",
+                width=1120,
+                height=800,
+                min_size=(960, 650),
+                resizable=True,
+                easy_drag=False,
+                confirm_close=False,
+                js_api=JSBridge()
+            )
+        else:
+            # Start PyWebView desktop client
+            webview.create_window(
+                title=f"OpenPOS - Register [{Config.VERSION}]",
+                url=entry_url,
+                width=1280,
+                height=800,
+                min_size=(1024, 680),
+                background_color="#0d1117",
+                js_api=JSBridge()
+            )
         webview.start(private_mode=False)
     finally:
         logger.info("Shutting down peripheral dispatchers...")
