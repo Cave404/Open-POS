@@ -1,0 +1,108 @@
+<!-- =============================================================================
+     Open-POS Locked Section Floating Authentication Modal
+     Renders when is_locked == True in manager routes.
+     ============================================================================= -->
+<div class="lockout-backdrop" id="serverLockoutBackdrop" role="dialog" aria-modal="true" aria-label="Manager Authentication Required">
+    <div class="lockout-modal-card" id="serverLockoutCard">
+        <div class="lockout-modal-icon">&#128274;</div>
+        <h2 class="lockout-modal-title">Manager Authentication Required</h2>
+        <p class="lockout-modal-notice">This section is locked to protect store financial ratios and settings.</p>
+
+        <div class="lockout-modal-input-wrap">
+            <input
+                type="password"
+                id="serverLockoutPassword"
+                class="lockout-modal-input"
+                placeholder="Enter admin PIN / password"
+                autocomplete="current-password"
+                maxlength="128"
+                autofocus
+            >
+        </div>
+
+        <div id="serverLockoutError" class="lockout-modal-error"></div>
+
+        <div class="lockout-modal-actions">
+            <button type="button" class="btn btn-primary" id="btnServerUnlock">
+                Unlock Section
+            </button>
+            <a href="/manager" class="btn btn-secondary btn-return-home" id="btnServerReturnHome">
+                &larr; Return to Home
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const backdrop = document.getElementById('serverLockoutBackdrop');
+    const input = document.getElementById('serverLockoutPassword');
+    const btnUnlock = document.getElementById('btnServerUnlock');
+    const errorEl = document.getElementById('serverLockoutError');
+    const card = document.getElementById('serverLockoutCard');
+    const container = document.querySelector('.view-container');
+
+    if (!backdrop) return;
+
+    function shakeError(msg) {
+        if (errorEl) errorEl.textContent = msg;
+        if (input) {
+            input.classList.add('error');
+            input.focus();
+        }
+        if (card) {
+            card.classList.remove('shake');
+            void card.offsetWidth;
+            card.classList.add('shake');
+        }
+    }
+
+    async function attemptUnlock() {
+        const pwd = input ? input.value : '';
+        if (!pwd) {
+            shakeError('Please enter administrator PIN or password.');
+            return;
+        }
+
+        btnUnlock.disabled = true;
+        btnUnlock.textContent = 'Verifying...';
+        if (errorEl) errorEl.textContent = '';
+
+        try {
+            const res = await fetch('/api/settings/verify_password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ password: pwd })
+            });
+            const data = await res.json();
+            if (data.authorized) {
+                backdrop.style.opacity = '0';
+                backdrop.style.transition = 'opacity 0.25s ease';
+                if (container) {
+                    container.classList.remove('locked');
+                    container.style.filter = 'none';
+                    container.style.pointerEvents = 'auto';
+                    container.style.userSelect = 'auto';
+                }
+                setTimeout(() => backdrop.remove(), 250);
+            } else {
+                shakeError(data.message || 'Incorrect PIN or password.');
+                if (input) input.value = '';
+            }
+        } catch (e) {
+            shakeError('Verification error: ' + e.message);
+        } finally {
+            btnUnlock.disabled = false;
+            btnUnlock.textContent = 'Unlock Section';
+        }
+    }
+
+    if (btnUnlock) btnUnlock.addEventListener('click', attemptUnlock);
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') attemptUnlock();
+        });
+        setTimeout(() => input.focus(), 150);
+    }
+})();
+</script>

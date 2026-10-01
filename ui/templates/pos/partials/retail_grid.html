@@ -1,0 +1,43 @@
+<div id="canvas-default-retail" class="retail-grid-container h-100">
+    <!-- Quick Search / Barcode Input Bar -->
+    <div class="canvas-search-dock">
+        <div class="search-input-group">
+            <span class="search-symbol">🔍</span>
+            <input type="text" id="barcodeOmniInput" class="barcode-omni-input" placeholder="Scan barcode / NFC UID, or search SKU / item name (F2)..." autocomplete="off" autofocus>
+            <span class="hotkey-badge">F2</span>
+            <button type="button" class="btn-clear-search" id="btnClearSearch" style="display: none;">✕</button>
+        </div>
+    </div>
+
+    <!-- Preset Category Filter Tabs -->
+    <div class="product-category-filters" id="categoryFilters">
+        <button type="button" class="cat-pill active" data-category="ALL">All Items</button>
+        <button type="button" class="cat-pill" data-category="TCG Sealed">🃏 Sealed TCG</button>
+        <button type="button" class="cat-pill" data-category="Accessories">🛡️ Accessories</button>
+        <button type="button" class="cat-pill" data-category="Events">🎟️ Events</button>
+        <button type="button" class="cat-pill" data-category="Snacks">🥤 Snacks</button>
+        <button type="button" class="cat-pill" data-category="CUSTOM">⚡ Custom Amount</button>
+    </div>
+
+    <!-- Quick-Key Product Grid -->
+    <div class="quick-products-grid" id="quickProductsGrid">
+        <!-- Loaded dynamically from /api/pos/products -->
+    </div>
+
+    <!-- Custom Manual Amount Entry Form (Drawer / Bar) -->
+    <div class="manual-entry-bar" id="manualEntryBar">
+        <div class="manual-input-group">
+            <label for="manualItemName">Custom Item:</label>
+            <input type="text" id="manualItemName" placeholder="Misc Merchandise / Service" class="form-input-sm">
+        </div>
+        <div class="manual-input-group">
+            <label for="manualItemPrice">Price ($):</label>
+            <input type="number" id="manualItemPrice" step="0.01" min="0" placeholder="0.00" class="form-input-sm">
+        </div>
+        <div class="manual-input-group">
+            <label for="manualItemTaxable">Taxable:</label>
+            <input type="checkbox" id="manualItemTaxable" checked class="form-check-sm">
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" id="btnAddManualItem">+ Add to Ticket</button>
+    </div>
+</div>

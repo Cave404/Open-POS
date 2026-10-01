@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Open-POS System Startup</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            background-color: #12141a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        /* Top Splash Graphic Area */
+        .splash-graphic-container {
+            width: 100%;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            background-color: #ffffff; /* Matches clean white splash art */
+        }
+        .splash-graphic-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Dedicated Docked Bottom Tray */
+        .progress-tray {
+            height: 54px;
+            min-height: 54px;
+            max-height: 54px;
+            flex-shrink: 0;
+            background-color: #1a1d24;
+            border-top: 1px solid #2d3340;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 18px 0 18px;
+            font-size: 12px;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(59, 130, 246, 0.2);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-percent {
+            color: #3b82f6;
+            font-weight: 700;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        /* Bottom Edge Progress Bar */
+        .progress-track {
+            width: 100%;
+            height: 4px;
+            background-color: #262c38;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #2563eb, #38bdf8);
+            transition: width 0.25s ease-out;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Exact Fit Graphic -->
+    <div class="splash-graphic-container splash-frame">
+        <img src="/manager/open_pos_splash.png" alt="OpenPOS Splash">
+    </div>
+
+    <!-- Docked Status & Progress Tray -->
+    <div class="progress-tray">
+        <div class="status-row">
+            <div class="status-left">
+                <div class="spinner"></div>
+                <span id="splashStatus">Initializing environment...</span>
+            </div>
+            <div class="status-percent" id="splashPercent">0%</div>
+        </div>
+        <div class="progress-track">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+    </div>
+
+    <script>
+        // Update Hook exposed to Python evaluate_js or IPC calls
+        function updateProgress(percent, message) {
+            const fill = document.getElementById('progressFill') || document.getElementById('progressBar');
+            const pctText = document.getElementById('splashPercent') || document.getElementById('percentLabel');
+            const statusText = document.getElementById('splashStatus') || document.getElementById('statusLabel');
+
+            if (fill) fill.style.width = percent + '%';
+            if (pctText) pctText.textContent = Math.round(percent) + '%';
+            if (statusText && message) statusText.textContent = message;
+        }
+    </script>
+</body>
+</html>

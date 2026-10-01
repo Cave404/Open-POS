@@ -1,0 +1,3 @@
+"""
+Open-POS Core Package
+"""

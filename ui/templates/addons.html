@@ -1,0 +1,2186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Addon Manager - Open-POS</title>
+    <link rel="stylesheet" href="/static/css/manager.css">
+    <link rel="stylesheet" href="/static/css/addons.css">
+    <script src="/static/js/notifications.js"></script>
+    <script src="/static/js/addons.js"></script>
+    <style>
+        .addons-container {
+            max-width: 1060px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Stat Metrics Row */
+        .metrics-row,
+        .addon-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .metric-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .metric-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-main);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .metric-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Toolbar & Controls */
+        .toolbar-card,
+        .addon-filter-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding: 0.75rem 1rem;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+
+        .search-box-wrap {
+            display: flex;
+            align-items: center;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0 12px;
+            flex: 1;
+            min-width: 240px;
+            max-width: 420px;
+        }
+
+        .search-icon {
+            color: var(--text-muted);
+            margin-right: 8px;
+            font-size: 14px;
+        }
+
+        .search-input {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 13px;
+            padding: 9px 0;
+            outline: none;
+            width: 100%;
+        }
+
+        .filter-tabs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-secondary);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .filter-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .filter-tab:hover {
+            color: var(--text-main);
+        }
+
+        .filter-tab.active {
+            background: var(--accent-blue);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+        }
+
+        /* Addons Grid */
+        .addons-grid,
+        .addon-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+            gap: 1.5rem;
+            align-items: stretch;
+        }
+
+        .addon-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 1.25rem;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+        }
+
+        .addon-card:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        /* Update Available Pill & Badge */
+        .btn-update-pill,
+        .badge-update-available {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #ffffff !important;
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            padding: 3px 9px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+            transition: all 0.15s ease;
+        }
+
+        .btn-update-pill:hover,
+        .badge-update-available:hover {
+            filter: brightness(1.15);
+            transform: translateY(-1px);
+        }
+
+        /* Universal Dynamic Addon Config Modal Styles */
+        .config-field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .config-field-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f0f6fc;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .config-field-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .config-input,
+        .config-select {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #f0f6fc;
+            padding: 8px 12px;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.15s ease;
+        }
+
+        .config-input:focus,
+        .config-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .config-secret-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .btn-toggle-secret {
+            position: absolute;
+            right: 8px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 14px;
+        }
+
+        .btn-toggle-secret:hover {
+            color: var(--text-main);
+        }
+
+        .addon-card.status-error {
+            border-color: rgba(239, 68, 68, 0.4);
+            background: linear-gradient(180deg, rgba(239, 68, 68, 0.03) 0%, var(--bg-card) 100%);
+        }
+
+        .addon-card.status-disabled {
+            opacity: 0.75;
+        }
+
+        .card-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .addon-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .addon-icon-wrap {
+            width: 46px;
+            height: 46px;
+            border-radius: 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .addon-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .addon-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.2;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .addon-version {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .addon-author {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+
+        .status-badge.disabled {
+            background: rgba(148, 163, 184, 0.15);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+
+        .status-badge.error {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            animation: pulse-border 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(239, 68, 68, 0.35); }
+            50% { border-color: rgba(239, 68, 68, 0.7); }
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .addon-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            min-height: 40px;
+        }
+
+        .addon-tags {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tag-pill {
+            font-size: 11px;
+            padding: 2px 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-muted);
+        }
+
+        .tag-pill.source-custom {
+            color: #c084fc;
+            border-color: rgba(192, 132, 252, 0.3);
+            background: rgba(192, 132, 252, 0.08);
+        }
+
+        /* Card Actions */
+        .card-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 14px;
+            border-top: 1px solid var(--border-color);
+            gap: 12px;
+        }
+
+        /* Custom Switch Toggle */
+        .toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .switch-input {
+            display: none;
+        }
+
+        .switch-slider {
+            width: 38px;
+            height: 22px;
+            background: #334155;
+            border-radius: 20px;
+            position: relative;
+            transition: background 0.25s ease;
+            flex-shrink: 0;
+        }
+
+        .switch-slider::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ffffff;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.25s ease;
+        }
+
+        .switch-input:checked + .switch-slider {
+            background: var(--success);
+        }
+
+        .switch-input:checked + .switch-slider::before {
+            transform: translateX(16px);
+        }
+
+        .toggle-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .action-btns {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-configure {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-configure:hover:not(.disabled) {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        .btn-configure.disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .btn-trace {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #f87171;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-trace:hover {
+            background: rgba(239, 68, 68, 0.22);
+            border-color: #f87171;
+        }
+
+        .btn-import-zip {
+            background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 7px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-import-zip:hover {
+            filter: brightness(1.12);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.45);
+        }
+
+        .btn-remove {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-remove:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: #ef4444;
+            color: #ffffff;
+        }
+
+        /* Primary View Mode Segmented Control */
+        .segmented-control-wrap {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .segmented-control {
+            display: inline-flex;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .segmented-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 18px;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .segmented-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .segmented-btn.active {
+            background: var(--bg-card);
+            color: #ffffff;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+        }
+
+        .catalog-live-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            font-size: 10px;
+            font-weight: 700;
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-compat-ok {
+            background: rgba(16, 185, 129, 0.15) !important;
+            color: #34d399 !important;
+            border-color: rgba(16, 185, 129, 0.35) !important;
+        }
+
+        .tag-compat-err {
+            background: rgba(239, 68, 68, 0.15) !important;
+            color: #f87171 !important;
+            border-color: rgba(239, 68, 68, 0.35) !important;
+        }
+
+        .btn-installed-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #34d399;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .btn-install-addon {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-install-addon:hover:not(:disabled) {
+            filter: brightness(1.12);
+            transform: translateY(-1px);
+        }
+
+        .btn-install-addon:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-refresh-catalog {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-refresh-catalog:hover {
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        /* Empty State */
+        .empty-state {
+            grid-column: 1 / -1;
+            background: var(--bg-card);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 48px 24px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            opacity: 0.6;
+        }
+
+        .empty-state h3 {
+            margin: 0;
+            font-size: 17px;
+            color: var(--text-main);
+        }
+
+        .empty-state p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-muted);
+            max-width: 440px;
+            line-height: 1.5;
+        }
+
+        /* Diagnostic Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal-card {
+            background: #11141c;
+            border: 1px solid #2d3748;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 760px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            animation: modalFadeIn 0.2s ease-out;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.97); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid #1f293d;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .modal-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #f87171;
+        }
+
+        .btn-modal-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+
+        .btn-modal-close:hover {
+            color: var(--text-main);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .error-summary-banner {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-left: 4px solid #ef4444;
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #fca5a5;
+            line-height: 1.5;
+        }
+
+        .terminal-code-wrap {
+            background: #090d16;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #64748b;
+            font-family: Consolas, monospace;
+            text-transform: uppercase;
+        }
+
+        .traceback-pre {
+            margin: 0;
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.55;
+            color: #cbd5e1;
+            max-height: 320px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .modal-footer {
+            padding: 14px 24px;
+            border-top: 1px solid #1f293d;
+            background: #0d1017;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .btn-copy {
+            background: var(--bg-secondary);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-copy:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .btn-dismiss {
+            background: var(--accent-blue);
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 18px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .btn-dismiss:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Update & Rollback Controls */
+        .btn-update-addon {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: #ffffff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+            transition: all 0.15s ease;
+        }
+
+        .btn-update-addon:hover:not(:disabled) {
+            filter: brightness(1.15);
+            transform: translateY(-1px);
+        }
+
+        .btn-update-addon:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-rollback-menu {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-rollback-menu:hover {
+            color: var(--text-main);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .btn-addon-logs {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 7px 13px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-addon-logs:hover {
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        .snapshot-item-card {
+            background: #090d16;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            transition: border-color 0.15s ease;
+        }
+
+        .snapshot-item-card:hover {
+            border-color: #3b82f6;
+        }
+
+        .snapshot-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .snapshot-version-tag {
+            font-size: 13px;
+            font-weight: 700;
+            color: #60a5fa;
+            font-family: Consolas, monospace;
+        }
+
+        .snapshot-timestamp {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .snapshot-folder-id {
+            font-size: 10px;
+            color: #64748b;
+            font-family: Consolas, monospace;
+        }
+
+        .btn-do-rollback {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+            color: #ffffff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
+            transition: all 0.15s ease;
+        }
+
+        .btn-do-rollback:hover {
+            filter: brightness(1.15);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="manager-body">
+    <header class="subview-header">
+        <div class="header-left">
+            <a href="/manager" class="btn-back" id="btnReturnDashboard">
+                <span class="btn-icon">&#8592;</span>
+                <span>Return to Dashboard</span>
+            </a>
+            <div class="header-divider"></div>
+            <div>
+                <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">
+                    Addons &rarr; Addon Control Center
+                </div>
+                <h2 class="subview-title" style="margin: 0;">Addon Manager</h2>
+            </div>
+        </div>
+        <div class="header-right">
+            <!-- Quick Return to POS Register -->
+            <a href="/pos" class="btn btn-sm btn-success btn-return-register" title="Switch to Front-of-House Register">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM1 3.5c0-.28.22-.5.5-.5h13c.28 0 .5.22.5.5v9c0 .28-.22.5-.5.5h-13a.5.5 0 0 1-.5-.5z"/>
+                    <path d="M2 4.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5m1 3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/>
+                </svg>
+                <span>⮌ Open Register</span>
+            </a>
+            <div class="notification-wrapper">
+                <button id="notifBellBtn" class="btn-icon-tray" title="System Notifications">
+                    &#128276; <span id="notifBadge" class="badge-count" style="display: none;">0</span>
+                </button>
+                <div id="notifDropdown" class="notif-dropdown-menu" style="display: none;">
+                    <div class="notif-dropdown-header">
+                        <span>System Notifications</span>
+                        <button id="clearNotifsBtn" class="btn-text-action">Clear</button>
+                    </div>
+                    <div id="notifList" class="notif-dropdown-body"></div>
+                    <div class="notif-dropdown-footer">
+                        <a href="/manager/logs" class="btn-full-action">Open Terminal Logs &rarr;</a>
+                    </div>
+                </div>
+            </div>
+            <span class="status-pill status-online">Engine: Online</span>
+            <a href="/manager/about" class="version-badge-link">v1.0.9</a>
+        </div>
+    </header>
+
+    <div class="view-container {% if is_locked %}locked{% endif %}">
+        <div class="addons-container">
+
+            <!-- Primary View Mode Tabs & Secondary Action Container -->
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 segmented-control-wrap">
+                <!-- Left Side: Tabs -->
+                <div class="segmented-control nav nav-pills custom-tab-pills" role="tablist">
+                    <button type="button" class="segmented-btn nav-link active" id="tabInstalledAddons" role="tab" aria-selected="true" onclick="switchMainTab('installed')">
+                        📦 Installed Addons
+                    </button>
+                    <button type="button" class="segmented-btn nav-link" id="tabAddonCatalog" role="tab" aria-selected="false" onclick="switchMainTab('catalog')">
+                        🌐 Addon Catalog <span class="catalog-live-badge ms-1">ONLINE</span>
+                    </button>
+                </div>
+
+                <!-- Right Side: Secondary Actions (Logs & Import) -->
+                <div class="d-flex align-items-center gap-2">
+                    <a href="/manager/addons/logs" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2 px-3 py-2 text-decoration-none" id="btnViewAddonLogs" onclick="openAddonLogsModal(); return false;" title="View Addon Logs">
+                        <svg width="15" height="15" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
+                            <path d="M4 4.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m0 3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m0 3a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5"/>
+                        </svg>
+                        <span>View Addon Logs</span>
+                    </a>
+                    <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-2 px-3 py-2 shadow-sm" id="btnImportAddon" onclick="document.getElementById('addonZipInput').click()" title="Import Addon (.zip)">
+                        <svg width="15" height="15" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
+                            <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"/>
+                        </svg>
+                        <span>Import Addon (.zip)</span>
+                    </button>
+                    <input type="file" id="addonZipInput" accept=".zip" style="display: none;" onchange="handleZipUpload(event)">
+                </div>
+            </div>
+
+            <!-- View Mode 1: Installed Addons -->
+            <div id="installedAddonsView">
+                <!-- Metrics Summary Row -->
+                <div class="metrics-row">
+                    <div class="metric-card">
+                        <div class="metric-label"><span>📦</span> Total Addons</div>
+                        <div class="metric-value" id="statTotalAddons">0</div>
+                        <div class="metric-sub">Discovered across system &amp; user stores</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label"><span>🟢</span> Active Plugins</div>
+                        <div class="metric-value" id="statActiveAddons" style="color: #34d399;">0</div>
+                        <div class="metric-sub">Mounted and running normally</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label"><span>⚪</span> Disabled</div>
+                        <div class="metric-value" id="statDisabledAddons" style="color: #94a3b8;">0</div>
+                        <div class="metric-sub">Toggled off in configuration</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label"><span>⚠️</span> Faulty / Degraded</div>
+                        <div class="metric-value" id="statErrorAddons" style="color: #f87171;">0</div>
+                        <div class="metric-sub">Isolated to protect core POS engine</div>
+                    </div>
+                </div>
+
+                <!-- Toolbar & Filter Controls -->
+                <div class="toolbar-card">
+                    <div class="search-box-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="addonSearchInput" class="search-input" placeholder="Search addons by name, description, or ID...">
+                    </div>
+
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-filter="ALL" onclick="setFilter('ALL', this)">All</button>
+                        <button class="filter-tab" data-filter="ACTIVE" onclick="setFilter('ACTIVE', this)">Active</button>
+                        <button class="filter-tab" data-filter="DISABLED" onclick="setFilter('DISABLED', this)">Disabled</button>
+                        <button class="filter-tab" data-filter="ERROR" onclick="setFilter('ERROR', this)">Failed</button>
+                    </div>
+                </div>
+
+                <!-- Addons Cards Grid -->
+                <div class="addons-grid" id="addonsGrid">
+                    <!-- Dynamically populated via loadAddons() -->
+                </div>
+            </div>
+
+            <!-- View Mode 2: Online Addon Catalog -->
+            <div id="catalogAddonsView" style="display: none;">
+                <div class="toolbar-card" style="margin-bottom: 24px;">
+                    <div class="search-box-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="catalogSearchInput" class="search-input" placeholder="Search remote catalog extensions...">
+                    </div>
+                    <div>
+                        <button type="button" class="btn-refresh-catalog" id="btnRefreshCatalog" onclick="loadCatalog(true)">
+                            <span>🔄</span> Refresh Catalog
+                        </button>
+                    </div>
+                </div>
+
+                <div class="addons-grid" id="catalogGrid">
+                    <!-- Dynamically populated via renderCatalogGrid() -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Diagnostic Error Trace Modal -->
+    <div class="modal-overlay" id="errorModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span>⚠️</span>
+                    <span id="modalAddonTitle">Addon Initialization Failure Trace</span>
+                </div>
+                <button class="btn-modal-close" onclick="closeErrorModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="error-summary-banner" id="modalErrorSummary">
+                    Failure description
+                </div>
+                <div class="terminal-code-wrap">
+                    <div class="terminal-header">
+                        <span>Python Exception Stack Trace</span>
+                        <span id="modalTimestamp">Live Dump</span>
+                    </div>
+                    <pre class="traceback-pre"><code id="modalTraceback">Traceback will appear here...</code></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-copy" id="btnCopyTrace" onclick="copyTraceback()">📋 Copy Trace</button>
+                <button class="btn-dismiss" onclick="closeErrorModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Addon Remove Confirmation Modal -->
+    <div class="modal-overlay" id="removeConfirmModal">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color: #f87171;">
+                    <span>🗑️</span>
+                    <span>Confirm Addon Removal</span>
+                </div>
+                <button class="btn-modal-close" onclick="closeRemoveModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="removeModalMessage" style="margin: 0; font-size: 14px; color: var(--text-main); line-height: 1.5;">
+                    Are you sure you want to remove this addon? This will delete its local files.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-dismiss" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main);" onclick="closeRemoveModal()">Cancel</button>
+                <button class="btn-dismiss" id="btnConfirmDelete" style="background: #ef4444; color: white;" onclick="executeRemoveAddon()">🗑️ Delete Addon</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Addon Version History & Rollback Modal -->
+    <div class="modal-overlay" id="rollbackModal">
+        <div class="modal-card" style="max-width: 680px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color: #60a5fa;">
+                    <span>⏪</span>
+                    <span id="rollbackModalAddonTitle">Version History &amp; Rollback</span>
+                </div>
+                <button class="btn-modal-close" onclick="closeRollbackModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="gap: 12px;" id="rollbackSnapshotsList">
+                <!-- Dynamically populated via openRollbackModal() -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-dismiss" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main);" onclick="closeRollbackModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Addon Universal Logs Modal -->
+    <div class="modal-overlay" id="addonLogsModal">
+        <div class="modal-card" style="max-width: 820px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color: #34d399;">
+                    <span>📜</span>
+                    <span>Addon Subsystem Log Stream (data/logs/openpos_addons.log)</span>
+                </div>
+                <button class="btn-modal-close" onclick="closeAddonLogsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="terminal-code-wrap" style="max-height: 480px;">
+                    <div class="terminal-header">
+                        <span>openpos_addons.log (Latest entries)</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-copy" style="padding: 3px 8px; font-size: 11px;" onclick="loadAddonLogs()">🔄 Refresh</button>
+                            <button class="btn-copy" id="btnCopyAddonLogs" style="padding: 3px 8px; font-size: 11px;" onclick="copyAddonLogs()">📋 Copy Logs</button>
+                        </div>
+                    </div>
+                    <pre class="traceback-pre" id="addonLogsPre" style="max-height: 400px; color: #93c5fd; font-size: 11px;"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-dismiss" onclick="closeAddonLogsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Universal Schema-Driven Addon Configuration Modal -->
+    <div class="modal-overlay" id="addonConfigModal">
+        <div class="modal-card" style="max-width: 680px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color: #60a5fa;">
+                    <span>⚙️</span>
+                    <span id="configModalTitle">Addon Configuration</span>
+                </div>
+                <button class="btn-modal-close" onclick="closeAddonConfigModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="configModalBody">
+                <div class="config-modal-loading" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    <div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem; margin-bottom: 12px;"></div>
+                    <div>Loading configuration schema...</div>
+                </div>
+                <form id="addonConfigForm" style="display: none;" onsubmit="saveAddonConfig(event)">
+                    <div id="configModalDescription" style="margin-bottom: 16px; font-size: 13px; color: var(--text-muted); line-height: 1.5;"></div>
+                    <div id="configFormFields" style="display: flex; flex-direction: column; gap: 16px;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-dismiss" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main);" onclick="closeAddonConfigModal()">Cancel</button>
+                <button type="button" class="btn-dismiss" id="btnSaveAddonConfig" style="background: var(--accent-blue); color: white;" onclick="document.getElementById('addonConfigForm').requestSubmit()">
+                    💾 Save Preferences
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allAddons = [];
+        let allAddonUpdates = {};
+        let currentFilter = 'ALL';
+        let currentSearch = '';
+
+        let activeMainTab = 'installed';
+        let allCatalogAddons = [];
+        window.allCatalogAddons = allCatalogAddons;
+        window.catalogAddons = allCatalogAddons;
+        window.catalogData = allCatalogAddons;
+        let currentCatalogSearch = '';
+
+        let activeConfigAddonId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAddons();
+
+            const searchInput = document.getElementById('addonSearchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    currentSearch = e.target.value.toLowerCase().trim();
+                    renderAddonsGrid();
+                });
+            }
+
+            const catalogSearch = document.getElementById('catalogSearchInput');
+            if (catalogSearch) {
+                catalogSearch.addEventListener('input', (e) => {
+                    currentCatalogSearch = e.target.value.toLowerCase().trim();
+                    renderCatalogGrid();
+                });
+            }
+        });
+
+        async function loadAddons() {
+            try {
+                if (allCatalogAddons.length === 0) {
+                    fetch('/manager/api/addons/catalog').then(r => r.json()).then(data => {
+                        allCatalogAddons = data;
+                        window.allCatalogAddons = data;
+                        window.catalogAddons = data;
+                        window.catalogData = data;
+                        renderAddonsGrid();
+                    }).catch(() => {});
+                }
+
+                // Poll live remote addon updates in parallel
+                fetch('/api/addons/updates').then(r => r.json()).then(data => {
+                    if (data && data.success && data.updates) {
+                        allAddonUpdates = data.updates;
+                        renderAddonsGrid();
+                    }
+                }).catch(() => {});
+
+                const res = await fetch('/manager/api/addons');
+                if (!res.ok) throw new Error('Failed to load addons');
+                allAddons = await res.json();
+                updateMetrics();
+                renderAddonsGrid();
+            } catch (err) {
+                console.error('Error fetching addons:', err);
+            }
+        }
+
+        function updateMetrics() {
+            const total = allAddons.length;
+            const active = allAddons.filter(a => a.status === 'ACTIVE').length;
+            const disabled = allAddons.filter(a => a.status === 'DISABLED').length;
+            const error = allAddons.filter(a => a.status === 'ERROR').length;
+
+            document.getElementById('statTotalAddons').textContent = total;
+            document.getElementById('statActiveAddons').textContent = active;
+            document.getElementById('statDisabledAddons').textContent = disabled;
+            document.getElementById('statErrorAddons').textContent = error;
+        }
+
+        function setFilter(filter, btn) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            renderAddonsGrid();
+        }
+
+        function renderAddonsGrid() {
+            const grid = document.getElementById('addonsGrid');
+            grid.innerHTML = '';
+
+            let filtered = allAddons.filter(item => {
+                // Filter tab
+                if (currentFilter !== 'ALL' && item.status !== currentFilter) {
+                    return false;
+                }
+                // Text search
+                if (currentSearch) {
+                    const matchName = (item.name || '').toLowerCase().includes(currentSearch);
+                    const matchId = (item.id || '').toLowerCase().includes(currentSearch);
+                    const matchDesc = (item.description || '').toLowerCase().includes(currentSearch);
+                    return matchName || matchId || matchDesc;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🧩</div>
+                        <h3>No addons match your filter</h3>
+                        <p>Try clearing your search query or installing extensions into the <code>addons/</code> or <code>data/custom_addons/</code> directory.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(addon => {
+                grid.appendChild(createAddonCard(addon));
+            });
+        }
+
+        function createAddonCard(addon) {
+            const card = document.createElement('div');
+            const statusKey = (addon.status || 'ACTIVE').toLowerCase();
+            card.className = `addon-card status-${statusKey}`;
+            card.id = `addon-card-${addon.id}`;
+
+            const isChecked = addon.enabled && statusKey !== 'error' && statusKey !== 'failed';
+            const isError = statusKey === 'error' || statusKey === 'failed';
+
+            let statusHtml = '';
+            if (statusKey === 'active') {
+                statusHtml = `<span class="status-badge active"><span class="status-dot"></span> Active</span>`;
+            } else if (statusKey === 'disabled') {
+                statusHtml = `<span class="status-badge disabled"><span class="status-dot"></span> Disabled</span>`;
+            } else {
+                statusHtml = `<span class="status-badge error"><span class="status-dot"></span> Failed</span>`;
+            }
+
+            const sourceBadge = addon.dir_type === 'custom'
+                ? `<span class="tag-pill source-custom">Custom Store Addon</span>`
+                : `<span class="tag-pill">Built-in Extension</span>`;
+
+            const dbBadge = addon.requires_db
+                ? `<span class="tag-pill">Database Required</span>`
+                : '';
+
+            // Icon resolution: image or default SVG fallback
+            const puzzleSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/></svg>`;
+
+            const rawIcon = addon.icon_url || addon.icon;
+            const isImg = rawIcon && (rawIcon.endsWith('.png') || rawIcon.endsWith('.svg') || rawIcon.endsWith('.jpg') || rawIcon.startsWith('http') || rawIcon.startsWith('/'));
+
+            const iconHtml = isImg
+                ? `<img src="${rawIcon}" alt="" class="addon-icon-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                   <div class="addon-icon-fallback" style="display: none;">${puzzleSvg}</div>`
+                : `<div class="addon-icon-fallback" style="display: flex;">${(addon.icon && !isImg && addon.icon.length <= 4) ? addon.icon : puzzleSvg}</div>`;
+
+            // Check remote version polling updates
+            const updateInfo = allAddonUpdates[addon.id];
+            const catalogItem = allCatalogAddons.find(c => c.id === addon.id);
+            const hasUpdate = (updateInfo && updateInfo.has_update) || (catalogItem && (catalogItem.has_update || (catalogItem.version && catalogItem.version !== addon.version)));
+            const latestVer = (updateInfo && updateInfo.latest_version) || (catalogItem && catalogItem.version) || 'latest';
+
+            // Active Update Available Pill
+            const updatePill = hasUpdate
+                ? `<button type="button" class="btn-update-pill" onclick="triggerAddonUpdate('${addon.id}', '${latestVer}')" title="In-place update to v${latestVer}">▲ Update Available (v${latestVer})</button>`
+                : '';
+
+            // View Error button
+            const errorBtn = isError
+                ? `<button class="btn btn-sm btn-outline-danger btn-view-trace" onclick="openErrorModal('${addon.id}')" title="Inspect failure stack trace">View Error</button>`
+                : '';
+
+            // Update button
+            const updateBtn = hasUpdate
+                ? `<button class="btn btn-sm btn-primary btn-update-addon" onclick="triggerAddonUpdate('${addon.id}', '${latestVer}')" title="In-place update to v${latestVer}">Update</button>`
+                : '';
+
+            // Rollback button
+            const rollbackBtn = (addon.dir_type === 'custom')
+                ? `<button class="btn btn-sm btn-secondary btn-rollback-menu" onclick="openRollbackModal('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Version History & Rollback">⏪ Rollback</button>`
+                : '';
+
+            // Universal Configure button
+            let configBtn = '';
+            if (addon.has_config_schema) {
+                configBtn = `<button class="btn btn-sm btn-secondary btn-configure-addon ${addon.status !== 'ACTIVE' ? 'disabled' : ''}" onclick="openAddonConfigModal('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Configure Addon Preferences">Configure</button>`;
+            } else if (addon.settings_route) {
+                configBtn = `<a href="${addon.settings_route}" class="btn btn-sm btn-secondary btn-configure-addon ${addon.status !== 'ACTIVE' ? 'disabled' : ''}">Configure</a>`;
+            } else {
+                configBtn = `<button class="btn btn-sm btn-secondary btn-configure-addon disabled" disabled title="No configure route specified">Configure</button>`;
+            }
+
+            // Uninstall button - Guaranteed on every card
+            let uninstallBtn = '';
+            if (addon.dir_type !== 'builtin') {
+                uninstallBtn = `<button class="btn btn-sm btn-danger btn-uninstall-addon" onclick="confirmRemoveAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}')" title="Permanently Delete Addon">🗑 Uninstall</button>`;
+            } else {
+                uninstallBtn = `<button class="btn btn-sm btn-danger btn-uninstall-addon" disabled style="opacity: 0.35; cursor: not-allowed;" title="Core built-in addons cannot be uninstalled">🗑 Uninstall</button>`;
+            }
+
+            card.innerHTML = `
+                <div class="card-top">
+                    <div class="addon-header-row">
+                        <div class="addon-icon-wrapper">
+                            ${iconHtml}
+                        </div>
+                        <div class="addon-title-group">
+                            <h3 class="addon-title">${addon.name || addon.id}</h3>
+                            <span class="addon-version-pill">v${addon.version || '1.0.0'}</span>
+                            ${updatePill}
+                            <span class="addon-author">by ${addon.author || 'OpenPOS'}</span>
+                        </div>
+                    </div>
+                    ${statusHtml}
+                </div>
+
+                <div class="addon-desc">${addon.description || 'No description provided.'}</div>
+
+                <div class="addon-tags">
+                    ${sourceBadge}
+                    ${dbBadge}
+                    <span class="tag-pill">ID: ${addon.id}</span>
+                </div>
+
+                <div class="addon-card-actions">
+                    <div class="actions-left">
+                        <label class="switch-toggle toggle-wrap">
+                            <input type="checkbox" class="switch-input addon-toggle-input" data-id="${addon.id}" ${isChecked ? 'checked' : ''} onchange="toggleAddonState('${addon.id}', this.checked)">
+                            <div class="switch-slider toggle-slider"></div>
+                        </label>
+                        <span class="toggle-label">${isChecked ? 'Enabled' : 'Disabled'}</span>
+                    </div>
+                    <div class="actions-right">
+                        ${errorBtn}
+                        ${updateBtn}
+                        ${rollbackBtn}
+                        ${configBtn}
+                        ${uninstallBtn}
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        /* ── Dynamic Universal Configuration Modal Handlers ── */
+        async function openAddonConfigModal(addonId, addonName) {
+            activeConfigAddonId = addonId;
+            const modal = document.getElementById('addonConfigModal');
+            const titleEl = document.getElementById('configModalTitle');
+            const descEl = document.getElementById('configModalDescription');
+            const fieldsEl = document.getElementById('configFormFields');
+            const loadingEl = document.querySelector('.config-modal-loading');
+            const formEl = document.getElementById('addonConfigForm');
+            const saveBtn = document.getElementById('btnSaveAddonConfig');
+
+            titleEl.textContent = `Configure: ${addonName || addonId}`;
+            descEl.textContent = '';
+            fieldsEl.innerHTML = '';
+            loadingEl.style.display = 'block';
+            formEl.style.display = 'none';
+            saveBtn.disabled = true;
+
+            modal.classList.add('open');
+
+            try {
+                const res = await fetch(`/api/addons/${addonId}/config`);
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to load configuration schema.');
+                }
+
+                const schema = data.schema || {};
+                const values = data.values || {};
+                descEl.textContent = schema.description || 'Adjust settings and preferences for this addon below.';
+
+                let fields = schema.fields;
+                if (!Array.isArray(fields) && schema.properties) {
+                    fields = Object.entries(schema.properties).map(([name, prop]) => ({
+                        name: name,
+                        ...prop
+                    }));
+                }
+
+                if (!fields || fields.length === 0) {
+                    fieldsEl.innerHTML = '<div style="color: var(--text-muted); font-size: 13px;">No configurable options defined in schema.</div>';
+                } else {
+                    fields.forEach(f => {
+                        const name = f.name;
+                        const label = f.label || name;
+                        const desc = f.description || '';
+                        const type = (f.type || 'string').toLowerCase();
+                        const val = values[name] !== undefined ? values[name] : (f.default !== undefined ? f.default : '');
+
+                        const group = document.createElement('div');
+                        group.className = 'config-field-group';
+
+                        if (type === 'boolean' || type === 'bool' || type === 'toggle') {
+                            group.innerHTML = `
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0;">
+                                    <div>
+                                        <div class="config-field-label">${escapeToastHtml(label)}</div>
+                                        ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                    </div>
+                                    <label class="switch-toggle toggle-wrap" style="margin: 0;">
+                                        <input type="checkbox" name="${escapeToastHtml(name)}" class="switch-input config-input-field" ${val ? 'checked' : ''}>
+                                        <div class="switch-slider toggle-slider"></div>
+                                    </label>
+                                </div>
+                            `;
+                        } else if (type === 'select') {
+                            const options = f.options || [];
+                            const optsHtml = options.map(opt => {
+                                const optVal = typeof opt === 'object' ? opt.value : opt;
+                                const optLabel = typeof opt === 'object' ? opt.label : opt;
+                                const isSelected = String(optVal) === String(val) ? 'selected' : '';
+                                return `<option value="${escapeToastHtml(String(optVal))}" ${isSelected}>${escapeToastHtml(String(optLabel))}</option>`;
+                            }).join('');
+
+                            group.innerHTML = `
+                                <label class="config-field-label">${escapeToastHtml(label)}</label>
+                                ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                <select name="${escapeToastHtml(name)}" class="config-select config-input-field">
+                                    ${optsHtml}
+                                </select>
+                            `;
+                        } else if (type === 'secret' || type === 'password') {
+                            group.innerHTML = `
+                                <label class="config-field-label">${escapeToastHtml(label)}</label>
+                                ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                <div class="config-secret-wrap">
+                                    <input type="password" name="${escapeToastHtml(name)}" value="${escapeToastHtml(String(val))}" class="config-input config-input-field" style="padding-right: 36px;">
+                                    <button type="button" class="btn-toggle-secret" onclick="toggleSecretVisibility(this)" title="Show/Hide">👁️</button>
+                                </div>
+                            `;
+                        } else if (type === 'number' || type === 'integer' || type === 'float') {
+                            const minAttr = f.min !== undefined ? `min="${f.min}"` : '';
+                            const maxAttr = f.max !== undefined ? `max="${f.max}"` : '';
+                            const stepAttr = (type === 'float' || String(val).includes('.')) ? 'step="any"' : 'step="1"';
+                            group.innerHTML = `
+                                <label class="config-field-label">${escapeToastHtml(label)}</label>
+                                ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                <input type="number" name="${escapeToastHtml(name)}" value="${val !== null ? val : ''}" ${minAttr} ${maxAttr} ${stepAttr} class="config-input config-input-field">
+                            `;
+                        } else {
+                            group.innerHTML = `
+                                <label class="config-field-label">${escapeToastHtml(label)}</label>
+                                ${desc ? `<div class="config-field-desc">${escapeToastHtml(desc)}</div>` : ''}
+                                <input type="text" name="${escapeToastHtml(name)}" value="${escapeToastHtml(String(val))}" class="config-input config-input-field">
+                            `;
+                        }
+                        fieldsEl.appendChild(group);
+                    });
+                }
+
+                loadingEl.style.display = 'none';
+                formEl.style.display = 'block';
+                saveBtn.disabled = false;
+            } catch (err) {
+                loadingEl.innerHTML = `
+                    <div style="color: #f87171; margin-bottom: 12px;">⚠️ Error loading settings</div>
+                    <div style="font-size: 13px; color: var(--text-muted);">${escapeToastHtml(err.message)}</div>
+                `;
+            }
+        }
+
+        function closeAddonConfigModal() {
+            const modal = document.getElementById('addonConfigModal');
+            if (modal) modal.classList.remove('open');
+            activeConfigAddonId = null;
+        }
+
+        function toggleSecretVisibility(btn) {
+            const input = btn.parentElement.querySelector('input');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🔒';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        async function saveAddonConfig(e) {
+            if (e) e.preventDefault();
+            if (!activeConfigAddonId) return;
+
+            const saveBtn = document.getElementById('btnSaveAddonConfig');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '⏳ Saving...';
+
+            const form = document.getElementById('addonConfigForm');
+            const inputs = form.querySelectorAll('.config-input-field');
+            const payload = {};
+
+            inputs.forEach(inp => {
+                const name = inp.name;
+                if (!name) return;
+                if (inp.type === 'checkbox') {
+                    payload[name] = inp.checked;
+                } else if (inp.type === 'number') {
+                    payload[name] = inp.value === '' ? null : Number(inp.value);
+                } else {
+                    payload[name] = inp.value;
+                }
+            });
+
+            try {
+                const res = await fetch(`/api/addons/${activeConfigAddonId}/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to save configuration.');
+                }
+
+                if (typeof showAddonToast === 'function') {
+                    showAddonToast(activeConfigAddonId, "Preferences Saved", "Settings updated successfully.", "success");
+                }
+                closeAddonConfigModal();
+            } catch (err) {
+                alert(`Error saving preferences: ${err.message}`);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            }
+        }
+
+
+        async function toggleAddonState(addonId, enabled) {
+            try {
+                const res = await fetch(`/manager/api/addons/${addonId}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: enabled })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await loadAddons();
+                } else {
+                    alert(`Failed to toggle addon: ${data.error || 'Unknown error'}`);
+                    await loadAddons();
+                }
+            } catch (err) {
+                console.error('Error toggling addon:', err);
+                await loadAddons();
+            }
+        }
+
+        function openErrorModal(addonId) {
+            const addon = allAddons.find(a => a.id === addonId);
+            if (!addon) return;
+
+            document.getElementById('modalAddonTitle').textContent = `Failure Trace: ${addon.name} (${addon.id})`;
+            document.getElementById('modalErrorSummary').textContent = addon.error || 'Unknown initialization error occurred.';
+            document.getElementById('modalTraceback').textContent = addon.traceback || 'No stack trace captured.';
+            document.getElementById('errorModal').classList.add('open');
+        }
+
+        function closeErrorModal() {
+            document.getElementById('errorModal').classList.remove('open');
+        }
+
+        function copyTraceback() {
+            const text = document.getElementById('modalTraceback').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('btnCopyTrace');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            }).catch(err => {
+                console.error('Clipboard copy failed:', err);
+            });
+        }
+
+        // Addon In-Place Hot Update Trigger
+        async function triggerAddonUpdate(addonId, targetVersion) {
+            const btn = document.getElementById(`btnUpdate-${addonId}`);
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span>⏳</span> Updating...`;
+            }
+
+            try {
+                const res = await fetch(`/api/addons/${addonId}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    alert(`✅ Addon updated successfully to v${data.version || targetVersion}!`);
+                    await loadAddons();
+                    if (allCatalogAddons.length > 0) {
+                        await loadCatalog(true);
+                    }
+                } else {
+                    alert(`❌ Update failed: ${data.message || 'Unknown error occurred.'}`);
+                    await loadAddons();
+                }
+            } catch (err) {
+                console.error('Error during addon update:', err);
+                alert(`❌ Network error during update: ${err.message}`);
+                await loadAddons();
+            } finally {
+                if (btn) {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        // Addon Rollback Modal & Execution
+        let currentRollbackAddonId = null;
+
+        async function openRollbackModal(addonId, addonName) {
+            currentRollbackAddonId = addonId;
+            document.getElementById('rollbackModalAddonTitle').textContent = `Version History & Rollback: ${addonName} (${addonId})`;
+            const listEl = document.getElementById('rollbackSnapshotsList');
+            listEl.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted);">Loading snapshots...</div>';
+            document.getElementById('rollbackModal').classList.add('open');
+
+            try {
+                const res = await fetch(`/api/addons/${addonId}/snapshots`);
+                const snapshots = await res.json();
+                if (!res.ok) throw new Error(snapshots.message || 'Failed to retrieve snapshot list');
+
+                if (!snapshots || snapshots.length === 0) {
+                    listEl.innerHTML = `
+                        <div style="padding: 36px 20px; text-align: center; color: var(--text-muted);">
+                            <div style="font-size: 32px; margin-bottom: 8px;">📂</div>
+                            <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">No previous version snapshots found</div>
+                            <div style="font-size: 12px;">Snapshots are created automatically before each hot update.</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                listEl.innerHTML = '';
+                snapshots.forEach(s => {
+                    const card = document.createElement('div');
+                    card.className = 'snapshot-item-card';
+                    card.innerHTML = `
+                        <div class="snapshot-info">
+                            <div class="snapshot-version-tag">Version ${s.version || 'Build'}</div>
+                            <div class="snapshot-timestamp">📅 ${s.timestamp || s.created_at || s.snapshot_id}</div>
+                            <div class="snapshot-folder-id">${s.snapshot_id}</div>
+                        </div>
+                        <button class="btn-do-rollback" onclick="executeRollback('${addonId}', '${s.snapshot_id}')">
+                            <span>⏪</span> Revert to this Build
+                        </button>
+                    `;
+                    listEl.appendChild(card);
+                });
+            } catch (err) {
+                listEl.innerHTML = `<div style="color: #f87171; padding: 20px;">Error loading snapshots: ${err.message}</div>`;
+            }
+        }
+
+        function closeRollbackModal() {
+            document.getElementById('rollbackModal').classList.remove('open');
+            currentRollbackAddonId = null;
+        }
+
+        async function executeRollback(addonId, snapshotId) {
+            if (!confirm(`Are you sure you want to revert addon '${addonId}' to snapshot '${snapshotId}'?`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/addons/${addonId}/rollback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ snapshot: snapshotId })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    closeRollbackModal();
+                    showAddonToast(addonId, "Rollback Complete", data.message || "Addon successfully reverted.", "success");
+                    await loadAddons();
+                } else {
+                    alert(`⚠️ Rollback result: ${data.message || 'Unknown response'}`);
+                    await loadAddons();
+                }
+            } catch (err) {
+                console.error('Error executing rollback:', err);
+                alert(`❌ Failed to execute rollback: ${err.message}`);
+            }
+        }
+
+        // Addon Logs Viewer
+        async function openAddonLogsModal() {
+            document.getElementById('addonLogsModal').classList.add('open');
+            await loadAddonLogs();
+        }
+
+        function closeAddonLogsModal() {
+            document.getElementById('addonLogsModal').classList.remove('open');
+        }
+
+        async function loadAddonLogs() {
+            const pre = document.getElementById('addonLogsPre');
+            pre.textContent = 'Streaming data/logs/openpos_addons.log...';
+            try {
+                const res = await fetch('/api/addons/logs?limit=250');
+                const data = await res.json();
+                if (res.ok && data.logs) {
+                    if (data.logs.length === 0) {
+                        pre.textContent = '[openpos_addons.log is currently empty]';
+                    } else {
+                        pre.textContent = data.logs.map(l => `[${l.timestamp}] [${l.level}] [${l.subsystem || 'ADDONS'}]: ${l.message}`).join('\n');
+                    }
+                } else {
+                    pre.textContent = 'Could not retrieve addon logs.';
+                }
+            } catch (err) {
+                pre.textContent = `Error loading addon logs: ${err.message}`;
+            }
+        }
+
+        function copyAddonLogs() {
+            const text = document.getElementById('addonLogsPre').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('btnCopyAddonLogs');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            }).catch(err => {
+                console.error('Clipboard copy failed:', err);
+            });
+        }
+
+        // Addon ZIP Import Handler
+        async function handleZipUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            if (!file.name.toLowerCase().endsWith('.zip')) {
+                alert('Please select a valid .zip file.');
+                event.target.value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const btn = document.getElementById('btnImportAddon');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span>⏳</span> Installing...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/addons/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showAddonToast(data.id || 'addon', "Import Complete", data.message || "Addon installed successfully!", "success");
+                    await loadAddons();
+                    if (typeof loadCatalog === 'function') loadCatalog();
+                } else {
+                    alert(`Import failed: ${data.error || data.message || 'Unknown error'}`);
+                }
+            } catch (err) {
+                console.error('Error uploading addon ZIP:', err);
+                alert('An error occurred during addon upload.');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                event.target.value = '';
+            }
+        }
+
+        // Addon Removal Confirmation & Execution
+        let pendingRemoveAddonId = null;
+
+        function confirmRemoveAddon(addonId, addonName) {
+            pendingRemoveAddonId = addonId;
+            document.getElementById('removeModalMessage').textContent = `Are you sure you want to remove "${addonName}"? This will delete its local files.`;
+            document.getElementById('removeConfirmModal').classList.add('open');
+        }
+
+        function closeRemoveModal() {
+            pendingRemoveAddonId = null;
+            document.getElementById('removeConfirmModal').classList.remove('open');
+        }
+
+        async function executeRemoveAddon() {
+            if (!pendingRemoveAddonId) return;
+            const addonId = pendingRemoveAddonId;
+            closeRemoveModal();
+
+            try {
+                const res = await fetch(`/api/addons/${addonId}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showAddonToast(addonId, "Addon Removed", data.message || "Addon uninstalled successfully.", "success");
+                    await loadAddons();
+                    if (typeof loadCatalog === 'function') loadCatalog();
+                } else {
+                    alert(`Failed to remove addon: ${data.error || 'Unknown error'}`);
+                }
+            } catch (err) {
+                console.error('Error removing addon:', err);
+                alert('Error removing addon. Please check console logs.');
+            }
+        }
+
+        // Tab switching between Installed Addons and Addon Catalog
+        function switchMainTab(tab) {
+            activeMainTab = tab;
+            const btnInstalled = document.getElementById('tabInstalledAddons');
+            const btnCatalog = document.getElementById('tabAddonCatalog');
+            const viewInstalled = document.getElementById('installedAddonsView');
+            const viewCatalog = document.getElementById('catalogAddonsView');
+
+            if (tab === 'catalog') {
+                btnInstalled.classList.remove('active');
+                btnInstalled.setAttribute('aria-selected', 'false');
+                btnCatalog.classList.add('active');
+                btnCatalog.setAttribute('aria-selected', 'true');
+
+                viewInstalled.style.display = 'none';
+                viewCatalog.style.display = 'block';
+
+                if (allCatalogAddons && allCatalogAddons.length > 0) {
+                    renderCatalogGrid();
+                } else {
+                    loadCatalog();
+                }
+            } else {
+                btnCatalog.classList.remove('active');
+                btnCatalog.setAttribute('aria-selected', 'false');
+                btnInstalled.classList.add('active');
+                btnInstalled.setAttribute('aria-selected', 'true');
+
+                viewCatalog.style.display = 'none';
+                viewInstalled.style.display = 'block';
+
+                loadAddons();
+            }
+        }
+
+        // Fetch remote catalog
+        async function loadCatalog(forceRefresh = false) {
+            const grid = document.getElementById('catalogGrid');
+            if (forceRefresh) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔄</div>
+                        <h3>Refreshing Addon Catalog...</h3>
+                        <p>Querying remote extension registry and checking compatibility.</p>
+                    </div>
+                `;
+            }
+
+            try {
+                const res = await fetch(`/manager/api/addons/catalog?refresh=${forceRefresh ? '1' : '0'}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                allCatalogAddons = await res.json();
+                window.allCatalogAddons = allCatalogAddons;
+                window.catalogAddons = allCatalogAddons;
+                window.catalogData = allCatalogAddons;
+                renderCatalogGrid();
+            } catch (err) {
+                console.error('Error fetching catalog:', err);
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <h3>Addon Catalog Unavailable</h3>
+                        <p>Could not load the online addon catalog (${err.message}). If this register is offline, you can install addons manually via ZIP import.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Render catalog cards
+        function renderCatalogGrid() {
+            const grid = document.getElementById('catalogGrid');
+            grid.innerHTML = '';
+
+            let filtered = allCatalogAddons.filter(item => {
+                if (currentCatalogSearch) {
+                    const matchName = (item.name || '').toLowerCase().includes(currentCatalogSearch);
+                    const matchId = (item.id || '').toLowerCase().includes(currentCatalogSearch);
+                    const matchDesc = (item.description || '').toLowerCase().includes(currentCatalogSearch);
+                    return matchName || matchId || matchDesc;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🌐</div>
+                        <h3>No extensions found in catalog</h3>
+                        <p>Try searching for a different keyword or click <strong>Refresh Catalog</strong> to query the registry again.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(addon => {
+                grid.appendChild(createCatalogCard(addon));
+            });
+        }
+
+        function createCatalogCard(addon) {
+            const card = document.createElement('div');
+            card.className = 'addon-card';
+            card.id = `catalog-card-${addon.id}`;
+
+            const puzzleSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/></svg>`;
+            const rawIcon = addon.icon_url || addon.icon;
+            const isImg = rawIcon && (rawIcon.endsWith('.png') || rawIcon.endsWith('.svg') || rawIcon.endsWith('.jpg') || rawIcon.startsWith('http') || rawIcon.startsWith('/'));
+
+            const iconHtml = isImg
+                ? `<img src="${rawIcon}" alt="" class="addon-icon-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                   <div class="addon-icon-fallback" style="display: none;">${puzzleSvg}</div>`
+                : `<div class="addon-icon-fallback" style="display: flex;">${(addon.icon && !isImg && addon.icon.length <= 4) ? addon.icon : puzzleSvg}</div>`;
+
+            const isCompatible = addon.is_compatible !== false;
+            const compatBadge = isCompatible
+                ? `<span class="tag-pill tag-compat-ok">✓ Compatible with OpenPOS v1.0.9</span>`
+                : `<span class="tag-pill tag-compat-err">⚠️ Incompatible (Requires OpenPOS ${addon.min_core_version || 'newer'})</span>`;
+
+            const dbBadge = addon.requires_db
+                ? `<span class="tag-pill">Database Required</span>`
+                : '';
+
+            const depsBadge = addon.dependencies && addon.dependencies.length > 0
+                ? `<span class="tag-pill">Deps: ${addon.dependencies.join(', ')}</span>`
+                : '';
+
+            let actionBtnHtml = '';
+            if (addon.is_installed) {
+                if (addon.has_update) {
+                    actionBtnHtml = `<button class="btn btn-sm btn-primary btn-install-addon" data-id="${addon.id}" onclick="installAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">🔄 Update to v${addon.version}</button>`;
+                } else {
+                    actionBtnHtml = `<span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6 btn-installed-badge">✓ Installed (v${addon.installed_version || addon.version})</span>`;
+                }
+            } else if (isCompatible) {
+                actionBtnHtml = `<button class="btn btn-sm btn-primary btn-install-addon" data-id="${addon.id}" onclick="installAddon('${addon.id}', '${(addon.name || addon.id).replace(/'/g, "\\'")}', this)">⬇️ Install Addon</button>`;
+            } else {
+                actionBtnHtml = `<button class="btn btn-sm btn-secondary disabled" disabled style="opacity: 0.5; cursor: not-allowed;">Incompatible</button>`;
+            }
+
+            card.innerHTML = `
+                <div class="card-top">
+                    <div class="addon-header-row">
+                        <div class="addon-icon-wrapper">
+                            ${iconHtml}
+                        </div>
+                        <div class="addon-title-group">
+                            <h3 class="addon-title">${addon.name}</h3>
+                            <span class="addon-version-pill">v${addon.version}</span>
+                            <span class="addon-author">by ${addon.author || 'Open-POS Community'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="addon-desc">${addon.description || 'No description provided.'}</div>
+
+                <div class="addon-tags">
+                    ${compatBadge}
+                    ${dbBadge}
+                    ${depsBadge}
+                    <span class="tag-pill">ID: ${addon.id}</span>
+                </div>
+
+                <div class="addon-card-actions">
+                    <div></div>
+                    <div class="actions-right">
+                        ${actionBtnHtml}
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Global alias for catalog installer pipeline
+        function installRemoteAddon(addonId) {
+            if (typeof installAddon === 'function') {
+                return installAddon(addonId);
+            }
+        }
+        window.installRemoteAddon = installRemoteAddon;
+    </script>
+
+    <!-- Floating Toast Notification Container -->
+    <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;"></div>
+</body>
+</html>
