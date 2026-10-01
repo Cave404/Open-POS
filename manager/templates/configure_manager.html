@@ -6,8 +6,6 @@
     <title>Configure Manager &amp; Administration - Open-POS</title>
     <link rel="stylesheet" href="/static/css/manager.css">
     <script src="/static/js/notifications.js"></script>
-    <!-- Lockout guard: blurs page and shows PIN modal when admin section is protected -->
-    <script src="/static/js/lockout_guard.js" data-section="admin"></script>
     <style>
         .admin-container {
             max-width: 1000px;
@@ -405,8 +403,5 @@ document.getElementById('btnRestartPOS').addEventListener('click', restartSystem
 
 document.addEventListener('DOMContentLoaded', loadAdminStatus);
 </script>
-{% if is_locked %}
-{% include 'lockout_modal.html' %}
-{% endif %}
 </body>
 </html>

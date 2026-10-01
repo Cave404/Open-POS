@@ -51,6 +51,13 @@ from core.db_migrator import (
     update_env_engine,
     dry_run_migration,
 )
+from core.auth import (
+    is_manager_elevated,
+    refresh_elevation,
+    revoke_elevation,
+    manager_required,
+)
+from core.services.security_service import verify_admin_pin
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +312,7 @@ def is_section_locked(section_name: str) -> bool:
     )
     if not is_protected:
         return False
-    return session.get('manager_authenticated') is not True
+    return not is_manager_elevated()
 
 
 # -----------------------------------------------------------------------------
@@ -360,6 +367,7 @@ def manager_setup():
 
 @manager_bp.route('/branding')
 @manager_bp.route('/settings')
+@manager_required
 def manager_branding():
     """Renders the Store Branding & Business Rules configuration panel."""
     from core.addons.ui_hooks import get_registered_workspaces
@@ -383,6 +391,7 @@ def manager_about():
 
 @manager_bp.route('/updates')
 @manager_bp.route('/admin/updates')
+@manager_required
 def manager_updates():
     """Renders the Core Auto-Updater & Scheduled Maintenance Administration Panel."""
     from core.updater.checker import check_for_system_updates
@@ -441,6 +450,8 @@ def manager_placeholder(applet_id):
 
 
 @manager_bp.route('/database')
+@manager_bp.route('/db')
+@manager_required
 def manager_database():
     """Renders the full Database Tools & Migration wizard view."""
     return render_template('database.html', is_locked=is_section_locked('database'))
@@ -463,6 +474,8 @@ def manager_logs():
 
 
 @manager_bp.route('/configure_manager')
+@manager_bp.route('/admin')
+@manager_required
 def manager_configure():
     """Renders the Configure Manager administrative security & update panel."""
     return render_template('configure_manager.html', is_locked=is_section_locked('configure_manager'))
@@ -470,6 +483,7 @@ def manager_configure():
 
 @manager_bp.route('/addons')
 @manager_bp.route('/applets')
+@manager_required
 def manager_addons():
     """Renders the Addons & Applets Management Control Center."""
     return render_template('addons.html', is_locked=is_section_locked('addons'))
@@ -1810,7 +1824,7 @@ def api_live_logs_stream():
 def api_admin_auth_status():
     """Returns access control configuration without exposing salt or hash."""
     cfg = _read_auth_file()
-    is_auth = session.get('manager_authenticated') is True
+    is_auth = is_manager_elevated() or (session.get('manager_authenticated') is True)
     return jsonify({
         "status": "success",
         "has_password": bool(cfg.get("password_hash")),
@@ -1820,6 +1834,26 @@ def api_admin_auth_status():
         "authenticated": is_auth,
         "authorized": is_auth
     })
+
+
+@manager_bp.route('/auth/verify-pin', methods=['POST'])
+@api_bp.route('/auth/verify-pin', methods=['POST'])
+def verify_pin():
+    """
+    Validates submitted administrative PIN and establishes a 15-minute elevated session.
+    """
+    data = request.get_json(silent=True) or request.form or {}
+    submitted_pin = str(data.get("pin", "")).strip()
+    next_url = data.get("next_url", "/manager")
+
+    if not submitted_pin:
+        return jsonify({"success": False, "error": "PIN cannot be blank"}), 400
+
+    if verify_admin_pin(submitted_pin):
+        refresh_elevation()
+        return jsonify({"success": True, "redirect_url": next_url})
+    else:
+        return jsonify({"success": False, "error": "Invalid administrative PIN"}), 403
 
 
 @api_bp.route('/admin/auth/configure', methods=['POST'])
@@ -1880,12 +1914,14 @@ def api_admin_auth_verify():
 
     if not cfg.get("require_password", False) or not cfg.get("password_hash"):
         session['manager_authenticated'] = True
+        refresh_elevation()
         return jsonify({"status": "success", "authorized": True})
 
     section = str(data.get('section', '')).strip()
     protected = cfg.get("protected_sections", [])
     if section and 'all' not in protected and section not in protected and section != 'settings':
         session['manager_authenticated'] = True
+        refresh_elevation()
         return jsonify({"status": "success", "authorized": True})
 
     pwd = str(data.get('password', ''))
@@ -1894,6 +1930,7 @@ def api_admin_auth_verify():
 
     if expected and _hash_with_salt(pwd, salt) == expected:
         session['manager_authenticated'] = True
+        refresh_elevation()
         return jsonify({"status": "success", "authorized": True})
 
     return jsonify({"status": "error", "authorized": False, "message": "Invalid administrator password."}), 401
@@ -1902,7 +1939,8 @@ def api_admin_auth_verify():
 @api_bp.route('/settings/logout', methods=['POST'])
 @manager_bp.route('/api/settings/logout', methods=['POST'])
 def api_settings_logout():
-    """Clears authenticated manager session."""
+    """Clears authenticated manager session and revokes elevation."""
+    revoke_elevation()
     session.pop('manager_authenticated', None)
     return jsonify({"status": "success", "message": "Session locked."})
 

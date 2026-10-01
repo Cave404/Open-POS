@@ -275,7 +275,7 @@ def install_remote_addon(addon_id: str) -> Dict[str, Any]:
             "status": "success",
             "success": True,
             "message": (
-                "Addon configured. Reloading engine..."
+                f"Addon '{addon_id}' configured. Reloading engine..."
                 if record.reload_required
                 else f"{addon_name} installed and activated successfully"
             ),

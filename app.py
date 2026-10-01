@@ -54,6 +54,11 @@ def create_app():
         from manager.routes import manager_setup
         return manager_setup()
 
+    @app.route('/auth/verify-pin', methods=['POST'])
+    def auth_verify_pin_root():
+        from manager.routes import verify_pin
+        return verify_pin()
+
     @app.route('/customers')
     def customers_directory():
         return render_template('customers/index.html')

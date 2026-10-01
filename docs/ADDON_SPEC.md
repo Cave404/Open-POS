@@ -1,123 +1,164 @@
-# OpenPOS Addon & Extension Specification
-**Target Core API Version:** `1.0.0`  
-**Minimum OpenPOS Platform Version:** `v1.0.8`
+# OpenPOS Addon Developer Specification (v1.0)
+
+This document establishes the official architectural contract, directory conventions, URL namespace standards, and integration hooks for building addons on OpenPOS.
 
 ---
 
-## 1. Directory Structure Contract
-Every OpenPOS addon must be packaged as a standalone folder containing a root `manifest.json`:
+## 1. Directory Structure
+
+All custom addons reside within `data/custom_addons/<addon_id>/`. The `<addon_id>` must be lowercase alphanumeric with underscores only (matching regex `^[a-z0-9_]+$`).
 
 ```text
-<addon_id>/
-├── manifest.json              # Contract metadata, routes, and dependencies
-├── plugin.py                  # Entrypoint exposing `addon_bp` Blueprint
-├── settings.py                # (Optional) Addon configuration persistence
-├── migrations/
-│   ├── schema_sqlite.sql      # Executed automatically on install if running SQLite
-│   └── schema_postgres.sql    # Executed automatically on install if running PostgreSQL
-├── static/
-│   ├── css/                   # Addon styling (must use core CSS variables)
-│   └── js/                    # Client-side scripts
-└── templates/
-    └── <addon_id>/            # Sandboxed Jinja2 templates
+data/custom_addons/<addon_id>/
+├── manifest.json              # Required: Metadata, dependencies, and UI hooks
+├── plugin.py                  # Required: Addon lifecycle entrypoint
+├── config_schema.json         # Optional: Settings schema for System Manager
+├── requirements.txt           # Optional: Third-party Python dependencies
+├── routes/                    # Blueprint route handlers
+│   ├── __init__.py
+│   └── views.py
+├── static/                    # Addon-specific static assets
+│   ├── css/
+│   └── js/
+├── templates/                 # Scoped Jinja2 templates
+│   └── <addon_id>/
+│       └── canvas.html
+└── migrations/                # Optional: Database migrations
+    ├── schema_sqlite.sql
+    └── schema_postgres.sql
 ```
 
 ---
 
 ## 2. Manifest Schema (`manifest.json`)
-The `manifest.json` file is strictly required. The core loader inspects this before executing any code:
+The `manifest.json` file is validated by `core/addons/validator.py` at runtime.
 
 ```json
 {
-  "id": "addon_unique_id",
-  "name": "Human-Readable Name",
+  "id": "sample_addon",
+  "name": "Sample Retail Addon",
   "version": "1.0.0",
-  "author": "Author or Community Name",
-  "description": "Short summary of the addon functionality.",
-  "category": "Desktop_Apps",
-  "icon": "icon_name.png",
-  "entrypoint": "plugin.py",
-  "requires_db": true,
-  "min_core_version": "1.0.8",
-  "dependencies": ["requests"],
-  "settings_route": "/addons/<addon_id>/settings",
-  "nav_items": [
-    {
-      "label": "Display Label",
-      "route": "/addons/<addon_id>/main",
-      "icon": "🧩"
-    }
-  ]
+  "author": "OpenPOS Contributor",
+  "description": "Demonstration extension for custom workflows.",
+  "min_core_version": "1.0.9",
+  "entrypoint": "plugin:setup_addon",
+  "requires_db": false,
+  "dependencies": [
+    "requests>=2.31.0"
+  ],
+  "ui_extensions": {
+    "provides_canvas": true,
+    "canvas_label": "Custom Desk",
+    "canvas_icon": "bi-terminal",
+    "canvas_template": "sample_addon/canvas.html",
+    "standalone_routes": [
+      {
+        "path": "/desk",
+        "label": "Full Screen Desk",
+        "template": "sample_addon/desk.html"
+      }
+    ],
+    "slots": [
+      {
+        "slot": "pos:header_actions",
+        "label": "Custom Action",
+        "action": "navigate",
+        "target": "/addon/sample_addon/desk"
+      }
+    ]
+  }
 }
 ```
 
-- `id`: Unique lowercase alphanumeric identifier (`snake_case`, e.g., `tcg_pos`).
-- `requires_db`: If true, the installer will automatically run the appropriate migration in `migrations/` before enabling the blueprint.
-- `entrypoint`: Python file containing the Flask blueprint (default: `plugin.py`).
-- `min_core_version`: The minimum OpenPOS version required to mount this addon.
+### Manifest Rules
+- **id**: Must match the directory name in `data/custom_addons/` exactly.
+- **entrypoint**: Formatted as `<module_filename>:<callable_function>`. Default is `plugin:setup_addon`.
+- **dependencies**: Pip requirement strings only. Do not include Python standard library modules or the string "python".
+- **ui_extensions.canvas_template**: Must be namespaced under the addon's template directory (`<addon_id>/<file>.html`).
 
 ---
 
-## 3. Blueprint Contract (`plugin.py`)
-Addons must expose an instance of `flask.Blueprint` named `addon_bp`:
+## 3. Packaging & Import Rules
+- **Namespace Isolation**: The core loader does not add individual addon folders to global `sys.path`.
+- **Relative Imports**: Addon internal modules must use explicit relative imports:
 
 ```python
-from flask import Blueprint, render_template
-
-addon_bp = Blueprint(
-    '<addon_id>',
-    __name__,
-    template_folder='templates',
-    static_folder='static',
-    static_url_path='/addons/<addon_id>/static'
-)
-
-# Routes are mounted automatically at: /addons/<addon_id>/...
-@addon_bp.route('/')
-def index():
-    return render_template('<addon_id>/index.html')
+from .routes import views_bp
+from .services.engine import DataProcessor
 ```
 
----
-
-## 4. Isolated Data Storage Rules
-Addons must never write runtime data, image caches, or dynamic settings inside their own code directory or the git tree. All mutable files must be stored within the core's isolated `data/` structure:
-
-- **Databases:** Interacted with via the core connection pool, or stored in `data/db/` if using SQLite.
-- **Asset & Image Caching:** `data/cache/<addon_id>/`
-- **Custom Configuration & Secrets:** `data/config/<addon_id>.json`
-- **Logs:** `data/logs/<addon_id>.log`
+- **Requirements Handling**: Third-party packages declared in `requirements.txt` are installed automatically via an isolated pip sub-process upon addon extraction.
 
 ---
 
-## 5. UI Design & Styling Standard
-To maintain visual consistency across all windows:
+## 4. Blueprint & URL Standards
+All web routes registered by an addon are mounted under the fixed prefix:
 
-- **Top Header:** All addon views must include the standard return header:
-
-```html
-<header class="subview-header">
-    <div class="header-left">
-        <a href="/manager" class="btn-back">
-            <span class="btn-icon">←</span>
-            <span>Return to Dashboard</span>
-        </a>
-        <div class="header-divider"></div>
-        <h2 class="subview-title">{{ addon_title }}</h2>
-    </div>
-</header>
+```plaintext
+/addon/<addon_id>/
 ```
 
-- **Theme Variables:** Use the core CSS variables declared in `/static/css/manager.css`:
-  - `--bg-primary` (Main dark background)
-  - `--bg-secondary` (Card/Sidebar background)
-  - `--border-color` (Subtle 1px outlines)
-  - `--accent-blue` (Primary buttons & active states)
-  - `--text-main` (Headings and primary text)
-  - `--text-muted` (Helper text and secondary descriptions)
+### Entrypoint Example (`plugin.py`)
+```python
+from flask import Blueprint
+from .routes.views import views_bp
+
+def setup_addon(app, core_context):
+    """
+    Entrypoint executed by OpenPOS Core Loader.
+    :param app: The Flask application instance.
+    :param core_context: Injected dictionary containing:
+        - 'cart': CartService
+        - 'customers': CustomerService
+        - 'events': event_bus
+        - 'config': System Config
+    """
+    addon_bp = Blueprint(
+        "sample_addon",
+        __name__,
+        url_prefix="/addon/sample_addon",
+        template_folder="templates",
+        static_folder="static",
+        static_url_path="/addon/sample_addon/static"
+    )
+
+    addon_bp.register_blueprint(views_bp, url_prefix="/views")
+    app.register_blueprint(addon_bp)
+```
+
+Target URLs resolve as:
+- Internal Route: `/addon/sample_addon/views/dashboard`
+- Static Resource: `/addon/sample_addon/static/js/main.js`
 
 ---
 
-## 6. Failure Isolation & Error Safety
-- If an addon crashes during registration or has missing dependencies, the core will mark the addon as `STATE_ERROR` in the Manager UI.
-- Addons must never execute blocking operations (like heavy network calls) on the main thread during module import.
+## 5. Core Services API
+Addons communicate with the register session, ledger, and customer data using core services provided in `core_context`:
+
+### A. Cart Session
+- `POST /api/pos/cart/item`: Adds an item to the active register ticket.
+```json
+{
+  "sku": "CUSTOM-SKU-001",
+  "name": "Custom Product",
+  "price": 19.99,
+  "quantity": 1,
+  "taxable": true,
+  "metadata": {
+    "addon_id": "sample_addon",
+    "custom_field": "sample_data"
+  }
+}
+```
+- `GET /api/pos/cart`: Retrieves active ticket items and totals.
+
+### B. Customers & Ledger
+- `POST /api/core/customers/resolve`: Resolves customer by phone, name, or NFC UID.
+- `POST /api/core/customers/<id>/credit/deposit`: Appends a transaction to the double-entry store credit ledger.
+
+### C. Event Bus (`core.events.event_bus`)
+```python
+event_bus.subscribe("pos:transaction_completed", handler_func)
+event_bus.subscribe("customer:badge_assigned", handler_func)
+event_bus.dispatch("addon:event_name", **payload)
+```

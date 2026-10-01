@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="/static/css/manager.css">
     <link rel="stylesheet" href="/static/css/addons.css">
     <script src="/static/js/notifications.js"></script>
-    <script src="/static/js/lockout_guard.js" data-section="addons"></script>
     <script src="/static/js/addons.js"></script>
     <style>
         .addons-container {
@@ -2172,6 +2171,13 @@
             return card;
         }
 
+        // Global alias for catalog installer pipeline
+        function installRemoteAddon(addonId) {
+            if (typeof installAddon === 'function') {
+                return installAddon(addonId);
+            }
+        }
+        window.installRemoteAddon = installRemoteAddon;
     </script>
 
     <!-- Floating Toast Notification Container -->

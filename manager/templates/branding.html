@@ -6,8 +6,6 @@
     <title>Store Branding &amp; Business Rules - Open-POS</title>
     <link rel="stylesheet" href="/static/css/manager.css">
     <script src="/static/js/notifications.js"></script>
-    <!-- Lockout guard: blurs page and shows PIN modal when branding section is protected -->
-    <script src="/static/js/lockout_guard.js" data-section="branding"></script>
 </head>
 <body class="manager-body">
 
@@ -370,8 +368,5 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 
 document.addEventListener('DOMContentLoaded', fetchSettings);
 </script>
-{% if is_locked %}
-{% include 'lockout_modal.html' %}
-{% endif %}
 </body>
 </html>

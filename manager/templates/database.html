@@ -6,7 +6,6 @@
     <title>Database Tools &amp; Migration - Open-POS</title>
     <link rel="stylesheet" href="/static/css/manager.css">
     <script src="/static/js/notifications.js"></script>
-    <script src="/static/js/lockout_guard.js" data-section="database"></script>
     <style>
         .db-container { max-width: 960px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 24px; }
         .db-status-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
@@ -678,8 +677,5 @@ function esc(str) {
     return d.innerHTML;
 }
 </script>
-{% if is_locked %}
-{% include 'lockout_modal.html' %}
-{% endif %}
 </body>
 </html>
