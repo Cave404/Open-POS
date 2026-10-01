@@ -71,7 +71,9 @@ def reset_event_bus():
 def _run_migrations_on(db_path):
     from core.services.customer_service import run_customer_migrations
     import os
-    sql_file = os.path.join(Config.BASE_DIR, 'migrations', 'core_002_add_customers.sqlite.sql')
+    sql_file = os.path.join(Config.BASE_DIR, 'storage', 'migrations', 'core_002_add_customers.sqlite.sql')
+    if not os.path.isfile(sql_file):
+        sql_file = os.path.join(Config.BASE_DIR, 'migrations', 'core_002_add_customers.sqlite.sql')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     with open(sql_file, 'r', encoding='utf-8') as f:

@@ -5,9 +5,28 @@ logo uploads, custom addons, or credentials.
 """
 
 import os
+import sys
+import types
 import pytest
 from core.config import Config
-from core.db import init_db
+from storage.database import init_db
+
+# Legacy module shims for decoupled 5-layer architecture
+import ui.app
+import ui.routes.manager_routes
+import run
+
+sys.modules['app'] = ui.app
+if 'manager' not in sys.modules:
+    sys.modules['manager'] = types.ModuleType('manager')
+sys.modules['manager.routes'] = ui.routes.manager_routes
+sys.modules['manager'].routes = ui.routes.manager_routes
+
+if 'setup_wizard' not in sys.modules:
+    _sw = types.ModuleType('setup_wizard')
+    _sw.SetupWizardBridge = getattr(run, 'JSBridge', None)
+    sys.modules['setup_wizard'] = _sw
+
 
 @pytest.fixture(autouse=True)
 def isolate_test_environment(monkeypatch, tmp_path):

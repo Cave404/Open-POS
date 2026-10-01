@@ -65,7 +65,7 @@ def apply_system_update(download_url: str, new_version: str) -> bool:
 
     try:
         # 1. Snapshot core files (Never copy data/, venv/, or .git/)
-        core_targets = ["core", "manager", "static", "templates", "migrations", "run.py", "Start_POS.bat", "app.py"]
+        core_targets = ["core", "hardware", "storage", "ui", "packaging", "run.py", "Start_POS.bat", "manager", "static", "templates", "migrations", "app.py"]
         snapshotted_count = 0
 
         for item in core_targets:

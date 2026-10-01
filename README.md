@@ -3,7 +3,7 @@
 <h1>Open-POS</h1>
 
 <p>
-  <img src="manager/open_pos_splash.png" alt="Open-POS Splash" width="380">
+  <img src="ui/static/img/open_pos_splash.png" alt="Open-POS Splash" width="380">
 </p>
 
 <p>
@@ -37,40 +37,23 @@
 
 ---
 
-## Core System Architecture
+## System Architecture
 
+OpenPOS is organized into five decoupled layers:
+
+```text
+open-pos/
+├── core/              # Business logic: cart calculations, tax engine, addon sandboxing
+├── hardware/          # Non-blocking peripheral workers (ESC/POS, serial NFC, drawer kick)
+├── storage/           # Database sessions, migrations, and repository abstractions
+├── ui/                # Presentation: routes, Jinja templates, static assets, PyWebView
+├── packaging/         # PyInstaller spec, Inno Setup scripts, build automation
+├── run.py             # Desktop application entrypoint
+└── Start_POS.bat      # Terminal-free development launcher
 ```
-Open-POS/
-├── core/                    # Core business logic, DB engines, and event bus
-│   ├── addons/              # Dynamic plugin discovery, installer, and catalog
-│   ├── models/              # Customer, Ledger, and core schema definitions
-│   ├── services/            # CustomerService, DB Migrator, and Encryption
-│   ├── events.py            # In-process pub/sub event dispatcher
-│   └── config.py            # Configuration manager and environment loader
-│
-├── data/                    # LOCAL ONLY — strictly git-ignored
-│   ├── config/              # Local .env, encryption secrets, auth hashes
-│   ├── custom_addons/       # Remotely installed addon repositories
-│   ├── db/                  # Local SQLite database files & backups
-│   ├── cache/               # Remote catalog and external API caches
-│   ├── uploads/             # Store logos and business branding assets
-│   └── logs/                # System traces and rotating diagnostic logs
-│
-├── manager/                 # System Manager control panel & UI routes
-│   ├── templates/           # Manager views, setup wizard, and subviews
-│   └── routes.py            # REST endpoints for control panel operations
-│
-├── migrations/              # Dual SQL migrations (SQLite & PostgreSQL)
-├── static/                  # Shared stylesheets, scripts, and branding
-│
-├── docs/
-│   ├── ADDON_SPEC.md        # Core Addon Interface Contract (API v1.0.0)
-│   └── WIKI.md              # System engineering guide and lifecycle docs
-│
-├── Open_POS.vbs             # Silent, terminal-free launcher for cashiers
-├── Start_POS.bat            # Bootstrapper (auto-creates venv & installs deps)
-└── run.py                   # Unified multi-threaded application runner
-```
+
+### Building the Windows Installer
+Run `packaging\build_installer.bat` to compile `OpenPOS.exe` and generate `OpenPOS-Setup.exe`.
 
 ---
 

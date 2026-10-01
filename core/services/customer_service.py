@@ -58,34 +58,8 @@ def run_customer_migrations() -> None:
 
     This is idempotent — all DDL uses IF NOT EXISTS.
     """
-    engine = getattr(Config, 'DB_ENGINE', 'sqlite').lower()
-    if engine in ('postgres', 'postgresql'):
-        sql_file = os.path.join(
-            Config.BASE_DIR, 'migrations', 'core_002_add_customers.pgsql.sql'
-        )
-    else:
-        sql_file = os.path.join(
-            Config.BASE_DIR, 'migrations', 'core_002_add_customers.sqlite.sql'
-        )
-
-    if not os.path.isfile(sql_file):
-        logger.error(f"Customer migration file not found: {sql_file}")
-        return
-
-    with open(sql_file, 'r', encoding='utf-8') as f:
-        sql_script = f.read()
-
-    try:
-        with get_db_connection() as conn:
-            if engine in ('postgres', 'postgresql'):
-                cur = conn.cursor()
-                cur.execute(sql_script)
-            else:
-                conn.executescript(sql_script)
-        logger.info("Customer migration completed successfully.")
-    except Exception as exc:
-        logger.error(f"Customer migration failed: {exc}", exc_info=True)
-        raise
+    from storage.migrations import run_customer_migrations as _run
+    _run()
 
 
 # ---------------------------------------------------------------------------

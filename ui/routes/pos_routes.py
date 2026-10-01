@@ -42,28 +42,8 @@ pos_bp = Blueprint(
 # -----------------------------------------------------------------------------
 def run_pos_migrations() -> None:
     """Executes the POS register schema migrations idempotently."""
-    engine = getattr(Config, 'DB_ENGINE', 'sqlite').lower()
-    if engine in ('postgres', 'postgresql'):
-        sql_file = os.path.join(Config.BASE_DIR, 'migrations', 'core_003_add_pos_register.pgsql.sql')
-    else:
-        sql_file = os.path.join(Config.BASE_DIR, 'migrations', 'core_003_add_pos_register.sqlite.sql')
-
-    if not os.path.isfile(sql_file):
-        logger.error(f"POS migration file not found: {sql_file}")
-        return
-
-    with open(sql_file, 'r', encoding='utf-8') as f:
-        sql_script = f.read()
-
-    try:
-        with get_db_connection() as conn:
-            if engine in ('postgres', 'postgresql'):
-                execute_sql(conn, sql_script)
-            else:
-                conn.executescript(sql_script)
-        logger.info("POS register database migrations executed successfully.")
-    except Exception as e:
-        logger.error(f"Error running POS migrations: {e}", exc_info=True)
+    from storage.migrations import run_pos_migrations as _run
+    _run()
 
 
 # -----------------------------------------------------------------------------
