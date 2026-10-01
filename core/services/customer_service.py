@@ -542,3 +542,18 @@ def redeem_store_credit(
 
     logger.info(f"Redeem: customer_id={customer_id} amount={amount} new_balance={new_balance}")
     return get_customer(customer_id)
+
+
+class CustomerService:
+    """Namespace class exposing atomic customer operations for core service context injection."""
+    resolve_customer = staticmethod(resolve_customer)
+    search_customers = staticmethod(search_customers)
+    get_customer = staticmethod(get_customer)
+    get_customer_ledger = staticmethod(get_customer_ledger)
+    create_customer = staticmethod(create_customer)
+    update_customer = staticmethod(update_customer)
+    assign_nfc_badge = staticmethod(assign_nfc_badge)
+    deposit_store_credit = staticmethod(deposit_store_credit)
+    redeem_store_credit = staticmethod(redeem_store_credit)
+    sanitize_nfc_uid = staticmethod(sanitize_nfc_uid)
+

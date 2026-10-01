@@ -125,7 +125,8 @@ def pos_register_view():
         default_pos_view=default_pos_view,
         has_canvas_switcher=has_canvas_switcher,
         canvases=canvases,
-        addon_workspaces=addon_workspaces
+        addon_workspaces=addon_workspaces,
+        registered_workspaces=addon_workspaces
     )
 
 

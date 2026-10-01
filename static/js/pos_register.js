@@ -135,22 +135,25 @@
     // 2. Pluggable Workspace Canvas Swapping
     // -------------------------------------------------------------------------
     function initCanvasSwitcher() {
-        const tabButtons = document.querySelectorAll('.workspace-tab-btn, .btn-canvas-toggle');
+        const tabButtons = document.querySelectorAll('.workspace-toggle, .workspace-tab-btn, .btn-canvas-toggle');
         const panes = document.querySelectorAll('.workspace-pane, .canvas-view');
 
         tabButtons.forEach(btn => {
             btn.addEventListener('click', function (e) {
                 e.preventDefault();
+                const paneId = btn.getAttribute('data-pane');
                 let targetSelector = btn.getAttribute('data-target');
                 let canvasId = btn.getAttribute('data-canvas');
                 
-                if (!targetSelector && canvasId) {
+                if (paneId) {
+                    targetSelector = `#${paneId}`;
+                } else if (!targetSelector && canvasId) {
                     targetSelector = (canvasId === 'default-retail') 
-                        ? '#canvas-default-retail' 
-                        : `#canvas-addon-${canvasId.replace(/^addon-/, '')}`;
+                        ? '#retail-pane, #canvas-default-retail' 
+                        : `#addon-pane-${canvasId.replace(/^addon-/, '')}, #canvas-addon-${canvasId.replace(/^addon-/, '')}`;
                 }
                 if (!canvasId && targetSelector) {
-                    canvasId = targetSelector.replace('#canvas-addon-', '').replace('#canvas-', '');
+                    canvasId = targetSelector.replace('#canvas-addon-', '').replace('#addon-pane-', '').replace('#canvas-', '').replace('#', '');
                 }
 
                 // Update button active classes
@@ -171,7 +174,7 @@
 
                     // Notify addon canvas if it has an onActivate hook
                     window.dispatchEvent(new CustomEvent('pos:workspace_changed', { 
-                        detail: { target: targetSelector, canvasId: canvasId } 
+                        detail: { target: targetSelector, canvasId: canvasId, paneId: paneId } 
                     }));
                     window.dispatchEvent(new CustomEvent('openpos:canvas_switched', { 
                         detail: { canvasId: canvasId } 
@@ -181,7 +184,7 @@
         });
 
         // Initialize active workspace pane matching active button or defaultCanvas
-        const activeBtn = document.querySelector('.workspace-tab-btn.active, .btn-canvas-toggle.active');
+        const activeBtn = document.querySelector('.workspace-toggle.active, .workspace-tab-btn.active, .btn-canvas-toggle.active');
         if (activeBtn) {
             let targetSelector = activeBtn.getAttribute('data-target');
             if (!targetSelector) {

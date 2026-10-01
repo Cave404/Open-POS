@@ -9,19 +9,154 @@ import importlib.util
 import traceback
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
-from flask import Flask, Blueprint, jsonify
+from flask import Flask, Blueprint, jsonify, request
 
 from core.config import Config
 from core.db import get_db_connection, execute_sql
 from core.settings import get_setting, set_setting
 from core.notifications import add_alert
+from core.events import event_bus
+from core.services.cart_service import CartService
+from core.services.customer_service import CustomerService
+from core.addons.validator import validate_addon_manifest
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("openpos.addons")
+
+# Global Active Addons Registry
+ACTIVE_ADDONS: Dict[str, Dict[str, Any]] = {}
+
+def get_core_context():
+    return {
+        "cart": CartService,
+        "customers": CustomerService,
+        "events": event_bus,
+        "config": Config,
+        "version": Config.VERSION
+    }
+
+def discover_addons():
+    addons_dir = os.path.join(Config.DATA_DIR, "custom_addons")
+    if not os.path.exists(addons_dir):
+        os.makedirs(addons_dir, exist_ok=True)
+        return []
+
+    discovered = []
+    for item in os.listdir(addons_dir):
+        full_path = os.path.join(addons_dir, item)
+        if os.path.isdir(full_path):
+            discovered.append(full_path)
+    return discovered
+
+def load_single_addon(addon_path: str, app=None):
+    valid, message = validate_addon_manifest(addon_path)
+    dir_name = os.path.basename(os.path.normpath(addon_path))
+
+    if not valid:
+        logger.error(f"Addon '{dir_name}' failed validation: {message}")
+        ACTIVE_ADDONS[dir_name] = {
+            "id": dir_name,
+            "status": "failed",
+            "error": message,
+            "manifest": {}
+        }
+        return False
+
+    with open(os.path.join(addon_path, "manifest.json"), "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    addon_id = manifest["id"]
+    entrypoint_str = manifest.get("entrypoint", "plugin:setup_addon")
+    if ":" in entrypoint_str:
+        module_file, func_name = entrypoint_str.split(":", 1)
+    else:
+        module_file = entrypoint_str[:-3] if entrypoint_str.endswith(".py") else entrypoint_str
+        func_name = None
+
+    module_path = os.path.join(addon_path, f"{module_file}.py")
+    if not os.path.exists(module_path):
+        err = f"Entrypoint file '{module_file}.py' not found"
+        logger.error(err)
+        ACTIVE_ADDONS[addon_id] = {"id": addon_id, "status": "failed", "error": err, "manifest": manifest}
+        return False
+
+    try:
+        package_name = f"data.custom_addons.{addon_id}"
+        spec = importlib.util.spec_from_file_location(
+            f"{package_name}.{module_file}",
+            module_path,
+            submodule_search_locations=[addon_path]
+        )
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot create module spec for '{module_path}'")
+
+        module = importlib.util.module_from_spec(spec)
+        module.__package__ = package_name
+        module.__path__ = [addon_path]
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+
+        target_app = app or getattr(addon_manager, "app", None)
+
+        if func_name:
+            entry_func = getattr(module, func_name, None)
+            if not entry_func:
+                raise AttributeError(f"Entrypoint function '{func_name}' not defined in {module_file}.py")
+
+            if target_app:
+                context = get_core_context()
+                entry_func(target_app, context)
+        elif target_app:
+            context = get_core_context()
+            if hasattr(module, "setup_addon") and callable(module.setup_addon):
+                module.setup_addon(target_app, context)
+            elif hasattr(module, "register_addon") and callable(module.register_addon):
+                module.register_addon(target_app)
+            elif hasattr(module, "setup") and callable(module.setup):
+                module.setup(target_app)
+
+        if target_app:
+            bp = getattr(module, 'blueprint', None) or getattr(module, 'addon_bp', None) or getattr(module, 'bp', None)
+            if bp is None:
+                for attr_name in dir(module):
+                    val = getattr(module, attr_name, None)
+                    if isinstance(val, Blueprint):
+                        bp = val
+                        break
+
+            if bp and bp.name not in target_app.blueprints:
+                prefix = f"/addon/{addon_id}"
+                target_app.register_blueprint(bp, url_prefix=prefix)
+
+        ACTIVE_ADDONS[addon_id] = {
+            "id": addon_id,
+            "status": "active",
+            "manifest": manifest,
+            "module": module,
+            "error": None
+        }
+        logger.info(f"Addon '{addon_id}' loaded successfully.")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to initialize addon '{addon_id}': {e}", exc_info=True)
+        ACTIVE_ADDONS[addon_id] = {
+            "id": addon_id,
+            "status": "failed",
+            "error": str(e),
+            "manifest": manifest
+        }
+        return False
+
+def init_addons(app):
+    discovered = discover_addons()
+    for addon_dir in discovered:
+        load_single_addon(addon_dir, app)
 
 # Addon runtime states
 STATE_ACTIVE = "ACTIVE"
 STATE_DISABLED = "DISABLED"
 STATE_ERROR = "ERROR"
+
 
 class HookBus:
     """
@@ -234,8 +369,22 @@ class AddonManager:
 
             if record.enabled:
                 record.status = STATE_ACTIVE
+                ACTIVE_ADDONS[addon_id] = {
+                    "id": addon_id,
+                    "status": "active",
+                    "manifest": manifest,
+                    "module": record.module,
+                    "error": None
+                }
             else:
                 record.status = STATE_DISABLED
+                ACTIVE_ADDONS[addon_id] = {
+                    "id": addon_id,
+                    "status": "disabled",
+                    "manifest": manifest,
+                    "module": record.module,
+                    "error": None
+                }
                 self.hook_bus.unregister_for_addon(addon_id)
 
             logger.info(f"Addon '{addon_id}' loaded successfully (status: {record.status}).")
@@ -246,11 +395,18 @@ class AddonManager:
             record.status = STATE_ERROR
             record.error = err_msg
             record.traceback = tb
+            ACTIVE_ADDONS[addon_id] = {
+                "id": addon_id,
+                "status": "failed",
+                "error": err_msg,
+                "manifest": manifest
+            }
             logger.error(f"Error initializing addon '{addon_id}': {err_msg}\n{tb}")
             add_alert("ERROR", f"Addon '{addon_id}' failed: {err_msg}", subsystem="ADDONS")
             self.hook_bus.unregister_for_addon(addon_id)
 
         return record
+
 
     def _validate_manifest(self, manifest: Dict[str, Any]) -> None:
         """Validates the addon manifest schema against the OpenPOS Addon Specification."""
@@ -413,11 +569,18 @@ class AddonManager:
         else:
             package_name = f"addons.{record.id}"
 
-        entrypoint_file = os.path.join(record.dir_path, record.entrypoint)
+        ep_raw = record.entrypoint
+        if ":" in ep_raw:
+            ep_file_part = ep_raw.split(":")[0]
+            entrypoint_file = os.path.join(record.dir_path, f"{ep_file_part}.py" if not ep_file_part.endswith(".py") else ep_file_part)
+        else:
+            entrypoint_file = os.path.join(record.dir_path, f"{ep_raw}.py" if not ep_raw.endswith(".py") else ep_raw)
+
         if not os.path.isfile(entrypoint_file):
             raise FileNotFoundError(
                 f"Addon entrypoint file '{record.entrypoint}' not found at {entrypoint_file}"
             )
+
 
         # ── 4. Invalidate all stale cached modules for this addon namespace
         stale = [
@@ -484,7 +647,16 @@ class AddonManager:
 
         # ── 6. Call optional addon initialisation hooks
         if target_app is not None:
-            if hasattr(module, "register_addon") and callable(module.register_addon):
+            context = get_core_context()
+            entrypoint_str = record.manifest.get("entrypoint", "")
+            if ":" in entrypoint_str:
+                _, func_name = entrypoint_str.split(":", 1)
+                entry_func = getattr(module, func_name, None)
+                if callable(entry_func):
+                    entry_func(target_app, context)
+            elif hasattr(module, "setup_addon") and callable(module.setup_addon):
+                module.setup_addon(target_app, context)
+            elif hasattr(module, "register_addon") and callable(module.register_addon):
                 module.register_addon(target_app)
             elif hasattr(module, "setup") and callable(module.setup):
                 module.setup(target_app)
@@ -519,12 +691,6 @@ class AddonManager:
             return
 
         # ── 8. Blueprint registration / deferral
-        #
-        # If the Flask engine is live (already serving requests) or the blueprint
-        # has already been registered on this app, attempting to register or add
-        # before_request hooks raises Flask's AssertionError.  Skip registration
-        # and set reload_required so the caller can return {reload_required: true}
-        # and trigger a WSGI reload.
         is_live = getattr(target_app, '_got_first_request', False) or (bp.name in target_app.blueprints)
         if is_live:
             record.reload_required = True
@@ -535,7 +701,8 @@ class AddonManager:
             return
 
         if bp.name not in target_app.blueprints:
-            prefix = f"/addons/{record.id}"
+            canonical_prefix = f"/addon/{record.id}"
+            legacy_prefix = f"/addons/{record.id}"
             addon_id_capture = record.id
 
             def make_guard(a_id: str):
@@ -550,14 +717,40 @@ class AddonManager:
 
             try:
                 bp.before_request(make_guard(addon_id_capture))
-                target_app.register_blueprint(bp, url_prefix=prefix)
+                target_app.register_blueprint(bp, url_prefix=canonical_prefix)
                 logger.info(
-                    f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{prefix}'."
+                    f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{canonical_prefix}'."
                 )
+
+                # Register legacy /addons/<addon_id> route alias for backwards compatibility
+                if not hasattr(target_app, "_openpos_addon_aliases"):
+                    target_app._openpos_addon_aliases = set()
+                if legacy_prefix not in target_app._openpos_addon_aliases:
+                    target_app._openpos_addon_aliases.add(legacy_prefix)
+                    def _create_legacy_dispatcher(addon_prefix):
+                        def _legacy_route(subpath=""):
+                            target_path = f"{addon_prefix}/{subpath}" if subpath else addon_prefix
+                            with target_app.test_request_context(path=target_path, method=request.method, query_string=request.query_string):
+                                return target_app.full_dispatch_request()
+                        return _legacy_route
+                    
+                    target_app.add_url_rule(
+                        f"{legacy_prefix}/<path:subpath>",
+                        endpoint=f"legacy_alias_{record.id}",
+                        view_func=_create_legacy_dispatcher(canonical_prefix),
+                        methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
+                    )
+                    target_app.add_url_rule(
+                        legacy_prefix,
+                        endpoint=f"legacy_alias_root_{record.id}",
+                        view_func=_create_legacy_dispatcher(canonical_prefix),
+                        methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
+                    )
             except Exception as bpe:
                 logger.warning(
                     f"Could not register blueprint '{bp.name}' for addon '{record.id}': {bpe}"
                 )
+
 
     def _register_hooks(self, record: AddonRecord) -> None:
         """Extracts and registers lifecycle hook listeners defined in the addon entrypoint."""
@@ -601,9 +794,14 @@ class AddonManager:
             else:
                 rec.status = STATE_ACTIVE
                 self._register_hooks(rec)
+                if addon_id in ACTIVE_ADDONS:
+                    ACTIVE_ADDONS[addon_id]["status"] = "active"
         else:
             rec.status = STATE_DISABLED
             self.hook_bus.unregister_for_addon(addon_id)
+            if addon_id in ACTIVE_ADDONS:
+                ACTIVE_ADDONS[addon_id]["status"] = "disabled"
+
 
         return {
             "success": True,

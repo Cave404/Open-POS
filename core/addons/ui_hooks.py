@@ -70,52 +70,114 @@ def get_active_ui_extensions() -> List[Dict[str, Any]]:
     return active_exts
 
 
+from core.addons.loader import ACTIVE_ADDONS
+
+
+def _sync_active_addons():
+    """Ensure ACTIVE_ADDONS reflects loaded addons from addon_manager if populated."""
+    try:
+        from core.addons.loader import ACTIVE_ADDONS, addon_manager
+        if hasattr(addon_manager, 'addons'):
+            for aid, rec in addon_manager.addons.items():
+                if aid not in ACTIVE_ADDONS or ACTIVE_ADDONS[aid].get("status") not in ("active", "failed"):
+                    st = "active" if getattr(rec, "status", None) == "ACTIVE" else str(getattr(rec, "status", "disabled")).lower()
+                    ACTIVE_ADDONS[aid] = {
+                        "id": aid,
+                        "status": st,
+                        "manifest": getattr(rec, "manifest", {}) or {},
+                        "module": getattr(rec, "module", None),
+                        "error": getattr(rec, "error", None)
+                    }
+                elif hasattr(rec, "status") and rec.status == "ACTIVE":
+                    ACTIVE_ADDONS[aid]["status"] = "active"
+                    if getattr(rec, "manifest", None):
+                        ACTIVE_ADDONS[aid]["manifest"] = rec.manifest
+    except Exception:
+        pass
+
+
 def get_registered_workspaces() -> List[Dict[str, Any]]:
     """
     Inspects active addon manifests to discover registered canvas workspaces.
     Returns list of workspace objects:
       - 'id': addon ID (e.g. 'tcg_pos')
-      - 'label': workspace tab label (e.g. '🃏 TCG Singles & Intake')
-      - 'icon_html': icon html or emoji string (e.g. '🃏')
-      - 'template_path': template relative path to include (e.g. 'tcg_pos/canvas.html')
+      - 'label': workspace tab label
+      - 'icon': canvas icon class (e.g. 'bi-terminal')
+      - 'template_path': template relative path to include (e.g. 'sample_addon/canvas.html')
+      - 'standalone_url': primary standalone url under /addon/<addon_id>/
     """
+    _sync_active_addons()
     workspaces = []
-    for ext in get_active_ui_extensions():
-        addon_id = ext["addon_id"]
-        manifest = ext.get("manifest", {})
-        ui_ext = ext.get("ui_extensions", {})
-
-        provides_canvas = (
-            ui_ext.get("provides_canvas") is True or
-            ui_ext.get("mode") == "canvas_replace" or
-            bool(ui_ext.get("canvas_template")) or
-            bool(ui_ext.get("canvas_label"))
-        )
-        if not provides_canvas:
+    for addon_id, record in ACTIVE_ADDONS.items():
+        if record.get("status") != "active":
             continue
 
-        raw_label = ui_ext.get("canvas_label") or manifest.get("name") or ext.get("name", addon_id)
-        icon_html = ui_ext.get("icon_html")
-        if not icon_html:
-            first_char = raw_label.strip()[:1] if raw_label else ""
-            if first_char and ord(first_char) > 127:
-                icon_html = ""
+        manifest = record.get("manifest", {})
+        ui_ext = manifest.get("ui_extensions", {})
+
+        if ui_ext.get("provides_canvas"):
+            raw_standalone = ui_ext.get("standalone_routes", [])
+            primary_standalone = None
+            if raw_standalone and isinstance(raw_standalone, list):
+                route_suffix = raw_standalone[0].get("path", "").lstrip("/")
+                primary_standalone = f"/addon/{addon_id}/{route_suffix}"
+            elif ui_ext.get("standalone_route"):
+                sr = ui_ext.get("standalone_route")
+                if sr.startswith("/addon/") or sr.startswith("http") or sr.startswith("/"):
+                    primary_standalone = sr
+                else:
+                    primary_standalone = f"/addon/{addon_id}/{sr.lstrip('/')}"
+
+            canvas_label = ui_ext.get("canvas_label", manifest.get("name", addon_id))
+            canvas_icon = ui_ext.get("canvas_icon", "bi-puzzle")
+            icon_html = ui_ext.get("icon_html", f'<i class="bi {canvas_icon}"></i>')
+            tmpl = ui_ext.get("canvas_template", "canvas.html")
+            if not tmpl.startswith(f"{addon_id}/") and not tmpl.startswith(f"{addon_id}\\"):
+                template_path = f"{addon_id}/{tmpl}".replace('\\', '/')
             else:
-                icon_html = "🧩"
+                template_path = tmpl.replace('\\', '/')
 
-        tmpl = ui_ext.get("canvas_template", "canvas.html")
-        if tmpl.startswith(f"{addon_id}/") or tmpl.startswith(f"{addon_id}\\"):
-            template_path = tmpl.replace('\\', '/')
-        else:
-            template_path = f"{addon_id}/{tmpl}".replace('\\', '/')
-
-        workspaces.append({
-            "id": addon_id,
-            "label": raw_label,
-            "icon_html": icon_html,
-            "template_path": template_path
-        })
+            workspaces.append({
+                "id": addon_id,
+                "label": canvas_label,
+                "icon": canvas_icon,
+                "icon_html": icon_html,
+                "template_path": template_path,
+                "standalone_url": primary_standalone
+            })
     return workspaces
+
+
+def get_registered_slot_actions(slot_name: str) -> List[Dict[str, Any]]:
+    """
+    Extracts registered slot actions for the requested slot name across all active addons.
+    Ensures targets are prefixed with /addon/<addon_id>/.
+    """
+    _sync_active_addons()
+    actions = []
+    for addon_id, record in ACTIVE_ADDONS.items():
+        if record.get("status") != "active":
+            continue
+
+        manifest = record.get("manifest", {})
+        ui_ext = manifest.get("ui_extensions", {})
+        slots = ui_ext.get("slots", [])
+
+        for s in slots:
+            if s.get("slot") == slot_name:
+                target_url = s.get("target", "")
+                if not target_url.startswith("/addon/") and not target_url.startswith("http"):
+                    target_url = f"/addon/{addon_id}/{target_url.lstrip('/')}"
+
+                actions.append({
+                    "addon_id": addon_id,
+                    "label": s.get("label", manifest.get("name")),
+                    "action": s.get("action", "navigate"),
+                    "target": target_url,
+                    "icon": s.get("icon", "bi-arrow-right-circle")
+                })
+    return actions
+
 
 
 def has_addon_canvas() -> bool:
