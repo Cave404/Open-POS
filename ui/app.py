@@ -83,6 +83,9 @@ def create_app():
 
     @app.route('/')
     def index():
+        sentinel_path = os.path.join(Config.DATA_DIR, "config", ".setup_complete")
+        if not os.path.exists(sentinel_path) and not app.config.get("TESTING"):
+            return redirect('/setup')
         return redirect('/pos')
 
     @app.route('/setup')

@@ -158,7 +158,25 @@ class JSBridge:
             return {"status": "error", "message": str(e)}
 
 
+import argparse
+from core.services.provisioning_service import run_headless_provisioning
+
+
+def parse_cli():
+    parser = argparse.ArgumentParser(description="OpenPOS Runner")
+    parser.add_argument("--provision", action="store_true", help="Run silent store provisioning and exit")
+    parser.add_argument("--store-name", type=str, default="OpenPOS Store", help="Business name")
+    parser.add_argument("--admin-pin", type=str, default="1234", help="Master security PIN")
+    parser.add_argument("--db-engine", type=str, default="sqlite", help="sqlite or postgres")
+    return parser.parse_known_args()
+
+
 def main():
+    args, _ = parse_cli()
+    if args.provision:
+        success = run_headless_provisioning(args.store_name, args.admin_pin, args.db_engine)
+        sys.exit(0 if success else 1)
+
     logger, _ = setup_system_logger()
     logger.info("Initializing OpenPOS subsystems...")
 

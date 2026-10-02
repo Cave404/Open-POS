@@ -24,7 +24,7 @@ hiddenimports = [
     "hardware",
     "storage",
     "ui"
-] + collect_submodules("ui.routes") + collect_submodules("core.addons")
+] + collect_submodules("ui.routes") + collect_submodules("core.addons") + collect_submodules("core.services")
 
 a = Analysis(
     [os.path.join(project_root, "run.py")],

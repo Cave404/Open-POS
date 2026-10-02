@@ -70,6 +70,30 @@ def isolate_test_environment(monkeypatch, tmp_path):
     except Exception:
         pass
 
+    # Ensure tests by default do not inherit a persistent locked state from a provisioned dev environment
+    import json
+    test_auth_file = str(tmp_path / "default_unlocked_auth.json")
+    with open(test_auth_file, "w", encoding="utf-8") as f:
+        json.dump({
+            "require_password": False,
+            "password_hash": "",
+            "salt": "",
+            "protected_sections": ["branding", "database", "admin"],
+            "bypass_manager_on_boot": False
+        }, f)
+    try:
+        monkeypatch.setattr("manager.routes.AUTH_CONFIG_PATH", test_auth_file)
+    except Exception:
+        pass
+    try:
+        monkeypatch.setattr("core.setup.wizard.AUTH_CONFIG_PATH", test_auth_file)
+    except Exception:
+        pass
+    try:
+        monkeypatch.setattr("core.services.security_service.AUTH_CONFIG_PATH", test_auth_file)
+    except Exception:
+        pass
+
     # Initialize clean isolated schema in the test database
     init_db()
 

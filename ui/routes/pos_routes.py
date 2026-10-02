@@ -76,9 +76,26 @@ def _get_active_cart_id() -> str:
 # -----------------------------------------------------------------------------
 # HTML UI Register Views
 # -----------------------------------------------------------------------------
+@pos_bp.route('/', methods=['GET'])
+def root_pos_redirect():
+    """
+    Directs to /pos or the register screen.
+    When .setup_complete is present, immediately redirects directly to /pos.
+    Retains /setup as a fallback for developer manual installs running raw Python scripts.
+    """
+    sentinel_path = os.path.join(Config.DATA_DIR, "config", ".setup_complete")
+    if not os.path.exists(sentinel_path) and not current_app.config.get("TESTING"):
+        return redirect('/setup')
+    return redirect('/pos')
+
+
 @pos_bp.route('/pos', methods=['GET'])
 def pos_register_view():
     """Renders the Core POS Register UI with the active default canvas."""
+    sentinel_path = os.path.join(Config.DATA_DIR, "config", ".setup_complete")
+    if not os.path.exists(sentinel_path) and not current_app.config.get("TESTING"):
+        return redirect('/setup')
+
     default_pos_view = get_setting('default_pos_view', 'default-retail')
     store_name = get_setting('store_name', 'Open-POS System')
     store_logo_url = get_setting('store_logo_url', '')

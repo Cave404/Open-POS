@@ -132,3 +132,49 @@ def verify_admin_pin(pin: str) -> bool:
             return True
 
     return False
+
+
+def set_admin_pin(admin_pin: str) -> bool:
+    """
+    Sets and persists the administrator master PIN across manager_auth.json,
+    auth.json, and admin_pin.hash.
+    """
+    if not admin_pin:
+        return False
+    pin_str = str(admin_pin).strip()
+    if not pin_str:
+        return False
+
+    import secrets
+    pwd_salt = secrets.token_hex(16)
+    pwd_hash = hashlib.sha256((pwd_salt + pin_str).encode('utf-8')).hexdigest()
+
+    auth_data = {
+        "require_password": True,
+        "password_hash": pwd_hash,
+        "salt": pwd_salt,
+        "protected_sections": ["branding", "database", "admin"],
+        "bypass_manager_on_boot": False
+    }
+
+    # 1. Write to active manager_auth.json path
+    auth_path = get_auth_config_path()
+    os.makedirs(os.path.dirname(auth_path), exist_ok=True)
+    with open(auth_path, 'w', encoding='utf-8') as f:
+        json.dump(auth_data, f, indent=2)
+
+    # Also write to data/config/auth.json for cross-compatibility
+    alt_auth_path = os.path.join(os.path.dirname(auth_path), 'auth.json')
+    try:
+        with open(alt_auth_path, 'w', encoding='utf-8') as f:
+            json.dump(auth_data, f, indent=2)
+    except Exception:
+        pass
+
+    # 2. Write admin_pin.hash
+    pin_file = get_pin_hash_path()
+    os.makedirs(os.path.dirname(pin_file), exist_ok=True)
+    with open(pin_file, 'w', encoding='utf-8') as pf:
+        pf.write(hashlib.sha256(pin_str.encode('utf-8')).hexdigest())
+
+    return True
