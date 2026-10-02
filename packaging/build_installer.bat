@@ -22,13 +22,18 @@ if not exist "dist\OpenPOS\OpenPOS.exe" (
 )
 
 echo [3/3] Compiling Inno Setup Windows Installer...
-set "ISCC_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-if not exist "%ISCC_PATH%" (
-    set "ISCC_PATH=C:\Program Files\Inno Setup 6\ISCC.exe"
+set "ISCC_PATH="
+if exist "C:\Program Files\Inno Setup 7\ISCC.exe" set "ISCC_PATH=C:\Program Files\Inno Setup 7\ISCC.exe"
+if not defined ISCC_PATH if exist "C:\Program Files (x86)\Inno Setup 7\ISCC.exe" set "ISCC_PATH=C:\Program Files (x86)\Inno Setup 7\ISCC.exe"
+if not defined ISCC_PATH if exist "C:\Program Files\Inno Setup 6\ISCC.exe" set "ISCC_PATH=C:\Program Files\Inno Setup 6\ISCC.exe"
+if not defined ISCC_PATH if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+if not defined ISCC_PATH (
+    for /f "delims=" %%I in ('where ISCC.exe 2^>nul') do set "ISCC_PATH=%%I"
 )
 
-if exist "%ISCC_PATH%" (
-    "%ISCC_PATH%" packaging\installer.iss
+if defined ISCC_PATH (
+    echo Using Inno Setup Compiler at: "!ISCC_PATH!"
+    "!ISCC_PATH!" packaging\installer.iss
     if %ERRORLEVEL% neq 0 (
         echo Error: Inno Setup compilation failed.
         exit /b %ERRORLEVEL%
@@ -36,7 +41,7 @@ if exist "%ISCC_PATH%" (
     echo Successfully generated installer in dist_installer\
 ) else (
     echo Warning: ISCC.exe not found. PyInstaller distribution generated, but Setup.exe was skipped.
-    echo Install Inno Setup 6 to generate Setup.exe automatically.
+    echo Install Inno Setup 6 or 7 to generate Setup.exe automatically.
 )
 
 echo Build process complete.

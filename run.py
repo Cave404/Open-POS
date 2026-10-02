@@ -34,6 +34,9 @@ class JSBridge:
     context via window.pywebview.api.<method>().
     """
 
+    def __init__(self, window=None):
+        self._window = window
+
     def save_recovery_file(self, content: str, filename: str = 'OpenPOS_Emergency_Recovery.txt') -> dict:
         try:
             win = getattr(self, '_window', None) or (webview.windows[0] if webview.windows else None)

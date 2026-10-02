@@ -283,14 +283,15 @@ class AddonManager:
     def get_search_directories(self) -> List[tuple]:
         """
         Returns list of (directory_path, dir_type) to scan.
-        Scans both built-in Open-POS/addons and user data/custom_addons.
+        Scans both built-in Open-POS/addons (if present) and user data/custom_addons.
         """
+        dirs = []
         builtin_dir = os.path.abspath(os.path.join(Config.BASE_DIR, 'addons'))
+        if os.path.isdir(builtin_dir):
+            dirs.append((builtin_dir, "builtin"))
         custom_dir = getattr(Config, 'CUSTOM_ADDONS_DIR', os.path.join(Config.DATA_DIR, 'custom_addons'))
-        return [
-            (builtin_dir, "builtin"),
-            (custom_dir, "custom")
-        ]
+        dirs.append((custom_dir, "custom"))
+        return dirs
 
     def discover_and_load_all(self) -> Dict[str, AddonRecord]:
         """
@@ -299,10 +300,11 @@ class AddonManager:
         """
         for scan_dir, dir_type in self.get_search_directories():
             if not os.path.isdir(scan_dir):
-                try:
-                    os.makedirs(scan_dir, exist_ok=True)
-                except Exception as e:
-                    logger.warning(f"Could not create addons directory {scan_dir}: {e}")
+                if dir_type == "custom":
+                    try:
+                        os.makedirs(scan_dir, exist_ok=True)
+                    except Exception as e:
+                        logger.warning(f"Could not create addons directory {scan_dir}: {e}")
                 continue
 
             for entry in os.listdir(scan_dir):
@@ -716,35 +718,24 @@ class AddonManager:
                 return _guard
 
             try:
-                bp.before_request(make_guard(addon_id_capture))
-                target_app.register_blueprint(bp, url_prefix=canonical_prefix)
-                logger.info(
-                    f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{canonical_prefix}'."
-                )
+                if not getattr(bp, "_openpos_guarded", False):
+                    try:
+                        bp.before_request(make_guard(addon_id_capture))
+                        bp._openpos_guarded = True
+                    except AssertionError:
+                        pass
 
-                # Register legacy /addons/<addon_id> route alias for backwards compatibility
-                if not hasattr(target_app, "_openpos_addon_aliases"):
-                    target_app._openpos_addon_aliases = set()
-                if legacy_prefix not in target_app._openpos_addon_aliases:
-                    target_app._openpos_addon_aliases.add(legacy_prefix)
-                    def _create_legacy_dispatcher(addon_prefix):
-                        def _legacy_route(subpath=""):
-                            target_path = f"{addon_prefix}/{subpath}" if subpath else addon_prefix
-                            with target_app.test_request_context(path=target_path, method=request.method, query_string=request.query_string):
-                                return target_app.full_dispatch_request()
-                        return _legacy_route
-                    
-                    target_app.add_url_rule(
-                        f"{legacy_prefix}/<path:subpath>",
-                        endpoint=f"legacy_alias_{record.id}",
-                        view_func=_create_legacy_dispatcher(canonical_prefix),
-                        methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
+                if bp.name not in target_app.blueprints:
+                    target_app.register_blueprint(bp, url_prefix=canonical_prefix)
+                    logger.info(
+                        f"Mounted blueprint '{bp.name}' for addon '{record.id}' at '{canonical_prefix}'."
                     )
-                    target_app.add_url_rule(
-                        legacy_prefix,
-                        endpoint=f"legacy_alias_root_{record.id}",
-                        view_func=_create_legacy_dispatcher(canonical_prefix),
-                        methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
+
+                legacy_name = f"{bp.name}_legacy"
+                if legacy_name not in target_app.blueprints:
+                    target_app.register_blueprint(bp, name=legacy_name, url_prefix=legacy_prefix)
+                    logger.info(
+                        f"Mounted legacy blueprint alias '{legacy_name}' for addon '{record.id}' at '{legacy_prefix}'."
                     )
             except Exception as bpe:
                 logger.warning(

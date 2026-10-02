@@ -893,7 +893,14 @@ def _is_route_registered(url_path: str) -> bool:
         from flask import current_app
         adapter = current_app.url_map.bind('localhost')
         path_only = url_path.split('?')[0]
-        adapter.match(path_only)
+        endpoint, _ = adapter.match(path_only)
+        if endpoint.startswith("legacy_alias_"):
+            canonical_path = path_only.replace("/addons/", "/addon/", 1)
+            try:
+                can_endpoint, _ = adapter.match(canonical_path)
+                return not can_endpoint.startswith("legacy_alias_")
+            except Exception:
+                return False
         return True
     except Exception:
         return False
@@ -905,7 +912,13 @@ def list_applets():
     Returns a dynamic list of built-in applets and discovered addon manifests.
     Ensures any addon without a valid route points safely to fallback placeholder.
     """
-    applets = list(BUILTIN_APPLETS)
+    applets = []
+    for a in BUILTIN_APPLETS:
+        item = dict(a)
+        if "name" not in item:
+            item["name"] = item.get("title", "")
+        applets.append(item)
+
     from core.addons import addon_manager
     for addon in addon_manager.get_all_addons():
         if not any(a["id"] == addon["id"] for a in BUILTIN_APPLETS):
@@ -913,7 +926,8 @@ def list_applets():
             target_url = raw_target if _is_route_registered(raw_target) else f"/manager/placeholder/{addon['id']}"
             applets.append({
                 "id": addon["id"],
-                "title": addon["name"],
+                "name": addon.get("name", addon.get("id")),
+                "title": addon.get("name", addon.get("id")),
                 "category": addon.get("category", "Addons"),
                 "icon": addon.get("icon", "generic_app.png"),
                 "target": target_url,

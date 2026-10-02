@@ -134,7 +134,7 @@ def run_boot_sequence(
             boot_log["database"]["settings_count"] = settings_count
 
         _notify(60, "Verifying local card art cache...")
-        cache_dir = os.path.join(BASE_DIR, 'static', 'card_cache')
+        cache_dir = os.path.join(BASE_DIR, 'ui', 'static', 'card_cache')
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir, exist_ok=True)
         boot_log["database"]["cache_directory"] = cache_dir

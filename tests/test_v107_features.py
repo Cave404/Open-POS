@@ -214,7 +214,12 @@ def test_branding_template_is_generic_retail(client):
 
 def test_decoupled_tcg_rules_schema_file():
     """Asserts that addons/tcg_pos/default_rules.json exists with proper trade-in and condition rules."""
-    tcg_rules_path = os.path.join(Config.BASE_DIR, "addons", "tcg_pos", "default_rules.json")
+    candidates = [
+        os.path.join(Config.CUSTOM_ADDONS_DIR, "tcg_pos", "default_rules.json"),
+        os.path.join(Config.DATA_DIR, "custom_addons", "tcg_pos", "default_rules.json"),
+        os.path.join(Config.BASE_DIR, "addons", "tcg_pos", "default_rules.json"),
+    ]
+    tcg_rules_path = next((c for c in candidates if os.path.isfile(c)), candidates[0])
     assert os.path.isfile(tcg_rules_path), f"TCG rules file not found at {tcg_rules_path}"
 
     with open(tcg_rules_path, "r", encoding="utf-8") as f:
