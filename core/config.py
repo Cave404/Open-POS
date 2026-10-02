@@ -1,12 +1,24 @@
 import os
+import sys
 import shutil
 from dotenv import load_dotenv
 
 # Load local .env if present
 load_dotenv()
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
+# 1. Read-Only Application Assets (Templates, Static CSS/JS, Migration SQL) vs Mutable Runtime Store Data
+if getattr(sys, "frozen", False):
+    # PyInstaller extracts/bundles assets inside _MEIPASS
+    BUNDLE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # Development mode from source
+    BUNDLE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    BASE_DIR = BUNDLE_DIR
+
+# 2. Mutable Store Data Directory (Databases, Configs, Logs, Uploads)
+# Stored alongside the executable to ensure data persistence across app updates
+DATA_DIR = os.path.join(BASE_DIR, "data")
 DB_DIR = os.path.join(DATA_DIR, 'db')
 CACHE_DIR = os.path.join(DATA_DIR, 'cache')
 UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
@@ -14,6 +26,7 @@ LOGS_DIR = os.path.join(DATA_DIR, 'logs')
 CUSTOM_ADDONS_DIR = os.path.join(DATA_DIR, 'custom_addons')
 CONFIG_DIR = os.path.join(DATA_DIR, 'config')
 BACKUP_DIR = os.path.join(DATA_DIR, 'backups')
+ADDONS_CONFIG_DIR = os.path.join(CONFIG_DIR, 'addons')
 
 # Priority: Load environment variables from data/config/.env first, falling back to root .env
 env_path = os.path.join(CONFIG_DIR, '.env')
@@ -59,13 +72,12 @@ if not persistent_secret:
 
 class Config:
     VERSION = "v1.0.9"
-    SECRET_KEY = persistent_secret or os.environ.get('SECRET_KEY', 'default_openpos_secret_key')
-    FERNET_KEY = os.environ.get('FERNET_KEY', '')
-    HOST = os.environ.get('HOST', '0.0.0.0')
-    PORT = int(os.environ.get('PORT', 5000))
 
-    # Isolated Private Data Paths
+    # 1. Read-Only Application Assets (Templates, Static CSS/JS, Migration SQL)
+    BUNDLE_DIR = BUNDLE_DIR
     BASE_DIR = BASE_DIR
+
+    # 2. Mutable Store Data Directory (Databases, Configs, Logs, Uploads)
     DATA_DIR = DATA_DIR
     DB_DIR = DB_DIR
     CACHE_DIR = CACHE_DIR
@@ -73,9 +85,22 @@ class Config:
     LOGS_DIR = LOGS_DIR
     CUSTOM_ADDONS_DIR = CUSTOM_ADDONS_DIR
     CONFIG_DIR = CONFIG_DIR
-    ADDONS_CONFIG_DIR = os.path.join(CONFIG_DIR, 'addons')
+    ADDONS_CONFIG_DIR = ADDONS_CONFIG_DIR
     BACKUP_DIR = BACKUP_DIR
     REQUIRED_DATA_DIRS = REQUIRED_DATA_DIRS
+
+    PORT = int(os.environ.get('PORT', 5000))
+    DEBUG = False
+
+    @classmethod
+    def init_directories(cls):
+        """Ensures all runtime data folders exist on startup."""
+        for sub in ["db", "config", "logs", "custom_addons", "backups", "uploads", "cache"]:
+            os.makedirs(os.path.join(cls.DATA_DIR, sub), exist_ok=True)
+
+    SECRET_KEY = persistent_secret or os.environ.get('SECRET_KEY', 'default_openpos_secret_key')
+    FERNET_KEY = os.environ.get('FERNET_KEY', '')
+    HOST = os.environ.get('HOST', '0.0.0.0')
 
     # Database Settings
     DB_ENGINE = os.environ.get('DB_ENGINE', 'sqlite').lower()

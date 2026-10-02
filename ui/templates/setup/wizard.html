@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenPOS - Initial Setup & Security Initialization</title>
+    <!-- Use url_for to guarantee resolution inside compiled PyInstaller bundle -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .setup-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 680px;
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+        }
+        .setup-header {
+            background: #21262d;
+            border-bottom: 1px solid #30363d;
+            padding: 1.25rem 1.5rem;
+        }
+        .step-pill {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            background: #30363d;
+            color: #8b949e;
+        }
+        .step-pill.active {
+            background: #1f6feb;
+            color: #ffffff;
+        }
+        .form-control, .form-select {
+            background-color: #0d1117 !important;
+            border: 1px solid #30363d !important;
+            color: #f0f6fc !important;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #58a6ff !important;
+            box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.25) !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-card">
+        <div class="setup-header d-flex align-items-center justify-content-between">
+            <div>
+                <h5 class="fw-bold mb-0 text-white">OpenPOS Setup Wizard</h5>
+                <small class="text-muted">Initial Store & Cryptographic Provisioning</small>
+            </div>
+            <span class="badge bg-primary">v{{ config_version or '1.0.9' }}</span>
+        </div>
+
+        <div class="p-4">
+            <div class="d-flex gap-2 mb-4">
+                <span class="step-pill active">1. Store Identity</span>
+                <span class="step-pill">2. Security & PIN</span>
+                <span class="step-pill">3. Database</span>
+                <span class="step-pill">4. Finalize</span>
+            </div>
+
+            <form id="setupWizardForm" action="/setup/complete" method="POST">
+                <div class="mb-3">
+                    <label class="form-label text-light fw-semibold">Store / Business Name</label>
+                    <input type="text" name="store_name" class="form-control" placeholder="e.g. Dragon's Lair Games" required autofocus>
+                    <div class="form-text text-muted">This will appear on customer receipts and register banners.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-light fw-semibold">Administrative Master PIN</label>
+                    <input type="password" name="admin_pin" class="form-control" placeholder="4 to 6 digit security PIN" maxlength="6" pattern="[0-9]*" required>
+                    <div class="form-text text-muted">Required to access financial reports, manager tools, and database settings.</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-light fw-semibold">Database Engine</label>
+                    <select name="database_engine" class="form-select">
+                        <option value="sqlite" selected>Local Embedded SQLite (Recommended for standalone register)</option>
+                        <option value="postgres">Centralized PostgreSQL (Multi-terminal network setup)</option>
+                    </select>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary">
+                    <button type="submit" class="btn btn-primary px-4 fw-semibold">
+                        Initialize System & Launch POS
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

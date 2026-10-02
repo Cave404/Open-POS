@@ -22,25 +22,32 @@ from core.routes.customer_routes import core_customers_bp
 from ui.routes.pos_routes import pos_bp
 from ui.routes.system_routes import system_bp
 from core.addons.ui_hooks import render_addon_hook, has_addon_canvas
-from core.logger import logger, install_global_excepthooks
+from core.logger import setup_system_logger, logger, install_global_excepthooks
 
 
 def create_app():
-    ui_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = Config.BASE_DIR
+    Config.init_directories()
+    logger, _ = setup_system_logger()
+
+    templates_path = os.path.join(Config.BUNDLE_DIR, "ui", "templates")
+    static_path = os.path.join(Config.BUNDLE_DIR, "ui", "static")
+
+    logger.info(f"Initializing Flask with templates: {templates_path}")
+    logger.info(f"Initializing Flask with static assets: {static_path}")
 
     app = Flask(
         __name__,
-        template_folder=os.path.join(ui_dir, 'templates'),
-        static_folder=os.path.join(ui_dir, 'static')
+        template_folder=templates_path,
+        static_folder=static_path,
+        static_url_path="/static"
     )
     app.config.from_object(Config)
 
     # Multi-path template loader to support ui/templates, templates, and manager/templates
     app.jinja_loader = ChoiceLoader([
-        FileSystemLoader(os.path.join(ui_dir, 'templates')),
-        FileSystemLoader(os.path.join(project_root, 'templates')),
-        FileSystemLoader(os.path.join(project_root, 'manager', 'templates')),
+        FileSystemLoader(templates_path),
+        FileSystemLoader(os.path.join(Config.BUNDLE_DIR, 'ui', 'templates', 'manager')),
+        FileSystemLoader(os.path.join(Config.BUNDLE_DIR, 'templates')),
     ])
 
     # Initialize database schema and default settings
@@ -82,6 +89,11 @@ def create_app():
     def setup_root():
         from ui.routes.manager_routes import manager_setup
         return manager_setup()
+
+    @app.route('/setup/wizard')
+    def setup_wizard_root():
+        from ui.routes.manager_routes import manager_setup_wizard
+        return manager_setup_wizard()
 
     @app.route('/auth/verify-pin', methods=['POST'])
     def auth_verify_pin_root():

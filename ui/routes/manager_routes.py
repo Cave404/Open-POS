@@ -377,6 +377,12 @@ def manager_setup():
     return render_template('setup_wizard.html', reauth_required=reauth_required)
 
 
+@manager_bp.route('/setup/wizard')
+def manager_setup_wizard():
+    """Renders the modernized setup wizard view."""
+    return render_template('setup/wizard.html', config_version=Config.VERSION.lstrip('v'))
+
+
 @manager_bp.route('/branding')
 @manager_bp.route('/settings')
 @manager_required
