@@ -203,31 +203,18 @@ def main():
     server_thread.start()
 
     try:
-        # Check if first-run onboarding setup is required
-        if not is_setup_complete():
-            webview.create_window(
-                title="OpenPOS - Initial Setup & Security Initialization",
-                url=f"http://127.0.0.1:{server_port}/setup",
-                width=1120,
-                height=800,
-                min_size=(960, 650),
-                resizable=True,
-                easy_drag=False,
-                confirm_close=False,
-                js_api=JSBridge()
-            )
-        else:
-            # Start PyWebView desktop client
-            webview.create_window(
-                title=f"OpenPOS - Register [{Config.VERSION}]",
-                url=entry_url,
-                width=1280,
-                height=800,
-                min_size=(1024, 680),
-                background_color="#0d1117",
-                js_api=JSBridge()
-            )
-        webview.start(private_mode=False)
+        # PyWebView desktop client window
+        webview.create_window(
+            title=f"OpenPOS - Register [{Config.VERSION}]",
+            url=entry_url,
+            width=1280,
+            height=800,
+            min_size=(1024, 680),
+            background_color="#0d1117",
+            js_api=JSBridge()
+        )
+        # Force edgechromium to prevent silent fallback to MSHTML/IE
+        webview.start(gui="edgechromium", private_mode=False)
     finally:
         logger.info("Shutting down peripheral dispatchers...")
         hardware_dispatcher.stop()

@@ -11,8 +11,6 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-AppSupportURL={#MyAppURL}
-AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
@@ -29,9 +27,6 @@ UsePreviousTasks=yes
 CloseApplications=yes
 CloseApplicationsFilter=*.exe
 RestartApplications=no
-
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -58,100 +53,125 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 
 [Code]
 var
-  ConfigPage: TWizardPage;
-  StoreNameEdit: TNewEdit;
-  PinEdit: TPasswordEdit;
-  DbCombo: TNewComboBox;
+  MaintenancePage: TWizardPage;
+  RadioRepair, RadioUpdate, RadioUninstall: TNewRadioButton;
+  IsMaintenanceMode: Boolean;
 
-function IsFreshInstallation(): Boolean;
+// 1. Detect if WebView2 Runtime is installed
+function IsWebView2Installed(): Boolean;
+var
+  InstalledVersion: String;
 begin
-  // Only present store configuration if .setup_complete does not already exist
-  Result := not FileExists(ExpandConstant('{app}\data\config\.setup_complete'));
+  Result := RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-991A-47C2-9A4E-A795240217C1}', 'pv', InstalledVersion) or
+            RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-991A-47C2-9A4E-A795240217C1}', 'pv', InstalledVersion);
+end;
+
+// 2. Detect if OpenPOS is already installed
+function IsAppInstalled(): Boolean;
+var
+  UninstPath: String;
+begin
+  Result := RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1', 'UninstallString', UninstPath) or
+            RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1', 'UninstallString', UninstPath);
 end;
 
 procedure InitializeWizard();
 var
-  LblStore, LblPin, LblDb: TLabel;
+  LblPrompt: TLabel;
 begin
-  ConfigPage := CreateCustomPage(wpSelectTasks, 
-    'Store Configuration & Security Setup', 
-    'Configure initial business branding and administrative access credentials.');
+  IsMaintenanceMode := IsAppInstalled();
 
-  LblStore := TLabel.Create(ConfigPage);
-  LblStore.Parent := ConfigPage.Surface;
-  LblStore.Caption := 'Store / Business Name:';
-  LblStore.Top := ScaleY(10);
-  LblStore.Left := ScaleX(0);
+  if IsMaintenanceMode then
+  begin
+    MaintenancePage := CreateCustomPage(wpWelcome, 
+      'OpenPOS Maintenance & Setup', 
+      'An existing OpenPOS installation was detected on this computer. Choose an operation.');
 
-  StoreNameEdit := TNewEdit.Create(ConfigPage);
-  StoreNameEdit.Parent := ConfigPage.Surface;
-  StoreNameEdit.Top := LblStore.Top + ScaleY(20);
-  StoreNameEdit.Left := ScaleX(0);
-  StoreNameEdit.Width := ScaleX(320);
-  StoreNameEdit.Text := 'Dragon''s Lair TCG';
+    LblPrompt := TLabel.Create(MaintenancePage);
+    LblPrompt.Parent := MaintenancePage.Surface;
+    LblPrompt.Caption := 'Select the action you wish to perform:';
+    LblPrompt.Top := ScaleY(10);
+    LblPrompt.Left := ScaleX(0);
 
-  LblPin := TLabel.Create(ConfigPage);
-  LblPin.Parent := ConfigPage.Surface;
-  LblPin.Caption := 'Administrative Master PIN (4 to 6 Digits):';
-  LblPin.Top := StoreNameEdit.Top + ScaleY(35);
-  LblPin.Left := ScaleX(0);
+    RadioRepair := TNewRadioButton.Create(MaintenancePage);
+    RadioRepair.Parent := MaintenancePage.Surface;
+    RadioRepair.Top := LblPrompt.Top + ScaleY(25);
+    RadioRepair.Left := ScaleX(10);
+    RadioRepair.Caption := 'Repair OpenPOS (Reinstall and repair missing or corrupted files)';
+    RadioRepair.Checked := True;
 
-  PinEdit := TPasswordEdit.Create(ConfigPage);
-  PinEdit.Parent := ConfigPage.Surface;
-  PinEdit.Top := LblPin.Top + ScaleY(20);
-  PinEdit.Left := ScaleX(0);
-  PinEdit.Width := ScaleX(160);
-  PinEdit.Text := '1234';
+    RadioUpdate := TNewRadioButton.Create(MaintenancePage);
+    RadioUpdate.Parent := MaintenancePage.Surface;
+    RadioUpdate.Top := RadioRepair.Top + ScaleY(28);
+    RadioUpdate.Left := ScaleX(10);
+    RadioUpdate.Caption := 'Update / Reinstall (Apply current software package)';
 
-  LblDb := TLabel.Create(ConfigPage);
-  LblDb.Parent := ConfigPage.Surface;
-  LblDb.Caption := 'Database Backend Architecture:';
-  LblDb.Top := PinEdit.Top + ScaleY(35);
-  LblDb.Left := ScaleX(0);
-
-  DbCombo := TNewComboBox.Create(ConfigPage);
-  DbCombo.Parent := ConfigPage.Surface;
-  DbCombo.Top := LblDb.Top + ScaleY(20);
-  DbCombo.Left := ScaleX(0);
-  DbCombo.Width := ScaleX(320);
-  DbCombo.Style := csDropDownList;
-  DbCombo.Items.Add('Local Embedded SQLite (Single Station)');
-  DbCombo.Items.Add('Centralized PostgreSQL (Multi-Terminal Network)');
-  DbCombo.ItemIndex := 0;
+    RadioUninstall := TNewRadioButton.Create(MaintenancePage);
+    RadioUninstall.Parent := MaintenancePage.Surface;
+    RadioUninstall.Top := RadioUpdate.Top + ScaleY(28);
+    RadioUninstall.Left := ScaleX(10);
+    RadioUninstall.Caption := 'Uninstall OpenPOS (Safely remove binaries; retains store database)';
+  end;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  // Skip custom page if OpenPOS is already provisioned on this computer
-  if (PageID = ConfigPage.ID) and (not IsFreshInstallation()) then
+  // In Maintenance Mode, skip directory and task selection if user just wants to repair or update in-place
+  if IsMaintenanceMode and (PageID = wpSelectDir) then
     Result := True
   else
     Result := False;
 end;
 
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  UninstallerPath: String;
+  ResultCode: Integer;
+begin
+  Result := True;
+  if IsMaintenanceMode and (MaintenancePage <> nil) and (CurPageID = MaintenancePage.ID) then
+  begin
+    if RadioUninstall.Checked then
+    begin
+      // User selected uninstall from the maintenance screen
+      if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1', 'UninstallString', UninstallerPath) or
+         RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1', 'UninstallString', UninstallerPath) then
+      begin
+        UninstallerPath := RemoveQuotes(UninstallerPath);
+        Exec(UninstallerPath, '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+        WizardForm.Close;
+        Result := False;
+      end;
+    end;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
-  Params: String;
-  DbChoice: String;
+  DownloadUrl, TempInstaller: String;
 begin
-  if CurStep = ssPostInstall then
+  if CurStep = ssPreInstall then
   begin
-    if IsFreshInstallation() then
+    // Check WebView2 prerequisite
+    if not IsWebView2Installed() then
     begin
-      if DbCombo.ItemIndex = 1 then
-        DbChoice := 'postgres'
+      WizardForm.StatusLabel.Caption := 'Installing Microsoft Edge WebView2 Runtime...';
+      // Download or trigger silent Evergreen Bootstrapper
+      DownloadUrl := 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
+      TempInstaller := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
+      
+      if FileExists(ExpandConstant('{src}\MicrosoftEdgeWebview2Setup.exe')) then
+        CopyFile(ExpandConstant('{src}\MicrosoftEdgeWebview2Setup.exe'), TempInstaller, False)
       else
-        DbChoice := 'sqlite';
+      begin
+        Exec('curl.exe', Format('-L -s -o "%s" "%s"', [TempInstaller, DownloadUrl]), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        if not FileExists(TempInstaller) then
+          Exec('powershell.exe', Format('-WindowStyle Hidden -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile(''%s'', ''%s'')"', [DownloadUrl, TempInstaller]), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end;
 
-      Params := Format('--provision --store-name "%s" --admin-pin "%s" --db-engine "%s"', [
-        StoreNameEdit.Text,
-        PinEdit.Text,
-        DbChoice
-      ]);
-
-      // Silently invoke Python to generate security keys, settings, and migrations
-      Exec(ExpandConstant('{app}\{#MyAppExeName}'), Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      if FileExists(TempInstaller) then
+        Exec(TempInstaller, '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;
   end;
 end;
@@ -160,8 +180,8 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    MsgBox('OpenPOS core binaries have been removed.' + #13#10 + #13#10 +
-           'Your store database, custom addons, receipts, and settings remain safely stored in the application data directory.', 
+    MsgBox('OpenPOS core application files have been uninstalled.' + #13#10 + #13#10 +
+           'All store databases, transaction logs, receipts, and custom addons remain safely preserved in the application data folder.', 
            mbInformation, MB_OK);
   end;
 end;

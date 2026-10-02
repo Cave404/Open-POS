@@ -85,7 +85,13 @@ def create_app():
     def index():
         sentinel_path = os.path.join(Config.DATA_DIR, "config", ".setup_complete")
         if not os.path.exists(sentinel_path) and not app.config.get("TESTING"):
-            return redirect('/setup')
+            import secrets
+            generated_recovery_key = secrets.token_hex(32)
+            return render_template(
+                'setup/activation.html',
+                generated_recovery_key=generated_recovery_key,
+                config_version=Config.VERSION
+            )
         return redirect('/pos')
 
     @app.route('/setup')
@@ -108,6 +114,7 @@ def create_app():
         return render_template('customers/index.html')
 
     @app.route('/data/uploads/<path:filename>')
+    @app.route('/uploads/<path:filename>')
     def serve_data_uploads(filename):
         return send_from_directory(Config.UPLOAD_DIR, filename)
 

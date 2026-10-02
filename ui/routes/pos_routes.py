@@ -74,27 +74,41 @@ def _get_active_cart_id() -> str:
 
 
 # -----------------------------------------------------------------------------
-# HTML UI Register Views
+# HTML UI Register Views & Store Activation Desk
 # -----------------------------------------------------------------------------
 @pos_bp.route('/', methods=['GET'])
 def root_pos_redirect():
     """
     Directs to /pos or the register screen.
-    When .setup_complete is present, immediately redirects directly to /pos.
-    Retains /setup as a fallback for developer manual installs running raw Python scripts.
+    When .setup_complete does not exist, renders the Store Activation Desk.
     """
     sentinel_path = os.path.join(Config.DATA_DIR, "config", ".setup_complete")
     if not os.path.exists(sentinel_path) and not current_app.config.get("TESTING"):
-        return redirect('/setup')
+        import secrets
+        generated_recovery_key = secrets.token_hex(32)
+        return render_template(
+            'setup/activation.html',
+            generated_recovery_key=generated_recovery_key,
+            config_version=Config.VERSION
+        )
     return redirect('/pos')
 
 
 @pos_bp.route('/pos', methods=['GET'])
 def pos_register_view():
-    """Renders the Core POS Register UI with the active default canvas."""
+    """
+    Renders the Core POS Register UI with the active default canvas.
+    When .setup_complete does not exist, renders the Store Activation Desk.
+    """
     sentinel_path = os.path.join(Config.DATA_DIR, "config", ".setup_complete")
     if not os.path.exists(sentinel_path) and not current_app.config.get("TESTING"):
-        return redirect('/setup')
+        import secrets
+        generated_recovery_key = secrets.token_hex(32)
+        return render_template(
+            'setup/activation.html',
+            generated_recovery_key=generated_recovery_key,
+            config_version=Config.VERSION
+        )
 
     default_pos_view = get_setting('default_pos_view', 'default-retail')
     store_name = get_setting('store_name', 'Open-POS System')
@@ -130,6 +144,130 @@ def pos_register_view():
 @pos_bp.route('/register', methods=['GET'])
 def legacy_register_redirect():
     """Redirects legacy /register route to standard /pos."""
+    return redirect('/pos')
+
+
+@pos_bp.route('/setup/complete', methods=['POST'])
+def setup_complete():
+    """
+    Handles Store Activation Desk submission.
+    Saves store settings, location, logo, admin PIN & recovery key,
+    runs database migrations, touches .setup_complete, and redirects to /pos.
+    """
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    else:
+        data = request.form.to_dict()
+
+    store_name = (data.get("store_name") or "OpenPOS Store").strip()
+    currency_symbol = (data.get("currency_symbol") or "$").strip()
+    receipt_header = (data.get("receipt_header") or store_name).strip()
+    phone = (data.get("phone") or "").strip()
+    address_line1 = (data.get("address_line1") or "").strip()
+    city = (data.get("city") or "").strip()
+    state = (data.get("state") or "").strip()
+    postal_code = (data.get("postal_code") or "").strip()
+    database_engine = (data.get("database_engine") or "sqlite").strip().lower()
+    admin_pin = (data.get("admin_pin") or "1234").strip()
+    recovery_key = (data.get("recovery_key") or "").strip()
+
+    # 1. Handle store logo upload if present
+    store_logo_url = ""
+    if "store_logo" in request.files:
+        logo_file = request.files["store_logo"]
+        if logo_file and logo_file.filename:
+            uploads_dir = os.path.join(Config.DATA_DIR, "uploads")
+            os.makedirs(uploads_dir, exist_ok=True)
+            logo_path = os.path.join(uploads_dir, "logo.png")
+            logo_file.save(logo_path)
+            store_logo_url = "/data/uploads/logo.png"
+
+    # 2. Save store name, location, and currency to data/config/store_settings.json
+    config_dir = os.path.join(Config.DATA_DIR, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    store_settings_path = os.path.join(config_dir, "store_settings.json")
+
+    store_settings = {
+        "store_name": store_name,
+        "currency_symbol": currency_symbol,
+        "receipt_header": receipt_header,
+        "phone": phone,
+        "address_line1": address_line1,
+        "city": city,
+        "state": state,
+        "postal_code": postal_code,
+        "database_engine": database_engine,
+    }
+    if store_logo_url:
+        store_settings["store_logo_url"] = store_logo_url
+
+    if os.path.isfile(store_settings_path):
+        try:
+            with open(store_settings_path, 'r', encoding='utf-8') as f:
+                existing = json.load(f)
+                if isinstance(existing, dict):
+                    existing.update(store_settings)
+                    store_settings = existing
+        except Exception:
+            pass
+
+    with open(store_settings_path, "w", encoding="utf-8") as f:
+        json.dump(store_settings, f, indent=2)
+
+    try:
+        from core.settings import set_setting
+        set_setting("store_name", store_name)
+        set_setting("currency_symbol", currency_symbol)
+        if store_logo_url:
+            set_setting("store_logo_url", store_logo_url)
+    except Exception as se:
+        logger.warning(f"Error syncing core settings: {se}")
+
+    # 3. Save hashed PIN and hashed recovery key in data/config/auth.json
+    import hashlib
+    pin_hash = hashlib.sha256(admin_pin.encode("utf-8")).hexdigest()
+    recovery_key_hash = hashlib.sha256(recovery_key.encode("utf-8")).hexdigest() if recovery_key else ""
+
+    auth_data = {
+        "pin_hash": pin_hash,
+        "recovery_key_hash": recovery_key_hash,
+        "require_password": True,
+        "password_hash": pin_hash,
+        "salt": "",
+        "protected_sections": ["branding", "database", "admin"],
+        "bypass_manager_on_boot": False
+    }
+
+    auth_path = os.path.join(config_dir, "auth.json")
+    with open(auth_path, "w", encoding="utf-8") as f:
+        json.dump(auth_data, f, indent=2)
+
+    try:
+        from core.services.security_service import set_admin_pin
+        set_admin_pin(admin_pin)
+    except Exception as ae:
+        logger.warning(f"Error persisting admin PIN: {ae}")
+
+    # 4. Execute database migrations via storage/migrations.py
+    try:
+        from storage.migrations import run_all_migrations, run_sqlite_migrations
+        db_path = getattr(Config, "DB_PATH", os.path.join(Config.DATA_DIR, "db", "pos_store.db"))
+        try:
+            run_sqlite_migrations(db_path)
+        except Exception:
+            pass
+        run_all_migrations()
+    except Exception as me:
+        logger.warning(f"Error running database migrations: {me}")
+
+    # 5. Touch data/config/.setup_complete
+    sentinel_path = os.path.join(config_dir, ".setup_complete")
+    with open(sentinel_path, "w", encoding="utf-8") as f:
+        f.write("PROVISIONED_VIA_ACTIVATION_DESK\n")
+
+    # 6. Redirect cleanly to /pos
+    if request.is_json:
+        return jsonify({"status": "success", "redirect": "/pos"})
     return redirect('/pos')
 
 

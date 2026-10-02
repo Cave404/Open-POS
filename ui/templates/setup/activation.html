@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenPOS - Store Activation Desk</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+        .activation-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 780px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        .activation-header {
+            background: #21262d;
+            border-bottom: 1px solid #30363d;
+            padding: 1.5rem;
+        }
+        .key-box {
+            font-family: monospace;
+            background: #0d1117;
+            border: 1px dashed #30363d;
+            padding: 1rem;
+            border-radius: 6px;
+            color: #58a6ff;
+            word-break: break-all;
+        }
+        .logo-preview-box {
+            width: 100px;
+            height: 100px;
+            border: 2px dashed #30363d;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #0d1117;
+        }
+        .logo-preview-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+    <div class="activation-card">
+        <div class="activation-header d-flex align-items-center justify-content-between">
+            <div>
+                <h4 class="fw-bold mb-1 text-white">Store Activation & Security Provisioning</h4>
+                <div class="text-muted small">Configure store identity, branding, manager credentials, and recovery keys.</div>
+            </div>
+            <span class="badge bg-primary">v{{ config_version }}</span>
+        </div>
+
+        <div class="p-4">
+            <form id="storeActivationForm" action="/setup/complete" method="POST" enctype="multipart/form-data">
+                <!-- Section 1: Store Branding & Identity -->
+                <h6 class="text-primary fw-bold text-uppercase border-bottom border-secondary pb-2 mb-3">1. Store Branding & Identity</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-8">
+                        <label class="form-label text-light fw-semibold">Business / Store Name</label>
+                        <input type="text" name="store_name" id="storeNameInput" class="form-control" placeholder="e.g. Dragon's Lair TCG" required autofocus>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-light fw-semibold">Currency Symbol</label>
+                        <input type="text" name="currency_symbol" class="form-control" value="$" required>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label text-light fw-semibold">Store Logo (Optional)</label>
+                        <input type="file" name="store_logo" id="logoInput" class="form-control" accept="image/png, image/jpeg, image/webp">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-center justify-content-center">
+                        <div class="logo-preview-box" id="logoPreview">
+                            <span class="text-muted small">No Logo</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Physical Location & Receipt Header -->
+                <h6 class="text-primary fw-bold text-uppercase border-bottom border-secondary pb-2 mb-3">2. Physical Location (Receipts)</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-7">
+                        <label class="form-label text-light fw-semibold">Receipt Header Line</label>
+                        <input type="text" name="receipt_header" id="receiptHeaderInput" class="form-control" placeholder="e.g. Dragon's Lair TCG - Hermann, MO">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label text-light fw-semibold">Phone Number</label>
+                        <input type="text" name="phone" class="form-control" placeholder="(555) 123-4567">
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label text-light fw-semibold">Street Address</label>
+                        <input type="text" name="address_line1" class="form-control" placeholder="123 Main Street">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label text-light fw-semibold">City</label>
+                        <input type="text" name="city" class="form-control" placeholder="Hermann">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-light fw-semibold">State</label>
+                        <input type="text" name="state" class="form-control" placeholder="MO">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-light fw-semibold">Postal Code</label>
+                        <input type="text" name="postal_code" class="form-control" placeholder="65041">
+                    </div>
+                </div>
+
+                <!-- Section 3: Manager Security & Emergency Key -->
+                <h6 class="text-primary fw-bold text-uppercase border-bottom border-secondary pb-2 mb-3">3. Manager Security & Emergency Recovery</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-light fw-semibold">Master Manager PIN (4 to 6 Digits)</label>
+                        <input type="password" name="admin_pin" class="form-control" placeholder="Enter PIN" maxlength="6" pattern="[0-9]*" required>
+                        <div class="form-text text-muted">Protects admin settings, reports, and database compaction.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-light fw-semibold">Database Engine</label>
+                        <select name="database_engine" class="form-select">
+                            <option value="sqlite" selected>Local Embedded SQLite (Single Station)</option>
+                            <option value="postgres">Centralized PostgreSQL (Multi-Terminal Network)</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-light fw-semibold">Emergency Master Recovery Key</label>
+                        <div class="key-box mb-2" id="displayRecoveryKey">{{ generated_recovery_key }}</div>
+                        <input type="hidden" name="recovery_key" value="{{ generated_recovery_key }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">Store this key safely. It is required to reset administrative access if the PIN is lost.</span>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnDownloadKey">Download Key (.txt)</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPrintKey">Print Recovery Key</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary">
+                    <button type="submit" class="btn btn-primary px-4 fw-semibold">
+                        Activate Store & Open Register
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Auto-fill receipt header from store name if empty
+        const storeNameInput = document.getElementById('storeNameInput');
+        const receiptHeaderInput = document.getElementById('receiptHeaderInput');
+        storeNameInput.addEventListener('input', function() {
+            if (!receiptHeaderInput.dataset.touched) {
+                receiptHeaderInput.value = storeNameInput.value;
+            }
+        });
+        receiptHeaderInput.addEventListener('input', function() {
+            receiptHeaderInput.dataset.touched = "true";
+        });
+
+        // Instant logo image preview
+        document.getElementById('logoInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const box = document.getElementById('logoPreview');
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    box.innerHTML = '<img src="' + evt.target.result + '" alt="Logo">';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Download emergency recovery key file
+        document.getElementById('btnDownloadKey').addEventListener('click', function() {
+            const key = document.getElementById('displayRecoveryKey').innerText;
+            const storeName = storeNameInput.value || 'OpenPOS Store';
+            const blob = new Blob([
+                "OPENPOS EMERGENCY RECOVERY KEY\n" +
+                "==========================================\n" +
+                "Store: " + storeName + "\n" +
+                "Key: " + key + "\n" +
+                "Generated: " + new Date().toISOString() + "\n\n" +
+                "Keep this file in a secure location. It can reset your master PIN.\n"
+            ], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'OpenPOS_Emergency_Recovery_Key.txt';
+            a.click();
+        });
+
+        // Print emergency recovery key
+        document.getElementById('btnPrintKey').addEventListener('click', function() {
+            const key = document.getElementById('displayRecoveryKey').innerText;
+            const storeName = storeNameInput.value || 'OpenPOS Store';
+            const printWin = window.open('', '_blank', 'width=600,height=400');
+            printWin.document.write(`
+                <html>
+                <head>
+                    <title>OpenPOS Master Recovery Key</title>
+                    <style>
+                        body { font-family: monospace; padding: 2rem; color: #000; }
+                        h2 { border-bottom: 2px solid #000; padding-bottom: 8px; }
+                        .key { border: 1px dashed #333; padding: 12px; font-size: 16px; margin: 15px 0; word-break: break-all; }
+                    </style>
+                </head>
+                <body>
+                    <h2>OPENPOS EMERGENCY RECOVERY KEY</h2>
+                    <p><strong>Store:</strong> ${storeName}</p>
+                    <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+                    <div class="key">${key}</div>
+                    <p><em>Keep this document in a physically secure location (safe, vault, or encrypted volume). It is required to restore access if the administrative PIN is lost.</em></p>
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+            printWin.focus();
+            printWin.print();
+            printWin.close();
+        });
+    </script>
+</body>
+</html>

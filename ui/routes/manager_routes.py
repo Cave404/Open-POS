@@ -28,7 +28,7 @@ if 'manager' not in sys.modules:
 sys.modules['manager.routes'] = sys.modules[__name__]
 sys.modules['manager'].routes = sys.modules[__name__]
 
-from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory, Response, stream_with_context, session
+from flask import Blueprint, jsonify, render_template, redirect, request, send_file, send_from_directory, Response, stream_with_context, session
 from core.config import Config
 from core.settings import get_all_settings, get_setting, set_setting
 from core.notifications import (
@@ -378,9 +378,12 @@ def manager_setup():
 
 
 @manager_bp.route('/setup/wizard')
+@manager_bp.route('/setup/activation')
 def manager_setup_wizard():
-    """Renders the modernized setup wizard view."""
-    return render_template('setup/wizard.html', config_version=Config.VERSION.lstrip('v'))
+    """Renders the comprehensive Store Activation Desk (multi-step provisioning wizard)."""
+    if is_setup_complete():
+        return redirect('/manager')
+    return render_template('setup/activation.html', config_version=Config.VERSION.lstrip('v'))
 
 
 @manager_bp.route('/branding')
@@ -1723,8 +1726,8 @@ def api_setup_install_dependencies():
     return jsonify(result), code
 
 
-@api_bp.route('/setup/complete', methods=['POST'])
 @manager_bp.route('/api/setup/complete', methods=['POST'])
+@api_bp.route('/setup/complete', methods=['POST'])
 def api_setup_complete():
     """Marks onboarding setup permanently complete by creating .setup_complete."""
     if is_setup_complete():
