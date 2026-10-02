@@ -3,10 +3,10 @@
 #define MyAppPublisher "OpenPOS Platform"
 #define MyAppURL "https://github.com/Cave404/Open-POS"
 #define MyAppExeName "OpenPOS.exe"
-#define MyAppId "{{7E1C3829-1B8F-4D2A-94B6-6BCB6B34A999}"
+#define MyAppId "{7E1C3829-1B8F-4D2A-94B6-6BCB6B34A999}"
 
 [Setup]
-AppId={#MyAppId}
+AppId={{#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -32,7 +32,10 @@ RestartApplications=no
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
+; Core application binaries
 Source: "..\dist\OpenPOS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Bundled WebView2 bootstrapper (temporarily extracted to run if needed)
+Source: "MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: ignoreversion deleteafterinstall
 
 [Dirs]
 Name: "{app}\data"; Flags: uninsneveruninstall
@@ -57,16 +60,15 @@ var
   RadioRepair, RadioUpdate, RadioUninstall: TNewRadioButton;
   IsMaintenanceMode: Boolean;
 
-// 1. Detect if WebView2 Runtime is installed
 function IsWebView2Installed(): Boolean;
 var
-  InstalledVersion: String;
+  VersionStr: String;
 begin
-  Result := RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-991A-47C2-9A4E-A795240217C1}', 'pv', InstalledVersion) or
-            RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-991A-47C2-9A4E-A795240217C1}', 'pv', InstalledVersion);
+  Result := RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-991A-47C2-9A4E-A795240217C1}', 'pv', VersionStr) or
+            RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-991A-47C2-9A4E-A795240217C1}', 'pv', VersionStr) or
+            RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-991A-47C2-9A4E-A795240217C1}', 'pv', VersionStr);
 end;
 
-// 2. Detect if OpenPOS is already installed
 function IsAppInstalled(): Boolean;
 var
   UninstPath: String;
@@ -84,40 +86,39 @@ begin
   if IsMaintenanceMode then
   begin
     MaintenancePage := CreateCustomPage(wpWelcome, 
-      'OpenPOS Maintenance & Setup', 
-      'An existing OpenPOS installation was detected on this computer. Choose an operation.');
+      'OpenPOS Maintenance', 
+      'An existing installation of OpenPOS was detected. Select an option to proceed:');
 
     LblPrompt := TLabel.Create(MaintenancePage);
     LblPrompt.Parent := MaintenancePage.Surface;
-    LblPrompt.Caption := 'Select the action you wish to perform:';
+    LblPrompt.Caption := 'Choose an operation:';
     LblPrompt.Top := ScaleY(10);
     LblPrompt.Left := ScaleX(0);
 
     RadioRepair := TNewRadioButton.Create(MaintenancePage);
     RadioRepair.Parent := MaintenancePage.Surface;
     RadioRepair.Top := LblPrompt.Top + ScaleY(25);
-    RadioRepair.Left := ScaleX(10);
-    RadioRepair.Caption := 'Repair OpenPOS (Reinstall and repair missing or corrupted files)';
+    RadioRepair.Left := ScaleX(15);
+    RadioRepair.Caption := 'Repair OpenPOS (Verify and restore all application files; keeps store data)';
     RadioRepair.Checked := True;
 
     RadioUpdate := TNewRadioButton.Create(MaintenancePage);
     RadioUpdate.Parent := MaintenancePage.Surface;
-    RadioUpdate.Top := RadioRepair.Top + ScaleY(28);
-    RadioUpdate.Left := ScaleX(10);
-    RadioUpdate.Caption := 'Update / Reinstall (Apply current software package)';
+    RadioUpdate.Top := RadioRepair.Top + ScaleY(30);
+    RadioUpdate.Left := ScaleX(15);
+    RadioUpdate.Caption := 'Update / Reinstall (Upgrade core files to version {#MyAppVersion})';
 
     RadioUninstall := TNewRadioButton.Create(MaintenancePage);
     RadioUninstall.Parent := MaintenancePage.Surface;
-    RadioUninstall.Top := RadioUpdate.Top + ScaleY(28);
-    RadioUninstall.Left := ScaleX(10);
-    RadioUninstall.Caption := 'Uninstall OpenPOS (Safely remove binaries; retains store database)';
+    RadioUninstall.Top := RadioUpdate.Top + ScaleY(30);
+    RadioUninstall.Left := ScaleX(15);
+    RadioUninstall.Caption := 'Uninstall OpenPOS (Remove binaries; preserves all store data and settings)';
   end;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  // In Maintenance Mode, skip directory and task selection if user just wants to repair or update in-place
-  if IsMaintenanceMode and (PageID = wpSelectDir) then
+  if IsMaintenanceMode and ((PageID = wpSelectDir) or (PageID = wpSelectTasks)) then
     Result := True
   else
     Result := False;
@@ -125,7 +126,7 @@ end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
-  UninstallerPath: String;
+  UninstPath: String;
   ResultCode: Integer;
 begin
   Result := True;
@@ -133,12 +134,11 @@ begin
   begin
     if RadioUninstall.Checked then
     begin
-      // User selected uninstall from the maintenance screen
-      if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1', 'UninstallString', UninstallerPath) or
-         RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1', 'UninstallString', UninstallerPath) then
+      if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1', 'UninstallString', UninstPath) or
+         RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1', 'UninstallString', UninstPath) then
       begin
-        UninstallerPath := RemoveQuotes(UninstallerPath);
-        Exec(UninstallerPath, '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+        UninstPath := RemoveQuotes(UninstPath);
+        Exec(UninstPath, '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
         WizardForm.Close;
         Result := False;
       end;
@@ -149,29 +149,18 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
-  DownloadUrl, TempInstaller: String;
+  BootstrapperPath: String;
 begin
   if CurStep = ssPreInstall then
   begin
-    // Check WebView2 prerequisite
     if not IsWebView2Installed() then
     begin
-      WizardForm.StatusLabel.Caption := 'Installing Microsoft Edge WebView2 Runtime...';
-      // Download or trigger silent Evergreen Bootstrapper
-      DownloadUrl := 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
-      TempInstaller := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
-      
-      if FileExists(ExpandConstant('{src}\MicrosoftEdgeWebview2Setup.exe')) then
-        CopyFile(ExpandConstant('{src}\MicrosoftEdgeWebview2Setup.exe'), TempInstaller, False)
-      else
+      BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
+      if FileExists(BootstrapperPath) then
       begin
-        Exec('curl.exe', Format('-L -s -o "%s" "%s"', [TempInstaller, DownloadUrl]), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-        if not FileExists(TempInstaller) then
-          Exec('powershell.exe', Format('-WindowStyle Hidden -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile(''%s'', ''%s'')"', [DownloadUrl, TempInstaller]), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        WizardForm.StatusLabel.Caption := 'Installing required Microsoft Edge WebView2 runtime...';
+        Exec(BootstrapperPath, '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       end;
-
-      if FileExists(TempInstaller) then
-        Exec(TempInstaller, '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;
   end;
 end;
@@ -180,8 +169,8 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    MsgBox('OpenPOS core application files have been uninstalled.' + #13#10 + #13#10 +
-           'All store databases, transaction logs, receipts, and custom addons remain safely preserved in the application data folder.', 
+    MsgBox('OpenPOS application files have been uninstalled.' + #13#10 + #13#10 +
+           'All store databases, sales history, custom addons, and configuration files remain safely preserved in the application data folder.', 
            mbInformation, MB_OK);
   end;
 end;

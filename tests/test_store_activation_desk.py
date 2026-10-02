@@ -1,7 +1,7 @@
 """
 Tests for Store Activation Desk & Setup Completion
 Validates:
-1. First-run rendering of Store Activation Desk at /pos with 32-byte recovery key.
+1. First-run redirection from /pos to /setup and rendering of Store Activation Desk.
 2. /setup/complete persistence of store identity, location, logo, and hashed PIN/recovery key in auth.json.
 3. Database migration execution and .setup_complete sentinel creation.
 4. Clean redirection to /pos register once setup is complete.
@@ -26,22 +26,32 @@ def client():
 
 
 def test_first_run_renders_store_activation_desk(monkeypatch, tmp_path):
-    """When .setup_complete is missing, /pos renders the Store Activation Desk."""
-    test_sentinel = tmp_path / ".setup_complete"
-    if test_sentinel.exists():
-        test_sentinel.unlink()
+    """When .setup_complete is missing, /pos redirects to /setup which renders the Store Activation Desk."""
+    test_config_dir = tmp_path / "config"
+    test_config_dir.mkdir(parents=True, exist_ok=True)
+    test_marker = str(test_config_dir / ".setup_complete")
 
     monkeypatch.setattr(Config, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr("core.config.Config.DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(Config, "CONFIG_DIR", str(test_config_dir))
+    monkeypatch.setattr("core.config.Config.CONFIG_DIR", str(test_config_dir))
+    monkeypatch.setattr("core.setup.wizard.SETUP_MARKER_PATH", test_marker)
+    monkeypatch.setattr("core.setup.wizard.is_setup_complete", lambda: False)
 
     app = create_app()
     app.config["TESTING"] = False  # Emulate real desktop production boot
     with app.test_client() as cl:
-        res = cl.get('/pos')
+        # /pos redirects to /setup
+        res_pos = cl.get('/pos')
+        assert res_pos.status_code == 302
+        assert res_pos.headers["Location"] == "/setup"
+
+        # /setup renders activation desk
+        res = cl.get('/setup')
         assert res.status_code == 200
         html = res.get_data(as_text=True)
         assert "Store Activation & Security Provisioning" in html
-        assert "Business / Store Name" in html
+        assert "Store / Business Name" in html
         assert "Emergency Master Recovery Key" in html
         assert "Activate Store & Open Register" in html
         assert 'action="/setup/complete"' in html

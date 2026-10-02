@@ -159,15 +159,22 @@ def set_admin_pin(admin_pin: str) -> bool:
 
     # 1. Write to active manager_auth.json path
     auth_path = get_auth_config_path()
-    os.makedirs(os.path.dirname(auth_path), exist_ok=True)
+    config_dir = os.path.dirname(auth_path)
+    os.makedirs(config_dir, exist_ok=True)
     with open(auth_path, 'w', encoding='utf-8') as f:
         json.dump(auth_data, f, indent=2)
 
     # Also write to data/config/auth.json for cross-compatibility
-    alt_auth_path = os.path.join(os.path.dirname(auth_path), 'auth.json')
+    alt_auth_path = os.path.join(config_dir, 'auth.json')
     try:
+        existing_alt = {}
+        if os.path.isfile(alt_auth_path):
+            with open(alt_auth_path, 'r', encoding='utf-8') as f:
+                existing_alt = json.load(f)
+        existing_alt.update(auth_data)
+        existing_alt["pin_hash"] = hashlib.sha256(pin_str.encode('utf-8')).hexdigest()
         with open(alt_auth_path, 'w', encoding='utf-8') as f:
-            json.dump(auth_data, f, indent=2)
+            json.dump(existing_alt, f, indent=2)
     except Exception:
         pass
 
@@ -178,3 +185,86 @@ def set_admin_pin(admin_pin: str) -> bool:
         pf.write(hashlib.sha256(pin_str.encode('utf-8')).hexdigest())
 
     return True
+
+
+def set_recovery_key(recovery_key: str) -> bool:
+    """
+    Sets and persists the SHA-256 hashed emergency recovery key in auth.json,
+    manager_auth.json, and recovery_key.hash.
+    """
+    if not recovery_key:
+        return False
+    rec_str = str(recovery_key).strip()
+    if not rec_str:
+        return False
+
+    rec_hash = hashlib.sha256(rec_str.encode('utf-8')).hexdigest()
+
+    auth_path = get_auth_config_path()
+    config_dir = os.path.dirname(auth_path)
+    os.makedirs(config_dir, exist_ok=True)
+
+    # 1. Update auth.json
+    alt_auth_path = os.path.join(config_dir, 'auth.json')
+    try:
+        data = {}
+        if os.path.isfile(alt_auth_path):
+            with open(alt_auth_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        data['recovery_key_hash'] = rec_hash
+        with open(alt_auth_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+    # 2. Update manager_auth.json if exists
+    try:
+        data = {}
+        if os.path.isfile(auth_path):
+            with open(auth_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        data['recovery_key_hash'] = rec_hash
+        with open(auth_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+    # 3. Write recovery_key.hash marker
+    try:
+        rec_file = os.path.join(config_dir, 'recovery_key.hash')
+        with open(rec_file, 'w', encoding='utf-8') as rf:
+            rf.write(rec_hash)
+    except Exception:
+        pass
+
+    return True
+
+
+def verify_recovery_key(recovery_key: str) -> bool:
+    """Verifies submitted recovery key against stored hash."""
+    if not recovery_key:
+        return False
+    rec_str = str(recovery_key).strip()
+    target_hash = hashlib.sha256(rec_str.encode('utf-8')).hexdigest()
+
+    auth_path = get_auth_config_path()
+    config_dir = os.path.dirname(auth_path)
+    for path in [os.path.join(config_dir, 'auth.json'), auth_path]:
+        if os.path.isfile(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if data.get('recovery_key_hash') == target_hash:
+                        return True
+            except Exception:
+                pass
+    rec_file = os.path.join(config_dir, 'recovery_key.hash')
+    if os.path.isfile(rec_file):
+        try:
+            with open(rec_file, 'r', encoding='utf-8') as rf:
+                if rf.read().strip() == target_hash:
+                    return True
+        except Exception:
+            pass
+    return False
+

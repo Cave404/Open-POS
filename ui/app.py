@@ -85,19 +85,17 @@ def create_app():
     def index():
         sentinel_path = os.path.join(Config.DATA_DIR, "config", ".setup_complete")
         if not os.path.exists(sentinel_path) and not app.config.get("TESTING"):
-            import secrets
-            generated_recovery_key = secrets.token_hex(32)
-            return render_template(
-                'setup/activation.html',
-                generated_recovery_key=generated_recovery_key,
-                config_version=Config.VERSION
-            )
+            return redirect('/setup')
         return redirect('/pos')
 
     @app.route('/setup')
     def setup_root():
-        from ui.routes.manager_routes import manager_setup
-        return manager_setup()
+        from core.setup import is_setup_complete
+        if is_setup_complete():
+            from ui.routes.manager_routes import manager_setup
+            return manager_setup()
+        from ui.routes.pos_routes import setup_activation
+        return setup_activation()
 
     @app.route('/setup/wizard')
     def setup_wizard_root():
