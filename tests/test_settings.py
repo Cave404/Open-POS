@@ -195,14 +195,14 @@ def test_about_view_route(client):
     assert "Return to Dashboard" in html
     assert "Third-Party Dependencies" in html
     assert "Cave404" in html
-    assert "v1.0.9" in html or "v1.0.8" in html or "v1.0.7" in html or "v1.0.6" in html
+    assert "v1.0.9" in html or "v1.0.8" in html or "v1.0.7" in html or "v1.0.6" in html or "1.0.99" in html or "v1.0.99" in html
 
 def test_api_system_credits(client):
     """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.8."""
     res = client.get("/api/system/credits")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["version"] in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")
+    assert data["version"] in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99")
     assert "https://github.com/Cave404/Open-POS" in data["repository"]
     assert len(data["authors"]) >= 1
     assert len(data["dependencies"]) >= 5

@@ -21,6 +21,7 @@ hiddenimports = [
     "serial",
     "requests",
     "core",
+    "core.network",
     "hardware",
     "storage",
     "ui"

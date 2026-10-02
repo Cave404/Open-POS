@@ -1,5 +1,5 @@
 #define MyAppName "OpenPOS"
-#define MyAppVersion "1.0.9"
+#define MyAppVersion "1.0.99"
 #define MyAppPublisher "OpenPOS Platform"
 #define MyAppURL "https://github.com/Cave404/Open-POS"
 #define MyAppExeName "OpenPOS.exe"
@@ -59,6 +59,7 @@ var
   MaintenancePage: TWizardPage;
   RadioRepair, RadioUpdate, RadioUninstall: TNewRadioButton;
   IsMaintenanceMode: Boolean;
+  PortPage: TInputQueryWizardPage;
 
 function IsWebView2Installed(): Boolean;
 var
@@ -114,11 +115,18 @@ begin
     RadioUninstall.Left := ScaleX(15);
     RadioUninstall.Caption := 'Uninstall OpenPOS (Remove binaries; preserves all store data and settings)';
   end;
+
+  PortPage := CreateInputQueryPage(wpSelectTasks,
+    'Server Configuration',
+    'Local Web Server Port Assignment',
+    'Specify the local TCP port for OpenPOS presentation server to bind to (Default: 5050):');
+  PortPage.Add('Server Port:', False);
+  PortPage.Values[0] := '5050';
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  if IsMaintenanceMode and ((PageID = wpSelectDir) or (PageID = wpSelectTasks)) then
+  if IsMaintenanceMode and ((PageID = wpSelectDir) or (PageID = wpSelectTasks) or ((PortPage <> nil) and (PageID = PortPage.ID))) then
     Result := True
   else
     Result := False;
@@ -128,6 +136,7 @@ function NextButtonClick(CurPageID: Integer): Boolean;
 var
   UninstPath: String;
   ResultCode: Integer;
+  PortVal: Integer;
 begin
   Result := True;
   if IsMaintenanceMode and (MaintenancePage <> nil) and (CurPageID = MaintenancePage.ID) then
@@ -141,8 +150,44 @@ begin
         Exec(UninstPath, '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
         WizardForm.Close;
         Result := False;
+        Exit;
       end;
     end;
+  end;
+
+  if (PortPage <> nil) and (CurPageID = PortPage.ID) then
+  begin
+    PortVal := StrToIntDef(Trim(PortPage.Values[0]), 0);
+    if (PortVal < 1024) or (PortVal > 65535) then
+    begin
+      MsgBox('Please enter a valid TCP port number between 1024 and 65535.', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+  end;
+end;
+
+procedure SaveInstallerPortConfig();
+var
+  ConfigDir, SettingsFile, PortStr, FileContent: String;
+begin
+  ConfigDir := ExpandConstant('{app}\data\config');
+  SettingsFile := ConfigDir + '\store_settings.json';
+  if PortPage <> nil then
+    PortStr := Trim(PortPage.Values[0])
+  else
+    PortStr := '5050';
+
+  if PortStr = '' then
+    PortStr := '5050';
+
+  ForceDirectories(ConfigDir);
+  if not FileExists(SettingsFile) then
+  begin
+    FileContent := '{' + #13#10 +
+                   '  "server_port": ' + PortStr + #13#10 +
+                   '}';
+    SaveStringToFile(SettingsFile, FileContent, False);
   end;
 end;
 
@@ -162,6 +207,10 @@ begin
         Exec(BootstrapperPath, '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       end;
     end;
+  end
+  else if CurStep = ssPostInstall then
+  begin
+    SaveInstallerPortConfig();
   end;
 end;
 

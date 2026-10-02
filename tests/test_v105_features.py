@@ -36,11 +36,11 @@ def client():
 
 def test_v105_version_consistency(client):
     """Asserts that Config.VERSION and all template badges reflect active version."""
-    assert Config.VERSION in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")
+    assert Config.VERSION in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99")
 
     res_credits = client.get("/api/system/credits")
     assert res_credits.status_code == 200
-    assert res_credits.get_json()["version"] in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")
+    assert res_credits.get_json()["version"] in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99")
 
     for route in ["/manager", "/manager/about", "/manager/branding", "/manager/configure_manager", "/manager/database", "/manager/logs"]:
         res = client.get(route)

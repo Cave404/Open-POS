@@ -145,10 +145,12 @@ def setup_activation():
         return manager_setup()
     import secrets
     recovery_key = secrets.token_hex(32)
+    active_port = getattr(Config, "ACTIVE_PORT", None) or getattr(Config, "DEFAULT_PORT", 5050)
     return render_template(
         "setup/activation.html",
         generated_recovery_key=recovery_key,
-        config_version=Config.VERSION
+        config_version=Config.VERSION,
+        active_port=active_port
     )
 
 
@@ -172,6 +174,12 @@ def setup_complete():
     recovery_key = data.get("recovery_key", "").strip()
     db_engine = data.get("database_engine", "sqlite").strip().lower()
 
+    default_port = getattr(Config, "ACTIVE_PORT", None) or getattr(Config, "DEFAULT_PORT", 5050)
+    try:
+        server_port = int(data.get("server_port", default_port))
+    except (ValueError, TypeError):
+        server_port = default_port
+
     # 1. Save store settings
     config_dir = os.path.join(Config.DATA_DIR, "config")
     os.makedirs(config_dir, exist_ok=True)
@@ -185,7 +193,8 @@ def setup_complete():
         "postal_code": data.get("postal_code", "").strip(),
         "phone": data.get("phone", "").strip(),
         "receipt_header": data.get("receipt_header", "").strip() or store_name,
-        "database_engine": db_engine
+        "database_engine": db_engine,
+        "server_port": server_port
     }
     with open(settings_path, "w", encoding="utf-8") as f:
         json.dump(settings_data, f, indent=2)

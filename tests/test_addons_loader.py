@@ -21,12 +21,12 @@ def client():
 
 def test_v106_version_consistency(client):
     """Asserts that Config.VERSION and all manager templates strictly reflect active version."""
-    assert Config.VERSION in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")
+    assert Config.VERSION in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99")
 
     # API system credits
     res_credits = client.get("/api/system/credits")
     assert res_credits.status_code == 200
-    assert res_credits.get_json()["version"] in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9")
+    assert res_credits.get_json()["version"] in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99")
 
     # Manager view templates
     views_to_check = [

@@ -68,6 +68,13 @@ def create_app():
     app.jinja_env.globals['render_addon_hook'] = render_addon_hook
     app.jinja_env.globals['has_addon_canvas'] = has_addon_canvas
 
+    @app.context_processor
+    def inject_global_template_vars():
+        return {
+            "config_version": Config.VERSION,
+            "active_port": getattr(Config, "ACTIVE_PORT", None) or getattr(Config, "DEFAULT_PORT", 5050)
+        }
+
     # Initialize dynamic Addon & Plugin Engine
     from core.addons import addon_manager
     addon_manager.init_app(app)

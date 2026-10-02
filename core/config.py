@@ -71,7 +71,9 @@ if not persistent_secret:
     os.environ['SECRET_KEY'] = persistent_secret
 
 class Config:
-    VERSION = "v1.0.9"
+    VERSION = "1.0.99"
+    DEFAULT_PORT = 5050
+    ACTIVE_PORT = None
 
     # 1. Read-Only Application Assets (Templates, Static CSS/JS, Migration SQL)
     BUNDLE_DIR = BUNDLE_DIR
@@ -89,8 +91,31 @@ class Config:
     BACKUP_DIR = BACKUP_DIR
     REQUIRED_DATA_DIRS = REQUIRED_DATA_DIRS
 
-    PORT = int(os.environ.get('PORT', 5000))
+    PORT = int(os.environ.get('PORT', 5050))
     DEBUG = False
+
+    @classmethod
+    def get_configured_port(cls) -> int:
+        """Reads server_port from store_settings.json or returns DEFAULT_PORT."""
+        settings_file = os.path.join(cls.DATA_DIR, "config", "store_settings.json")
+        if os.path.exists(settings_file):
+            try:
+                import json
+                with open(settings_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return int(data.get("server_port", cls.DEFAULT_PORT))
+            except Exception:
+                pass
+        return cls.DEFAULT_PORT
+
+    @classmethod
+    def determine_runtime_port(cls) -> int:
+        """Resolves preferred port with collision fallback and sets ACTIVE_PORT and PORT."""
+        preferred = cls.get_configured_port()
+        from core.network import resolve_server_port
+        cls.ACTIVE_PORT = resolve_server_port(preferred_port=preferred)
+        cls.PORT = cls.ACTIVE_PORT
+        return cls.ACTIVE_PORT
 
     @classmethod
     def init_directories(cls):

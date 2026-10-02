@@ -124,16 +124,21 @@
                 <h6 class="text-primary fw-bold text-uppercase border-bottom border-secondary pb-2 mb-3">3. Security Credentials & Emergency Recovery</h6>
                 <div class="row g-3 mb-4">
                     <div class="col-md-6">
-                        <label class="form-label text-light fw-semibold">Master Administrative PIN (4 to 6 Digits)</label>
+                        <label class="form-label text-light fw-semibold">Master Manager PIN (4 to 6 Digits)</label>
                         <input type="password" name="admin_pin" class="form-control" placeholder="Enter PIN" maxlength="6" pattern="[0-9]*" required>
-                        <div class="form-text text-muted">Required to access management tools, reports, and database settings.</div>
+                        <div class="form-text text-muted">Protects admin settings, reports, and database compaction.</div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-3">
                         <label class="form-label text-light fw-semibold">Database Engine</label>
                         <select name="database_engine" class="form-select">
-                            <option value="sqlite" selected>Local Embedded SQLite (Single Station)</option>
-                            <option value="postgres">Centralized PostgreSQL (Multi-Terminal Network)</option>
+                            <option value="sqlite" selected>Local SQLite</option>
+                            <option value="postgres">PostgreSQL</option>
                         </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-light fw-semibold">Local Port</label>
+                        <input type="number" name="server_port" class="form-control" value="{{ active_port }}" min="1024" max="65535" required>
+                        <div class="form-text text-muted">Local web server port.</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label text-light fw-semibold">Emergency Master Recovery Key</label>

@@ -26,6 +26,7 @@ from core.setup import is_setup_complete
 from hardware.dispatcher import hardware_dispatcher
 from ui.app import create_app
 import webview
+import waitress
 
 
 class JSBridge:
@@ -186,26 +187,25 @@ def main():
     # Initialize Flask presentation engine
     app = create_app()
 
-    # Determine host URL
-    server_port = Config.PORT or 5000
+    # Determine runtime port and host URL
+    server_port = Config.determine_runtime_port()
     entry_url = f"http://127.0.0.1:{server_port}/pos"
 
-    # Start background WSGI server daemon thread
-    def _run_server():
-        try:
-            from waitress import serve
-            serve(app, host="127.0.0.1", port=server_port, threads=6)
-        except Exception as e:
-            logger.warning(f"Waitress serve failed ({e}), falling back to Werkzeug development server.")
-            app.run(host="127.0.0.1", port=server_port, debug=False, use_reloader=False)
+    logger.info(f"Starting OpenPOS presentation server on port {server_port}")
 
-    server_thread = threading.Thread(target=_run_server, daemon=True, name="OpenPOS-BackendWorker")
+    server_thread = threading.Thread(
+        target=waitress.serve,
+        args=(app,),
+        kwargs={"host": "127.0.0.1", "port": server_port, "threads": 6},
+        daemon=True,
+        name="WaitressServerThread"
+    )
     server_thread.start()
 
     try:
         # PyWebView desktop client window
         webview.create_window(
-            title=f"OpenPOS - Register [{Config.VERSION}]",
+            title=f"OpenPOS - Register [v{Config.VERSION}] (Port {server_port})",
             url=entry_url,
             width=1280,
             height=800,

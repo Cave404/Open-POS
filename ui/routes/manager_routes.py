@@ -383,7 +383,8 @@ def manager_setup_wizard():
     """Renders the comprehensive Store Activation Desk (multi-step provisioning wizard)."""
     if is_setup_complete():
         return redirect('/manager')
-    return render_template('setup/activation.html', config_version=Config.VERSION.lstrip('v'))
+    active_port = getattr(Config, "ACTIVE_PORT", None) or getattr(Config, "DEFAULT_PORT", 5050)
+    return render_template('setup/activation.html', config_version=Config.VERSION.lstrip('v'), active_port=active_port)
 
 
 @manager_bp.route('/branding')

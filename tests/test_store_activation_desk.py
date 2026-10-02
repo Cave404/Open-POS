@@ -53,6 +53,8 @@ def test_first_run_renders_store_activation_desk(monkeypatch, tmp_path):
         assert "Store Activation & Security Provisioning" in html
         assert "Store / Business Name" in html
         assert "Emergency Master Recovery Key" in html
+        assert "Local Port" in html
+        assert 'name="server_port"' in html
         assert "Activate Store & Open Register" in html
         assert 'action="/setup/complete"' in html
 
@@ -82,6 +84,7 @@ def test_setup_complete_processing(client, monkeypatch, tmp_path):
         "state": "MO",
         "postal_code": "65041",
         "database_engine": "sqlite",
+        "server_port": "5055",
         "admin_pin": "5678",
         "recovery_key": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
         "store_logo": dummy_logo
@@ -105,6 +108,7 @@ def test_setup_complete_processing(client, monkeypatch, tmp_path):
     assert settings["phone"] == "(555) 019-2834"
     assert settings["receipt_header"] == "Dragon's Lair TCG - Main St"
     assert settings["database_engine"] == "sqlite"
+    assert settings["server_port"] == 5055
 
     # 2. Verify logo saved
     logo_file = test_data_dir / "uploads" / "logo.png"
