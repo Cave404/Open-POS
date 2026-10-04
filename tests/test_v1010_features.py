@@ -135,7 +135,7 @@ def test_header_version_badge_rendering(client):
     assert "v1.0.10" in html or "1.0.10" in html
 
 
-def test_manager_lock_modal_styling_and_dom_isolation(client, tmp_path, monkeypatch):
+def test_manager_lock_modal_styling_and_dom_isolation(client, monkeypatch):
     """Asserts that main.css and manager_lock.html isolate the auth card from backdrop blur."""
     css_path = os.path.join(Config.BASE_DIR, "ui", "static", "css", "main.css")
     with open(css_path, "r", encoding="utf-8") as f:
@@ -146,10 +146,13 @@ def test_manager_lock_modal_styling_and_dom_isolation(client, tmp_path, monkeypa
     assert "filter: none !important;" in css
     assert "backdrop-filter: none !important;" in css
 
-    # Enable lockout guard in temporary environment
-    config_dir = tmp_path / "config"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    auth_file = str(config_dir / "manager_auth.json")
+    # Enable lockout guard in active Config.DATA_DIR
+    config_dir = os.path.join(Config.DATA_DIR, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    with open(os.path.join(config_dir, ".setup_complete"), "w", encoding="utf-8") as f:
+        f.write("PROVISIONED\n")
+
+    auth_file = os.path.join(config_dir, "manager_auth.json")
     with open(auth_file, "w", encoding="utf-8") as f:
         json.dump({
             "require_password": True,
@@ -158,8 +161,13 @@ def test_manager_lock_modal_styling_and_dom_isolation(client, tmp_path, monkeypa
             "protected_sections": ["database", "branding", "addons"]
         }, f)
 
+    monkeypatch.setattr("manager.routes.AUTH_CONFIG_PATH", auth_file)
+    monkeypatch.setattr("core.setup.wizard.AUTH_CONFIG_PATH", auth_file)
     monkeypatch.setattr("core.services.security_service.AUTH_CONFIG_PATH", auth_file)
     monkeypatch.setattr("core.auth.AUTH_CONFIG_PATH", auth_file, raising=False)
+
+    with client.session_transaction() as sess:
+        sess.clear()
 
     # Test lock screen render
     res = client.get("/manager/database")
