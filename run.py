@@ -23,6 +23,7 @@ if BASE_DIR not in sys.path:
 from core.logger import setup_system_logger
 from core.config import Config
 from core.setup import is_setup_complete
+from core.tray import SystemTrayManager
 from hardware.dispatcher import hardware_dispatcher
 from ui.app import create_app
 import webview
@@ -204,7 +205,7 @@ def main():
 
     try:
         # PyWebView desktop client window
-        webview.create_window(
+        window = webview.create_window(
             title=f"OpenPOS - Register [v{Config.VERSION}] (Port {server_port})",
             url=entry_url,
             width=1280,
@@ -213,6 +214,15 @@ def main():
             background_color="#0d1117",
             js_api=JSBridge()
         )
+
+        # Initialize System Tray with window control
+        tray = SystemTrayManager(
+            app_window=window,
+            port=server_port,
+            on_exit_callback=lambda: hardware_dispatcher.stop()
+        )
+        tray.start()
+
         # Force edgechromium to prevent silent fallback to MSHTML/IE
         webview.start(gui="edgechromium", private_mode=False)
     finally:

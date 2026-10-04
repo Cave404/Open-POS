@@ -20,8 +20,12 @@ hiddenimports = [
     "sqlalchemy",
     "serial",
     "requests",
+    "pystray",
+    "PIL",
+    "pystray._win32",
     "core",
     "core.network",
+    "core.tray",
     "hardware",
     "storage",
     "ui"

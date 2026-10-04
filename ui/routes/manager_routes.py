@@ -508,7 +508,25 @@ def manager_configure():
 @manager_required
 def manager_addons():
     """Renders the Addons & Applets Management Control Center."""
-    return render_template('addons.html', is_locked=is_section_locked('addons'))
+    from core.addons.loader import ACTIVE_ADDONS
+    from core.addons.catalog import fetch_catalog
+
+    installed_addons = ACTIVE_ADDONS or {}
+    catalog_addons = []
+    try:
+        catalog_addons = fetch_catalog() or []
+    except Exception as e:
+        logger.warning(f"Failed to load catalog addons: {e}")
+        catalog_addons = []
+
+    return render_template(
+        'addons.html',
+        is_locked=is_section_locked('addons'),
+        active_addons=ACTIVE_ADDONS,
+        installed_addons=installed_addons,
+        catalog_addons=catalog_addons,
+        config_version=Config.VERSION
+    )
 
 
 @api_bp.route('/addons/import', methods=['POST'])

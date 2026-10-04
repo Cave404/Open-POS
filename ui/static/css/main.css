@@ -74,3 +74,49 @@ body {
   border-bottom: 1px solid var(--app-border);
   padding: 1.25rem 1.5rem;
 }
+
+/* Prevent backdrop-filter from bleeding into modal contents */
+.auth-lock-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  background: rgba(13, 17, 23, 0.85);
+}
+
+.auth-lock-card {
+  position: relative;
+  z-index: 1060;
+  background: #161b22 !important;
+  border: 1px solid #30363d !important;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8) !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+  backdrop-filter: none !important;
+  opacity: 1 !important;
+  color: #f0f6fc !important;
+}
+
+.auth-lock-card input,
+.auth-lock-card button,
+.auth-lock-card h4,
+.auth-lock-card p {
+  filter: none !important;
+  -webkit-filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Remove any inherited blur classes from body or app container */
+body.auth-locked #app,
+body.auth-locked .main-layout {
+  filter: none !important;
+}
+

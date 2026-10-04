@@ -133,3 +133,85 @@ def test_header_version_badge_rendering(client):
     assert res.status_code == 200
     html = res.get_data(as_text=True)
     assert "v1.0.10" in html or "1.0.10" in html
+
+
+def test_manager_lock_modal_styling_and_dom_isolation(client, tmp_path, monkeypatch):
+    """Asserts that main.css and manager_lock.html isolate the auth card from backdrop blur."""
+    css_path = os.path.join(Config.BASE_DIR, "ui", "static", "css", "main.css")
+    with open(css_path, "r", encoding="utf-8") as f:
+        css = f.read()
+
+    assert ".auth-lock-wrapper" in css
+    assert ".auth-lock-card" in css
+    assert "filter: none !important;" in css
+    assert "backdrop-filter: none !important;" in css
+
+    # Enable lockout guard in temporary environment
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    auth_file = str(config_dir / "manager_auth.json")
+    with open(auth_file, "w", encoding="utf-8") as f:
+        json.dump({
+            "require_password": True,
+            "password_hash": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
+            "salt": "",
+            "protected_sections": ["database", "branding", "addons"]
+        }, f)
+
+    monkeypatch.setattr("core.services.security_service.AUTH_CONFIG_PATH", auth_file)
+    monkeypatch.setattr("core.auth.AUTH_CONFIG_PATH", auth_file, raising=False)
+
+    # Test lock screen render
+    res = client.get("/manager/database")
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert "auth-lock-wrapper" in html
+    assert "auth-lock-card" in html
+    assert 'id="managerLockForm"' in html
+    assert 'id="adminPinInput"' in html
+    assert "Manager Authentication Required" in html
+
+
+def test_manager_addons_route_authenticated(client):
+    """Asserts /manager/addons renders successfully with active and catalog addons."""
+    with client.session_transaction() as sess:
+        sess["manager_auth_verified"] = True
+
+    res = client.get("/manager/addons")
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert "Installed Addons" in html
+    assert "Addon Catalog" in html
+    assert "v1.0.10" in html or "1.0.10" in html
+
+
+def test_system_tray_manager_and_packaging_spec():
+    """Asserts SystemTrayManager functionality and PyInstaller packaging hiddenimports."""
+    from unittest.mock import MagicMock
+    from core.tray import SystemTrayManager
+    from PIL import Image
+
+    mock_win = MagicMock()
+    mock_exit = MagicMock()
+    tray = SystemTrayManager(app_window=mock_win, port=5050, on_exit_callback=mock_exit)
+
+    # Test fallback icon generation
+    fallback_icon = tray._create_fallback_icon()
+    assert isinstance(fallback_icon, Image.Image)
+    assert fallback_icon.size == (64, 64)
+
+    # Test window show/restore
+    tray.show_window("/manager")
+    mock_win.load_url.assert_called_with("http://127.0.0.1:5050/manager")
+    mock_win.show.assert_called_once()
+    mock_win.restore.assert_called_once()
+
+    # Test packaging spec includes tray and Pillow dependencies
+    spec_path = os.path.join(Config.BASE_DIR, "packaging", "openpos.spec")
+    with open(spec_path, "r", encoding="utf-8") as f:
+        spec_content = f.read()
+    assert '"pystray"' in spec_content
+    assert '"PIL"' in spec_content
+    assert '"pystray._win32"' in spec_content
+    assert '"core.tray"' in spec_content
+
