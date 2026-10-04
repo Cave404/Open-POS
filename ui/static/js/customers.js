@@ -1,6 +1,6 @@
 /**
  * customers.js — Customer Directory client-side controller
- * Open-POS v1.0.9
+ * Open-POS v1.0.10
  *
  * Responsibilities:
  *  - Debounced search with AbortController cancellation

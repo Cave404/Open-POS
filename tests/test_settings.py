@@ -195,14 +195,14 @@ def test_about_view_route(client):
     assert "Return to Dashboard" in html
     assert "Third-Party Dependencies" in html
     assert "Cave404" in html
-    assert "v1.0.9" in html or "v1.0.8" in html or "v1.0.7" in html or "v1.0.6" in html or "1.0.99" in html or "v1.0.99" in html
+    assert any(v in html for v in ("v1.0.10", "1.0.10", "v1.0.9", "v1.0.8", "v1.0.7", "v1.0.6", "1.0.99", "v1.0.99"))
 
 def test_api_system_credits(client):
     """Asserts that GET /api/system/credits returns application metadata and dependency audit with v1.0.8."""
     res = client.get("/api/system/credits")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["version"] in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99")
+    assert data["version"] in ("v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99", "1.0.10", "v1.0.10")
     assert "https://github.com/Cave404/Open-POS" in data["repository"]
     assert len(data["authors"]) >= 1
     assert len(data["dependencies"]) >= 5
@@ -350,7 +350,7 @@ def test_manager_dashboard_home_view(client):
     html = res.get_data(as_text=True)
     assert "Quick-Access Dashboard" in html
     assert "Home" in html
-    assert any(v in html for v in ("v1.0.9", "v1.0.8", "v1.0.7", "v1.0.6"))
+    assert any(v in html for v in ("v1.0.10", "1.0.10", "v1.0.9", "v1.0.8", "v1.0.7", "v1.0.6"))
     assert "notifBellBtn" in html
     assert "configure_manager" in html
 
@@ -365,7 +365,7 @@ def test_logs_view_route(client):
     assert "btnExportCsv" in html
     assert "btnDownloadLog" in html
     assert "btnOpenLiveTerminal" in html
-    assert any(v in html for v in ("v1.0.9", "v1.0.8", "v1.0.7", "v1.0.6"))
+    assert any(v in html for v in ("v1.0.10", "1.0.10", "v1.0.9", "v1.0.8", "v1.0.7", "v1.0.6"))
 
 def test_configure_manager_view_route(client):
     """Asserts that GET /manager/configure_manager renders the Configure Manager view."""
@@ -378,7 +378,7 @@ def test_configure_manager_view_route(client):
     assert "requirePasswordToggle" in html
     assert "bypassManagerToggle" in html
     assert "password-grid" in html
-    assert any(v in html for v in ("v1.0.9", "v1.0.8", "v1.0.7", "v1.0.6"))
+    assert any(v in html for v in ("v1.0.10", "1.0.10", "v1.0.9", "v1.0.8", "v1.0.7", "v1.0.6"))
 
     # Verify btnScanPackages is now unified in Core Auto-Updater & Maintenance view (/manager/updates)
     res_updates = client.get('/manager/updates')

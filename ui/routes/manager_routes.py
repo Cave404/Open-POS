@@ -1823,7 +1823,7 @@ def api_live_logs_stream():
             ],
             "DISCORD": [
                 ("INFO", "Discord Gateway WebSocket heartbeat acknowledged (ping: 26ms)."),
-                ("INFO", "Shard #0 presence updated: 'Monitoring Open-POS v1.0.9 Cashiers'."),
+                ("INFO", f"Shard #0 presence updated: 'Monitoring Open-POS v{Config.VERSION} Cashiers'."),
                 ("INFO", "Daily trade webhooks channel #pos-trades listener healthy."),
                 ("INFO", "Discord bot queue empty. 0 outgoing transaction summaries pending.")
             ]

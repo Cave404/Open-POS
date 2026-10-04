@@ -184,12 +184,12 @@ def main():
     # Start non-blocking hardware queue
     hardware_dispatcher.start()
 
-    # Initialize Flask presentation engine
-    app = create_app()
-
     # Determine runtime port and host URL
     server_port = Config.determine_runtime_port()
     entry_url = f"http://127.0.0.1:{server_port}/pos"
+
+    # Initialize Flask presentation engine
+    app = create_app()
 
     logger.info(f"Starting OpenPOS presentation server on port {server_port}")
 

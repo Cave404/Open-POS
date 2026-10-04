@@ -136,7 +136,7 @@
         if (!modal) return;
 
         const info = currentUpdateData || {};
-        const curVer = info.current_version || 'v1.0.9';
+        const curVer = info.current_version || 'v1.0.10';
         const newVer = info.latest_version || 'v1.1.0';
 
         const deltaBadge = document.getElementById('clModalDeltaBadge');

@@ -180,6 +180,9 @@ def setup_complete():
     except (ValueError, TypeError):
         server_port = default_port
 
+    Config.ACTIVE_PORT = server_port
+    Config.PORT = server_port
+
     # 1. Save store settings
     config_dir = os.path.join(Config.DATA_DIR, "config")
     os.makedirs(config_dir, exist_ok=True)

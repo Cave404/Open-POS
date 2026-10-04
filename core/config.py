@@ -71,7 +71,7 @@ if not persistent_secret:
     os.environ['SECRET_KEY'] = persistent_secret
 
 class Config:
-    VERSION = "1.0.99"
+    VERSION = "1.0.10"
     DEFAULT_PORT = 5050
     ACTIVE_PORT = None
 

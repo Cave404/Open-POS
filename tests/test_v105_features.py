@@ -36,18 +36,18 @@ def client():
 
 def test_v105_version_consistency(client):
     """Asserts that Config.VERSION and all template badges reflect active version."""
-    assert Config.VERSION in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99")
+    assert Config.VERSION in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99", "1.0.10", "v1.0.10")
 
     res_credits = client.get("/api/system/credits")
     assert res_credits.status_code == 200
-    assert res_credits.get_json()["version"] in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99")
+    assert res_credits.get_json()["version"] in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.99", "v1.0.99", "1.0.10", "v1.0.10")
 
     for route in ["/manager", "/manager/about", "/manager/branding", "/manager/configure_manager", "/manager/database", "/manager/logs"]:
         res = client.get(route)
         if res.status_code == 308:
             res = client.get(route + "/")
         assert res.status_code == 200
-        assert any(v in res.get_data(as_text=True) for v in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9"))
+        assert any(v in res.get_data(as_text=True) for v in ("v1.0.5", "v1.0.6", "v1.0.7", "v1.0.8", "v1.0.9", "1.0.10", "v1.0.10"))
 
 
 def test_setup_viewport_and_stepper_hygiene(client, monkeypatch):

@@ -1,5 +1,5 @@
 #define MyAppName "OpenPOS"
-#define MyAppVersion "1.0.99"
+#define MyAppVersion "1.0.10"
 #define MyAppPublisher "OpenPOS Platform"
 #define MyAppURL "https://github.com/Cave404/Open-POS"
 #define MyAppExeName "OpenPOS.exe"
